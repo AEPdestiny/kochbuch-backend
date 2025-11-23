@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.htwberlin.webtech.WebtechApplicationTests" tests="1" skipped="0" failures="0" errors="0" timestamp="2025-11-23T14:29:22.713Z" hostname="Mac" time="0.306">
+  <properties/>
+  <testcase name="contextLoads()" classname="de.htwberlin.webtech.WebtechApplicationTests" time="0.306"/>
+  <system-out><![CDATA[15:29:22.228 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [de.htwberlin.webtech.WebtechApplicationTests]: WebtechApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+15:29:22.260 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration de.htwberlin.webtech.WebtechApplication for test class de.htwberlin.webtech.WebtechApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.6)
+
+2025-11-23T15:29:22.386+01:00  INFO 7498 --- [webtech] [    Test worker] d.h.webtech.WebtechApplicationTests      : Starting WebtechApplicationTests using Java 21.0.6 with PID 7498 (started by salmadarwiche in /Users/salmadarwiche/Documents/2 Semester/Angewandte Programmierung/Projekt-1)
+2025-11-23T15:29:22.386+01:00  INFO 7498 --- [webtech] [    Test worker] d.h.webtech.WebtechApplicationTests      : No active profile set, falling back to 1 default profile: "default"
+2025-11-23T15:29:22.674+01:00  WARN 7498 --- [webtech] [    Test worker] ion$DefaultTemplateResolverConfiguration : Cannot find template location: classpath:/templates/ (please add some templates, check your Thymeleaf configuration, or set spring.thymeleaf.check-template-location=false)
+2025-11-23T15:29:22.709+01:00  INFO 7498 --- [webtech] [    Test worker] d.h.webtech.WebtechApplicationTests      : Started WebtechApplicationTests in 0.398 seconds (process running for 0.748)
+]]></system-out>
+  <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/Users/salmadarwiche/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.17.7/fbf3d6d649ed37fc9e9c59480a05be0a26e3c2da/byte-buddy-agent-1.17.7.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>
