@@ -11,4 +11,5 @@ RUN gradle build --no-daemon
 #
 FROM eclipse-temurin:21-jdk-jammy
 COPY --from=build /home/gradle/src/build/libs/webtech-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8080
 ENTRYPOINT ["'java","-jar","/app.jar"]
