@@ -5,4 +5,3 @@ die Inhalte werden dauerhaft gespeichert, sodass die Lieblingsrezepte immer verf
 
 Team:
 - Salma Darwiche - s0596829 - Salma.Darwiche@Student.HTW-Berlin.de
-- Malak Al-Baidhani - s0597416 - Malak.Al-Baidhani@Student.HTW-Berlin.de
