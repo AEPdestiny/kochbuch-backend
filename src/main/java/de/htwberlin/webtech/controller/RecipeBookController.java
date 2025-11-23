@@ -10,11 +10,14 @@ import java.util.List;
 @RestController
 public class RecipeBookController {
 
-    @GetMapping("/")
+    @GetMapping("/recipes")
     public ResponseEntity<List<Recipe>> home() {
         List<Recipe> data = List.of(
                 new Recipe("1", "Pasta Carbonara", "Pasta, Eier, Speck, Käse, Pfeffer", true),
-                new Recipe("2", "Tomatensuppe", "Tomaten, Zwiebeln, Knoblauch, Brühe", false)
+                new Recipe("2", "Tomatensuppe", "Tomaten, Zwiebeln, Knoblauch, Brühe", false),
+                new Recipe("3", "Tiramisu", "Mascarpone, Espresso, Löffelbiskuit, Eier, Kakao", true),
+                new Recipe("4", "Pizza Margherita", "Mehl, Tomaten, Mozzarella, Basilikum", false),
+                new Recipe("5", "Schnitzel Wiener Art", "Kalbsschnitzel, Paniermehl, Ei, Zitrone", false)
         );
         return ResponseEntity.ok(data);
     }
