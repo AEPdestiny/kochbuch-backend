@@ -3,7 +3,6 @@ COPY --chown=gradle:gradle . /home/gradle/src
 WORKDIR /home/gradle/src
 RUN gradle build --no-daemon -x test
 
-
 LABEL authors="salmadarwiche"
 
 FROM eclipse-temurin:21-jdk-jammy
