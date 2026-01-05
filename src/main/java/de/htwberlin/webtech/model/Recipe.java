@@ -22,6 +22,8 @@ public class Recipe {
     private String ingredients;
     private String instructions;
     private boolean favorite;
+    private boolean published;
+
 
     public Recipe() {
     }
@@ -36,7 +38,8 @@ public class Recipe {
                   double rating,
                   String ingredients,
                   String instructions,
-                  boolean favorite) {
+                  boolean favorite,
+                  boolean published) {
         this.title = title;
         this.imageUrl = imageUrl;
         this.prepTimeMinutes = prepTimeMinutes;
@@ -48,6 +51,7 @@ public class Recipe {
         this.ingredients = ingredients;
         this.instructions = instructions;
         this.favorite = favorite;
+        this.published = published;
     }
 
     public Long getId() {
@@ -128,5 +132,11 @@ public class Recipe {
     }
     public void setFavorite(boolean favorite) {
         this.favorite = favorite;
+    }
+    public boolean isPublished() {
+        return published;
+    }
+    public void setPublished(boolean published) {
+        this.published = published;
     }
 }

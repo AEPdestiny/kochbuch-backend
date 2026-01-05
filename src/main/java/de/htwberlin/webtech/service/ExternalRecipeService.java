@@ -60,7 +60,8 @@ public class ExternalRecipeService {
                 rating,
                 ingredients,
                 instructions,
-                favorite
+                favorite,
+                true
         );
     }
 }

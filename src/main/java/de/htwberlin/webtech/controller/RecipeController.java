@@ -34,6 +34,26 @@ public class RecipeController {
         return service.findAll();
     }
 
+    @GetMapping("/published")
+    public List<Recipe> getPublished() {
+        return service.findAllPublished();
+    }
+
+    @GetMapping("/{id}")
+    public Recipe getById(@PathVariable Long id) {
+        return service.findById(id);
+    }
+
+    @PutMapping("/{id}")
+    public Recipe update(@PathVariable Long id, @RequestBody Recipe recipe) {
+        return service.update(id, recipe);
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {
+        service.delete(id);
+    }
+
     @GetMapping("/external")
     public List<Recipe> getExternal() {
         return externalService.fetchExternalRecipes();
