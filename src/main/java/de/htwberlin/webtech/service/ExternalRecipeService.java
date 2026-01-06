@@ -12,7 +12,7 @@ import java.util.Map;
 public class ExternalRecipeService {
 
     private final RestTemplate restTemplate = new RestTemplate();
-    private static final String BASE_URL = "https://dummyjson.com/recipes?limit=20";
+    private static final String BASE_URL = "https://dummyjson.com/recipes?limit=0";
 
     public List<Recipe> fetchExternalRecipes() {
         Map response = restTemplate.getForObject(BASE_URL, Map.class);
