@@ -3,17 +3,25 @@ package de.htwberlin.webtech.service;
 import de.htwberlin.webtech.model.Recipe;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Service zum Laden und Umwandeln externer Rezepte aus einer API.
+ * Die Daten werden geholt und in Recipe-Modell gemappt.
+ */
 @Service
 public class ExternalRecipeService {
 
     private final RestTemplate restTemplate = new RestTemplate();
-    private static final String BASE_URL = "https://dummyjson.com/recipes?limit=0";
+    private static final String BASE_URL = "https://dummyjson.com/recipes?limit=0"; // URL der API, Rezepte ohne Limit
 
+    /**
+     * Ruft die API auf und wandelt die Antwort in eine Liste von Recipe-Objekten um.
+     *
+     * @return Liste externer Rezepte im internen Recipe-Format
+     */
     public List<Recipe> fetchExternalRecipes() {
         Map response = restTemplate.getForObject(BASE_URL, Map.class);
         if (response == null || !response.containsKey("recipes")) {
@@ -31,6 +39,12 @@ public class ExternalRecipeService {
         return result;
     }
 
+    /**
+     * Wandelt JSON-Rezept in ein Recipe-Objekt um.
+     *
+     * @param r Map mit den Eigenschaften eines Rezepts aus der API
+     * @return Recipe-Objekt mit passenden Feldern
+     */
     private Recipe mapToRecipe(Map<String, Object> r) {
         String title = (String) r.getOrDefault("name", "Unbekanntes Rezept");
         String imageUrl = (String) r.getOrDefault("image", "");

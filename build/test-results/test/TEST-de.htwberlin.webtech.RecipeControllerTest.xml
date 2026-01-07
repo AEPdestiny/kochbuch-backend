@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.htwberlin.webtech.RecipeControllerTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-01-07T00:56:58.640Z" hostname="Mac.fritz.box" time="0.105">
+  <properties/>
+  <testcase name="create_should_return_ok()" classname="de.htwberlin.webtech.RecipeControllerTest" time="0.077"/>
+  <testcase name="getAll_should_return_ok()" classname="de.htwberlin.webtech.RecipeControllerTest" time="0.008"/>
+  <testcase name="update_should_return_ok()" classname="de.htwberlin.webtech.RecipeControllerTest" time="0.004"/>
+  <testcase name="getPublished_should_return_ok()" classname="de.htwberlin.webtech.RecipeControllerTest" time="0.003"/>
+  <testcase name="delete_should_return_ok()" classname="de.htwberlin.webtech.RecipeControllerTest" time="0.005"/>
+  <testcase name="getById_should_return_ok()" classname="de.htwberlin.webtech.RecipeControllerTest" time="0.003"/>
+  <testcase name="getExternal_should_return_ok()" classname="de.htwberlin.webtech.RecipeControllerTest" time="0.002"/>
+  <system-out><![CDATA[01:56:57.698 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [de.htwberlin.webtech.RecipeControllerTest]: RecipeControllerTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+01:56:57.744 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration de.htwberlin.webtech.WebtechApplication for test class de.htwberlin.webtech.RecipeControllerTest
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.6)
+
+2026-01-07T01:56:57.870+01:00  INFO 71029 --- [webtech] [    Test worker] d.h.webtech.RecipeControllerTest         : Starting RecipeControllerTest using Java 21.0.6 with PID 71029 (started by salmadarwiche in /Users/salmadarwiche/Documents/2 Semester/Angewandte Programmierung/Projekt-1)
+2026-01-07T01:56:57.871+01:00  INFO 71029 --- [webtech] [    Test worker] d.h.webtech.RecipeControllerTest         : No active profile set, falling back to 1 default profile: "default"
+2026-01-07T01:56:58.605+01:00  WARN 71029 --- [webtech] [    Test worker] ion$DefaultTemplateResolverConfiguration : Cannot find template location: classpath:/templates/ (please add some templates, check your Thymeleaf configuration, or set spring.thymeleaf.check-template-location=false)
+2026-01-07T01:56:58.625+01:00  INFO 71029 --- [webtech] [    Test worker] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-01-07T01:56:58.625+01:00  INFO 71029 --- [webtech] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-01-07T01:56:58.626+01:00  INFO 71029 --- [webtech] [    Test worker] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 0 ms
+2026-01-07T01:56:58.637+01:00  INFO 71029 --- [webtech] [    Test worker] d.h.webtech.RecipeControllerTest         : Started RecipeControllerTest in 0.872 seconds (process running for 1.238)
+]]></system-out>
+  <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/Users/salmadarwiche/.gradle/caches/modules-2/files-2.1/net.bytebuddy/byte-buddy-agent/1.17.7/fbf3d6d649ed37fc9e9c59480a05be0a26e3c2da/byte-buddy-agent-1.17.7.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+]]></system-err>
+</testsuite>

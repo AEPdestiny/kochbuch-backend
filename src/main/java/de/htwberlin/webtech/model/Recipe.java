@@ -5,29 +5,33 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 
+/**
+ * Entität für ein Rezept.
+ * Wird direkt in der Datenbank als Tabelle gespeichert.
+ */
 @Entity
 public class Recipe {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    private String title;
-    private String imageUrl;
-    private int prepTimeMinutes;
-    private int cookTimeMinutes;
-    private int servings;
-    private String difficulty;
-    private String category;
-    private double rating;
-    private String ingredients;
-    private String instructions;
-    private boolean favorite;
-    private boolean published;
+    private Long id; //automatisch generierte ID
+    private String title; //Titel des Rezeptes
+    private String imageUrl; //URL zu einem Rezeptbild
+    private int prepTimeMinutes; //Vorbereitungszeit
+    private int cookTimeMinutes; //Koch-Backzeit
+    private int servings; //Anzahl der Portionen, für die das Rezept gedacht ist
+    private String difficulty; //Schwierigkeitsgrad des Rezeptes
+    private String category; //Kategorie oder Küche
+    private double rating; //Bewertungsdurchschnitt
+    private String ingredients; //Zutaten
+    private String instructions; //Schritt-für-Schritt-Anleitung
+    private boolean favorite; //Kennzeichnet, ob das Rezept vom Nutzer als Favorit markiert wurde
+    private boolean published; //Gibt an, ob das Rezept öffentlich im Frontend angezeigt werden soll
 
 
     public Recipe() {
     }
-
+    //Konstruktor
     public Recipe(String title,
                   String imageUrl,
                   int prepTimeMinutes,
@@ -53,7 +57,7 @@ public class Recipe {
         this.favorite = favorite;
         this.published = published;
     }
-
+    //Getter und Setter
     public Long getId() {
         return id; }
 
