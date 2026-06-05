@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.htwberlin.webtech.user.AppUserRepositoryIntegrationTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-05T19:36:44.199Z" hostname="DESKTOP-JTGLLC2" time="0.053">
+  <properties/>
+  <testcase name="should_reject_duplicate_username()" classname="de.htwberlin.webtech.user.AppUserRepositoryIntegrationTest" time="0.02"/>
+  <testcase name="should_save_app_user()" classname="de.htwberlin.webtech.user.AppUserRepositoryIntegrationTest" time="0.005"/>
+  <testcase name="should_find_app_user_by_email()" classname="de.htwberlin.webtech.user.AppUserRepositoryIntegrationTest" time="0.006"/>
+  <testcase name="should_reject_duplicate_email()" classname="de.htwberlin.webtech.user.AppUserRepositoryIntegrationTest" time="0.008"/>
+  <testcase name="should_find_app_user_by_username()" classname="de.htwberlin.webtech.user.AppUserRepositoryIntegrationTest" time="0.008"/>
+  <system-out><![CDATA[2026-06-05 21:36:44,213 WARN  [org.hibernate.orm.jdbc.error] (Test worker) HHH000247: ErrorCode: 0, SQLState: 23505
+2026-06-05 21:36:44,214 WARN  [org.hibernate.orm.jdbc.error] (Test worker) ERROR: duplicate key value violates unique constraint "app_user_username_key"
+  Detail: Key (username)=(duplicate-username) already exists.
+2026-06-05 21:36:44,241 WARN  [org.hibernate.orm.jdbc.error] (Test worker) HHH000247: ErrorCode: 0, SQLState: 23505
+2026-06-05 21:36:44,242 WARN  [org.hibernate.orm.jdbc.error] (Test worker) ERROR: duplicate key value violates unique constraint "app_user_email_key"
+  Detail: Key (email)=(duplicate-email@example.com) already exists.
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

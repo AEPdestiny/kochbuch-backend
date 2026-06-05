@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.htwberlin.webtech.auth.AuthServiceIntegrationTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-06-05T19:36:42.647Z" hostname="DESKTOP-JTGLLC2" time="1.464">
+  <properties/>
+  <testcase name="register_should_return_auth_response_with_token()" classname="de.htwberlin.webtech.auth.AuthServiceIntegrationTest" time="0.652"/>
+  <testcase name="register_should_fail_when_username_already_exists()" classname="de.htwberlin.webtech.auth.AuthServiceIntegrationTest" time="0.097"/>
+  <testcase name="register_should_persist_app_user()" classname="de.htwberlin.webtech.auth.AuthServiceIntegrationTest" time="0.109"/>
+  <testcase name="login_should_succeed_with_correct_credentials()" classname="de.htwberlin.webtech.auth.AuthServiceIntegrationTest" time="0.173"/>
+  <testcase name="register_should_fail_when_email_already_exists()" classname="de.htwberlin.webtech.auth.AuthServiceIntegrationTest" time="0.093"/>
+  <testcase name="login_should_fail_with_wrong_password()" classname="de.htwberlin.webtech.auth.AuthServiceIntegrationTest" time="0.169"/>
+  <testcase name="register_should_store_bcrypt_hash_instead_of_plain_password()" classname="de.htwberlin.webtech.auth.AuthServiceIntegrationTest" time="0.161"/>
+  <system-out><![CDATA[2026-06-05 21:36:37,471 INFO  [io.quarkus] (Test worker) webtech stopped in 0.023s
+2026-06-05 21:36:37,571 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Creating container for image: docker.io/library/postgres:18
+2026-06-05 21:36:37,671 INFO  [org.testcontainers.utility.RegistryAuthLocator] (ForkJoinPool.commonPool-worker-5) Credential helper/store (docker-credential-desktop) does not have credentials for docker.io
+2026-06-05 21:36:37,679 WARN  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Reuse was requested but the environment does not support the reuse of containers
+To enable reuse of containers, you must set 'testcontainers.reuse.enable=true' in a file located at C:\Users\ibrah\.testcontainers.properties
+2026-06-05 21:36:37,680 INFO  [tc.testcontainers/ryuk:0.14.0] (ForkJoinPool.commonPool-worker-5) Creating container for image: testcontainers/ryuk:0.14.0
+2026-06-05 21:36:37,904 INFO  [tc.testcontainers/ryuk:0.14.0] (ForkJoinPool.commonPool-worker-5) Container testcontainers/ryuk:0.14.0 is starting: 8d8feb71efedd9eb79c6dcd66225987543e5fa7428e2951da22ce3b8f29a0cd8
+2026-06-05 21:36:38,369 INFO  [tc.testcontainers/ryuk:0.14.0] (ForkJoinPool.commonPool-worker-5) Container testcontainers/ryuk:0.14.0 started in PT0.6884318S
+2026-06-05 21:36:38,435 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Container docker.io/library/postgres:18 is starting: c32a9832d7c6f8a4da6fa9780d0b3e16e2bdb8fe50951bddac5af867d026130d
+2026-06-05 21:36:40,331 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Container docker.io/library/postgres:18 started in PT2.7593196S
+2026-06-05 21:36:40,331 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Container is started (JDBC URL: jdbc:postgresql://localhost:51757/webtech_test?loggerLevel=OFF)
+2026-06-05 21:36:40,333 INFO  [io.quarkus.datasource.deployment.devservices.DevServicesDatasourceProcessor] (ForkJoinPool.commonPool-worker-5) Dev Services for default datasource (postgresql) started - container ID is c32a9832d7c6
+2026-06-05 21:36:42,641 INFO  [io.quarkus] (Test worker) webtech 0.0.1-SNAPSHOT on JVM (powered by Quarkus 3.35.2) started in 2.236s. Listening on: http://localhost:8081
+2026-06-05 21:36:42,641 INFO  [io.quarkus] (Test worker) Profile test activated. 
+2026-06-05 21:36:42,641 INFO  [io.quarkus] (Test worker) Installed features: [agroal, cdi, compose, hibernate-orm, hibernate-orm-panache, hibernate-validator, jdbc-postgresql, narayana-jta, rest, rest-jackson, security, smallrye-context-propagation, smallrye-jwt, smallrye-openapi, swagger-ui, vertx]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

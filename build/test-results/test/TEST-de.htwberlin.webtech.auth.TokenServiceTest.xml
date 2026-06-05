@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.htwberlin.webtech.auth.TokenServiceTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-06-05T19:36:35.874Z" hostname="DESKTOP-JTGLLC2" time="0.081">
+  <properties/>
+  <testcase name="should_create_token_with_expected_claims_and_expiration()" classname="de.htwberlin.webtech.auth.TokenServiceTest" time="0.081"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

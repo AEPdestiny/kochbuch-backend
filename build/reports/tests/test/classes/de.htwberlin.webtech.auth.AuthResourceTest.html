@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="x-ua-compatible" content="IE=edge"/>
+<title>Test results - AuthResourceTest</title>
+<link href="../css/base-style.css" rel="stylesheet" type="text/css"/>
+<link href="../css/style.css" rel="stylesheet" type="text/css"/>
+<script src="../js/report.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="content">
+<h1>AuthResourceTest</h1>
+<div class="breadcrumbs">
+<a href="../index.html">all</a> &gt; 
+<a href="../packages/de.htwberlin.webtech.auth.html">de.htwberlin.webtech.auth</a> &gt; AuthResourceTest</div>
+<div id="summary">
+<table>
+<tr>
+<td>
+<div class="summaryGroup">
+<table>
+<tr>
+<td>
+<div class="infoBox" id="tests">
+<div class="counter">6</div>
+<p>tests</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="failures">
+<div class="counter">0</div>
+<p>failures</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="ignored">
+<div class="counter">0</div>
+<p>ignored</p>
+</div>
+</td>
+<td>
+<div class="infoBox" id="duration">
+<div class="counter">4.423s</div>
+<p>duration</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</td>
+<td>
+<div class="infoBox success" id="successRate">
+<div class="percent">100%</div>
+<p>successful</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+<div class="tab-container">
+<ul class="tabLinks">
+<li>
+<a href="#">Tests</a>
+</li>
+<li>
+<a href="#">Standard output</a>
+</li>
+<li>
+<a href="#">Standard error</a>
+</li>
+</ul>
+<div class="tab">
+<h2>Tests</h2>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Duration</th>
+<th>Result</th>
+</tr>
+</thead>
+<tr>
+<td class="success">login_should_return_ok_with_token()</td>
+<td class="success">0.112s</td>
+<td class="success">passed</td>
+</tr>
+<tr>
+<td class="success">login_should_return_unauthorized_when_password_is_wrong()</td>
+<td class="success">0.103s</td>
+<td class="success">passed</td>
+</tr>
+<tr>
+<td class="success">me_should_return_current_user_with_valid_token()</td>
+<td class="success">0.234s</td>
+<td class="success">passed</td>
+</tr>
+<tr>
+<td class="success">me_should_return_unauthorized_without_token()</td>
+<td class="success">3.011s</td>
+<td class="success">passed</td>
+</tr>
+<tr>
+<td class="success">register_should_return_conflict_when_email_exists()</td>
+<td class="success">0.871s</td>
+<td class="success">passed</td>
+</tr>
+<tr>
+<td class="success">register_should_return_created_with_token()</td>
+<td class="success">0.092s</td>
+<td class="success">passed</td>
+</tr>
+</table>
+</div>
+<div class="tab">
+<h2>Standard output</h2>
+<span class="code">
+<pre id="class-stdout">2026-06-05 21:36:30,152 INFO  [org.hibernate.orm.jpa] (Test worker) HHH008540: Processing PersistenceUnitInfo [name: &lt;default&gt;]
+2026-06-05 21:36:30,281 INFO  [org.hibernate.orm.core] (Test worker) HHH000001: Hibernate ORM core version 7.3.2.Final
+2026-06-05 21:36:30,460 INFO  [org.hibernate.orm.connections.pooling] (Test worker) HHH10001005: Database info:
+	Database JDBC URL [undefined/unknown]
+	Database driver: undefined/unknown
+	Database dialect: PostgreSQLDialect
+	Database version: 13.0
+	Default catalog/schema: unknown/unknown
+	Autocommit mode: undefined/unknown
+	Isolation level: &lt;unknown&gt;
+	JDBC fetch size: undefined/unknown
+	Pool: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-06-05 21:36:30,612 INFO  [org.hibernate.validator.internal.util.Version] (Test worker) HV000001: Hibernate Validator 9.1.0.Final
+2026-06-05 21:36:31,379 INFO  [io.quarkus] (Test worker) webtech 0.0.1-SNAPSHOT on JVM (powered by Quarkus 3.35.2) started in 12.475s. Listening on: http://localhost:8081
+2026-06-05 21:36:31,380 INFO  [io.quarkus] (Test worker) Profile test activated. 
+2026-06-05 21:36:31,380 INFO  [io.quarkus] (Test worker) Installed features: [agroal, cdi, compose, hibernate-orm, hibernate-orm-panache, hibernate-validator, jdbc-postgresql, narayana-jta, rest, rest-jackson, security, smallrye-context-propagation, smallrye-jwt, smallrye-openapi, swagger-ui, vertx]
+</pre>
+<button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="class-stdout">Copy</button>
+</span>
+</div>
+<div class="tab">
+<h2>Standard error</h2>
+<span class="code">
+<pre id="class-stderr">Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (C:\Users\ibrah\.gradle\caches\modules-2\files-2.1\net.bytebuddy\byte-buddy-agent\1.18.8\ed5c6c9b3a146b4aa376df3b6770d6cabed20482\byte-buddy-agent-1.18.8.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+</pre>
+<button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="class-stderr">Copy</button>
+</span>
+</div>
+</div>
+<div id="footer">
+<p>
+<div>
+<label class="hidden" id="label-for-line-wrapping-toggle" for="line-wrapping-toggle">Wrap lines
+<input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
+</label>
+</div>Generated by 
+<a href="https://www.gradle.org">Gradle 9.1.0</a> at 05.06.2026, 21:36:45</p>
+</div>
+</div>
+</body>
+</html>
