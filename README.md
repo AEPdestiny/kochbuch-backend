@@ -382,6 +382,10 @@ Ohne Suchbegriff verwendet das Backend eine kleine Default-Suche. Die externen
 Rezeptdaten sind im MVP zunächst englisch, werden nicht in PostgreSQL
 gespeichert und gehören keinem Dishly-User.
 
+TheMealDB-Ergebnisse werden im Backend 15 Minuten in-memory pro Suchbegriff
+gecached. Der Cache reduziert externe API-Requests, wird aber bei einem
+Render-Neustart geleert und nicht extern gespeichert.
+
 `GET /recipes/{id}` ist öffentlich nur für veröffentlichte Rezepte sichtbar.
 Private oder unveröffentlichte Rezepte werden für fremde oder anonyme Nutzer als
 `404 Not Found` behandelt. Eigene Rezepte des eingeloggten Users können über
