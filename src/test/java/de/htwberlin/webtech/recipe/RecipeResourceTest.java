@@ -67,6 +67,57 @@ class RecipeResourceTest {
     }
 
     @Test
+    void getMine_should_return_unauthorized_without_token() {
+        doThrow(new UnauthorizedException("Missing or invalid Bearer token."))
+                .when(userContext).requireUser(null);
+
+        given()
+                .when().get("/recipes/mine")
+                .then()
+                .statusCode(401)
+                .body("status", equalTo(401))
+                .body("error", equalTo("Unauthorized"))
+                .body("message", equalTo("Missing or invalid Bearer token."))
+                .body("path", equalTo("/recipes/mine"));
+    }
+
+    @Test
+    void getMine_should_return_ok_with_token() {
+        AppUser currentUser = user();
+        Recipe mine = recipe("Mine");
+        mine.setOwner(currentUser);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(List.of(mine)).when(recipeService).findMine(currentUser);
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .when().get("/recipes/mine")
+                .then()
+                .statusCode(200)
+                .body("$", hasSize(1))
+                .body("[0].title", equalTo("Mine"));
+
+        verify(recipeService).findMine(currentUser);
+    }
+
+    @Test
+    void getMine_should_return_only_current_users_recipes() {
+        AppUser currentUser = user();
+        Recipe mine = recipe("Mine");
+        mine.setOwner(currentUser);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(List.of(mine)).when(recipeService).findMine(currentUser);
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .when().get("/recipes/mine")
+                .then()
+                .statusCode(200)
+                .body("$", hasSize(1))
+                .body("[0].title", equalTo("Mine"));
+    }
+
+    @Test
     void getExternal_should_return_ok() {
         doReturn(List.of(recipe("Ext"))).when(externalRecipeService).fetchExternalRecipes();
 

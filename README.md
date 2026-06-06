@@ -1,14 +1,14 @@
 # Dishly Smart Backend
 
-Quarkus-Backend fuer die Rezeptverwaltung. Das aktuelle MVP stellt die
+Quarkus-Backend für die Rezeptverwaltung. Das aktuelle MVP stellt die
 bestehende Recipe-API unter `/recipes` bereit und verwendet PostgreSQL mit
 Hibernate ORM/Panache. `POST /recipes`, `PUT /recipes/{id}` und
-`DELETE /recipes/{id}` benoetigen einen Bearer Token; Recipe-Read-Endpunkte
-bleiben oeffentlich.
+`DELETE /recipes/{id}` benötigen einen Bearer Token; Recipe-Read-Endpunkte
+bleiben öffentlich.
 
 ## Tests
 
-Alle Backend-Tests ausfuehren:
+Alle Backend-Tests ausführen:
 
 ```powershell
 .\gradlew.bat test
@@ -16,7 +16,7 @@ Alle Backend-Tests ausfuehren:
 
 Die normalen Unit- und Resource-Tests laufen ohne manuell konfigurierte lokale
 Datenbank. Die Datenbank-Integrationstests verwenden Quarkus Dev Services, um
-eine temporaere PostgreSQL-Datenbank fuer das Testprofil zu starten.
+eine temporäre PostgreSQL-Datenbank für das Testprofil zu starten.
 
 ## PostgreSQL-Integrationstests
 
@@ -27,40 +27,40 @@ src/test/java/de/htwberlin/webtech/recipe/RecipeRepositoryIntegrationTest.java
 src/test/java/de/htwberlin/webtech/user/AppUserRepositoryIntegrationTest.java
 ```
 
-Der `RecipeRepositoryIntegrationTest` prueft, dass Quarkus, Panache, PostgreSQL
-und die Entity `Recipe` fuer folgende Faelle zusammenarbeiten:
+Der `RecipeRepositoryIntegrationTest` prüft, dass Quarkus, Panache, PostgreSQL
+und die Entity `Recipe` für folgende Fälle zusammenarbeiten:
 
 - Rezept speichern
 - Rezept anhand der ID lesen
-- veroeffentlichte Rezepte filtern
-- Rezept loeschen
+- veröffentlichte Rezepte filtern
+- Rezept löschen
 
-Der `AppUserRepositoryIntegrationTest` prueft:
+Der `AppUserRepositoryIntegrationTest` prüft:
 
 - AppUser speichern
 - AppUser anhand der E-Mail lesen
 - AppUser anhand des Usernamens lesen
-- doppelte E-Mails ueber eine PostgreSQL-Unique-Constraint ablehnen
-- doppelte Usernames ueber eine PostgreSQL-Unique-Constraint ablehnen
+- doppelte E-Mails über eine PostgreSQL-Unique-Constraint ablehnen
+- doppelte Usernames über eine PostgreSQL-Unique-Constraint ablehnen
 
 Voraussetzung:
 
 - Docker Desktop muss installiert sein und laufen
 
 Quarkus Dev Services/Testcontainers startet und stoppt die PostgreSQL-
-Testdatenbank automatisch. Fuer diesen Test ist keine manuelle lokale
+Testdatenbank automatisch. Für diesen Test ist keine manuelle lokale
 PostgreSQL-Instanz erforderlich.
 
 ## Lokale Entwicklung
 
 Im Dev-Modus kann Quarkus Dev Services PostgreSQL ebenfalls automatisch
-bereitstellen, wenn Docker Desktop laeuft:
+bereitstellen, wenn Docker Desktop läuft:
 
 ```powershell
 .\gradlew.bat quarkusDev
 ```
 
-Fuer Produktion wird die Datenbank ausschliesslich ueber Environment Variables
+Für Produktion wird die Datenbank ausschließlich über Environment Variables
 konfiguriert:
 
 - `DB_URL`
@@ -75,16 +75,16 @@ Das Backend stellt JWT-basierte Authentifizierungsendpunkte bereit:
 - `POST /auth/login`
 - `GET /auth/me`
 
-Recipe-Endpunkte bleiben im aktuellen Schritt oeffentlich.
+Recipe-Endpunkte bleiben im aktuellen Schritt öffentlich.
 
 JWT-Konfiguration:
 
-- `JWT_SECRET`: HS256-Signatur-Secret. In Produktion einen langen, zufaelligen
+- `JWT_SECRET`: HS256-Signatur-Secret. In Produktion einen langen, zufälligen
   Wert verwenden.
 - `JWT_ISSUER`: Token-Issuer, Standardwert ist `dishly-smart`.
 - `JWT_EXPIRES_IN_SECONDS`: Token-Laufzeit, Standardwert ist `3600` Sekunden.
 
-Die Token-Laufzeit im MVP betraegt 1 Stunde.
+Die Token-Laufzeit im MVP beträgt 1 Stunde.
 
 ### Registrierung
 
@@ -99,7 +99,7 @@ Content-Type: application/json
 }
 ```
 
-Eine erfolgreiche Registrierung gibt `201 Created` zurueck und loggt den User
+Eine erfolgreiche Registrierung gibt `201 Created` zurück und loggt den User
 direkt ein:
 
 ```json
@@ -130,7 +130,7 @@ Content-Type: application/json
 ```
 
 Ein erfolgreicher Login gibt `200 OK` mit derselben `AuthResponse`-Struktur
-zurueck.
+zurück.
 
 ### Aktueller User
 
@@ -139,13 +139,67 @@ GET /auth/me
 Authorization: Bearer <jwt>
 ```
 
-Gibt `200 OK` mit dem aktuellen User zurueck. Fehlende oder ungueltige Tokens
-geben `401 Unauthorized` zurueck.
+Gibt `200 OK` mit dem aktuellen User zurück. Fehlende oder ungültige Tokens
+geben `401 Unauthorized` zurück.
+
+## Pantry-Endpunkte
+
+Die Pantry ist eine persönliche Vorratsverwaltung. Alle Pantry-Endpunkte
+benötigen einen Bearer Token. Nutzer sehen, ändern und löschen nur eigene
+Pantry Items.
+
+Eigene Pantry Items abrufen:
+
+```http
+GET /pantry/items
+Authorization: Bearer <jwt>
+```
+
+Pantry Item erstellen:
+
+```http
+POST /pantry/items
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "name": "Rice",
+  "quantity": 2,
+  "unit": "kg",
+  "category": "Grains"
+}
+```
+
+Eigenes Pantry Item aktualisieren:
+
+```http
+PUT /pantry/items/1
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "name": "Basmati Rice",
+  "quantity": 1.5,
+  "unit": "kg",
+  "category": "Grains"
+}
+```
+
+Eigenes Pantry Item löschen:
+
+```http
+DELETE /pantry/items/1
+Authorization: Bearer <jwt>
+```
+
+Fehlende oder ungültige Tokens geben `401 Unauthorized` zurück. Fremde Pantry
+Items geben bei `PUT` und `DELETE` `403 Forbidden` zurück. Nicht vorhandene
+Pantry Items geben `404 Not Found` zurück.
 
 ## Recipe-Write-Endpunkte
 
 Das Erstellen von Rezepten erfordert jetzt einen authentifizierten User. Das
-erstellte Rezept gehoert dem User aus dem Bearer Token.
+erstellte Rezept gehört dem User aus dem Bearer Token.
 
 ```http
 POST /recipes
@@ -169,7 +223,7 @@ Content-Type: application/json
 ```
 
 Das Aktualisieren von Rezepten erfordert ebenfalls Authentifizierung. Nur der
-Owner des Rezepts darf es aendern:
+Owner des Rezepts darf es ändern:
 
 ```http
 PUT /recipes/1
@@ -192,17 +246,31 @@ Content-Type: application/json
 }
 ```
 
-Das Loeschen von Rezepten erfordert ebenfalls Authentifizierung. Nur der Owner
-darf das Rezept loeschen:
+Das Löschen von Rezepten erfordert ebenfalls Authentifizierung. Nur der Owner
+darf das Rezept löschen:
 
 ```http
 DELETE /recipes/1
 Authorization: Bearer <jwt>
 ```
 
-Oeffentliche Recipe-Read-Endpunkte benoetigen keinen Token:
+Eigene Rezepte des eingeloggten Users können über einen geschützten
+Read-Endpunkt abgerufen werden:
+
+```http
+GET /recipes/mine
+Authorization: Bearer <jwt>
+```
+
+Öffentliche Recipe-Read-Endpunkte benötigen keinen Token:
 
 - `GET /recipes`
 - `GET /recipes/published`
 - `GET /recipes/{id}`
 - `GET /recipes/external`
+
+## Smoke-Test
+
+Eine manuelle Smoke-Test-Checkliste befindet sich im Frontend-Projekt unter:
+
+`../kochbuch-frontend/docs/SMOKE_TEST.md`

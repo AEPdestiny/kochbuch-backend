@@ -92,6 +92,31 @@ class RecipeRepositoryIntegrationTest {
         assertEquals("recipe-owner@example.com", found.getOwner().getEmail());
     }
 
+    @Test
+    @TestTransaction
+    void should_find_recipes_by_owner() {
+        AppUser owner = user("mine-owner", "mine-owner@example.com");
+        AppUser other = user("other-owner", "other-owner@example.com");
+        userRepository.persist(owner);
+        userRepository.persist(other);
+
+        Recipe mine = recipe("Mine", true);
+        mine.setOwner(owner);
+        Recipe otherRecipe = recipe("Other", true);
+        otherRecipe.setOwner(other);
+        Recipe legacy = recipe("Legacy", true);
+        repository.persist(mine);
+        repository.persist(otherRecipe);
+        repository.persist(legacy);
+        repository.flush();
+
+        var result = repository.findByOwner(owner);
+
+        assertEquals(1, result.size());
+        assertEquals("Mine", result.get(0).getTitle());
+        assertEquals(owner.getEmail(), result.get(0).getOwner().getEmail());
+    }
+
     private Recipe recipe(String title, boolean published) {
         return new Recipe(
                 title,

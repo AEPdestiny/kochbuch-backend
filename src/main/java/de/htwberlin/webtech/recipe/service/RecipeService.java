@@ -46,6 +46,10 @@ public class RecipeService {
         return repo.findPublished();
     }
 
+    public List<Recipe> findMine(AppUser currentUser) {
+        return repo.findByOwner(currentUser);
+    }
+
     public Recipe findById(Long id) {
         Recipe recipe = repo.findById(id);
         if (recipe == null) {

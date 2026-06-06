@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="de.htwberlin.webtech.recipe.RecipeServiceTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-06-05T19:36:44.414Z" hostname="DESKTOP-JTGLLC2" time="0.033">
+<testsuite name="de.htwberlin.webtech.recipe.RecipeServiceTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-06-06T01:28:38.269Z" hostname="DESKTOP-JTGLLC2" time="0.031">
   <properties/>
-  <testcase name="findAll should delegate to repository" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.011"/>
+  <testcase name="findAll should delegate to repository" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.005"/>
   <testcase name="update should copy fields and return managed entity" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.002"/>
-  <testcase name="update with owner should reject legacy recipe without owner" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.002"/>
-  <testcase name="delete with owner should reject legacy recipe without owner" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.002"/>
-  <testcase name="create with owner should set owner and persist" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.002"/>
+  <testcase name="findMine should call repo.findByOwner" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.003"/>
+  <testcase name="update with owner should reject legacy recipe without owner" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.001"/>
+  <testcase name="delete with owner should reject legacy recipe without owner" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.001"/>
+  <testcase name="create with owner should set owner and persist" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.0"/>
   <testcase name="delete with owner should allow owner" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.002"/>
-  <testcase name="delete with owner should reject different user" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.001"/>
+  <testcase name="delete with owner should reject different user" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.002"/>
   <testcase name="delete should delegate to repo.deleteById" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.001"/>
   <testcase name="update with owner should allow owner" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.001"/>
   <testcase name="findById should throw when recipe not found" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.002"/>
-  <testcase name="create should throw IllegalArgumentException when title is empty" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.001"/>
+  <testcase name="create should throw IllegalArgumentException when title is empty" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.002"/>
   <testcase name="update with owner should reject different user" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.002"/>
   <testcase name="findAllPublished should call repo.findPublished" classname="de.htwberlin.webtech.recipe.RecipeServiceTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>

@@ -11,32 +11,32 @@ Akzeptiert
 ## Kontext
 
 Dishly Smart hat eine JWT-basierte Authentifizierung. Rezepte sind aktuell
-nicht einem User zugeordnet und alle Recipe-Endpunkte sind oeffentlich.
-Schreiboperationen sollen schrittweise geschuetzt werden, ohne bestehende
-oeffentliche Read-Endpunkte zu brechen.
+nicht einem User zugeordnet und alle Recipe-Endpunkte sind öffentlich.
+Schreiboperationen sollen schrittweise geschützt werden, ohne bestehende
+öffentliche Read-Endpunkte zu brechen.
 
 ## Entscheidung
 
 - `GET /recipes`, `GET /recipes/published`, `GET /recipes/{id}` und
-  `GET /recipes/external` bleiben zunaechst oeffentlich.
-- `POST /recipes` wird als erster Schritt geschuetzt.
-- Neue Rezepte gehoeren dem eingeloggten User.
+  `GET /recipes/external` bleiben zunächst öffentlich.
+- `POST /recipes` wird als erster Schritt geschützt.
+- Neue Rezepte gehören dem eingeloggten User.
 - `PUT /recipes/{id}` und `DELETE /recipes/{id}` bleiben in diesem Schritt
-  noch unveraendert.
-- Owner-basierte Aendern-/Loeschen-Regeln folgen in einem spaeteren Schritt.
-- Admin-Logik bleibt optional fuer spaeter.
+  noch unverändert.
+- Owner-basierte Ändern-/Löschen-Regeln folgen in einem späteren Schritt.
+- Admin-Logik bleibt optional für später.
 
 ## Konsequenzen
 
-- `Recipe` erhaelt eine nullable Beziehung `owner` zu `AppUser`.
+- `Recipe` erhält eine nullable Beziehung `owner` zu `AppUser`.
 - Bestehende Rezepte ohne Owner bleiben lesbar.
-- Create-Requests benoetigen einen Bearer Token.
+- Create-Requests benötigen einen Bearer Token.
 - Die JSON-Struktur der Recipe API bleibt kompatibel.
 
 ## Risiken
 
-- Bestehende Rezepte ohne Owner muessen spaeter bei PUT/DELETE bewusst
+- Bestehende Rezepte ohne Owner müssen später bei PUT/DELETE bewusst
   behandelt werden.
-- Frontend muss fuer Create spaeter einen Token mitsenden.
-- Eine produktionsreife Datenmigration sollte spaeter mit Flyway/Liquibase
+- Frontend muss für Create später einen Token mitsenden.
+- Eine produktionsreife Datenmigration sollte später mit Flyway/Liquibase
   erfolgen.

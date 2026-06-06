@@ -56,6 +56,22 @@ class RecipeServiceTest {
     }
 
     @Test
+    @DisplayName("findMine should call repo.findByOwner")
+    void findMine_should_call_findByOwner() {
+        var owner = user(1L, "owner@example.com");
+        var mine = recipe("Mine");
+        mine.setOwner(owner);
+        doReturn(List.of(mine)).when(repo).findByOwner(owner);
+
+        var result = underTest.findMine(owner);
+
+        verify(repo).findByOwner(owner);
+        verifyNoMoreInteractions(repo);
+        assertEquals(1, result.size());
+        assertSame(owner, result.get(0).getOwner());
+    }
+
+    @Test
     @DisplayName("create should throw IllegalArgumentException when title is empty")
     void create_should_throw_when_title_empty() {
         var recipe = new Recipe("", "", 0, 0, 0,

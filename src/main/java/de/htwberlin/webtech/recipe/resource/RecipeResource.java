@@ -78,6 +78,15 @@ public class RecipeResource {
     }
 
     @GET
+    @Path("/mine")
+    @Operation(summary = "List own recipes", description = "Returns recipes owned by the authenticated user.")
+    @APIResponse(responseCode = "200", description = "Own recipes returned")
+    @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
+    public List<RecipeResponse> getMine(@HeaderParam("Authorization") String authorizationHeader) {
+        return mapper.toResponseList(service.findMine(userContext.requireUser(authorizationHeader)));
+    }
+
+    @GET
     @Path("/{id}")
     @Operation(summary = "Get recipe by id", description = "Returns one recipe by its technical id.")
     @APIResponse(responseCode = "200", description = "Recipe returned")
