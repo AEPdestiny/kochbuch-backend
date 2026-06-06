@@ -2,7 +2,7 @@ package de.htwberlin.webtech.recipe;
 
 import de.htwberlin.webtech.recipe.entity.Recipe;
 import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
-import de.htwberlin.webtech.recipe.service.ExternalRecipeService;
+import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
 import de.htwberlin.webtech.recipe.service.RecipeService;
 import de.htwberlin.webtech.security.UserContext;
 import de.htwberlin.webtech.shared.exception.ForbiddenException;
@@ -123,13 +123,28 @@ class RecipeResourceTest {
 
     @Test
     void getExternal_should_return_ok() {
-        doReturn(List.of(recipe("Ext"))).when(externalRecipeService).fetchExternalRecipes();
+        doReturn(List.of(recipe("Ext"))).when(externalRecipeService).fetchExternalRecipes(null);
 
         given()
                 .when().get("/recipes/external")
                 .then()
                 .statusCode(200)
                 .body("$", hasSize(1));
+    }
+
+    @Test
+    void getExternal_should_pass_search_query() {
+        doReturn(List.of(recipe("Pasta"))).when(externalRecipeService).fetchExternalRecipes("pasta");
+
+        given()
+                .queryParam("search", "pasta")
+                .when().get("/recipes/external")
+                .then()
+                .statusCode(200)
+                .body("$", hasSize(1))
+                .body("[0].title", equalTo("Pasta"));
+
+        verify(externalRecipeService).fetchExternalRecipes("pasta");
     }
 
     @Test

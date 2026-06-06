@@ -371,6 +371,17 @@ veröffentlichte Rezepte:
 - `GET /recipes/published`
 - `GET /recipes/external`
 
+`GET /recipes/external` lädt externe Rezepte über TheMealDB. Optional kann ein
+Suchbegriff übergeben werden:
+
+```http
+GET /recipes/external?search=pasta
+```
+
+Ohne Suchbegriff verwendet das Backend eine kleine Default-Suche. Die externen
+Rezeptdaten sind im MVP zunächst englisch, werden nicht in PostgreSQL
+gespeichert und gehören keinem Dishly-User.
+
 `GET /recipes/{id}` ist öffentlich nur für veröffentlichte Rezepte sichtbar.
 Private oder unveröffentlichte Rezepte werden für fremde oder anonyme Nutzer als
 `404 Not Found` behandelt. Eigene Rezepte des eingeloggten Users können über

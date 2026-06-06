@@ -2,8 +2,8 @@ package de.htwberlin.webtech.recipe.resource;
 
 import de.htwberlin.webtech.recipe.dto.RecipeRequest;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
+import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
 import de.htwberlin.webtech.recipe.mapper.RecipeMapper;
-import de.htwberlin.webtech.recipe.service.ExternalRecipeService;
 import de.htwberlin.webtech.recipe.service.RecipeService;
 import de.htwberlin.webtech.security.UserContext;
 import jakarta.ws.rs.DELETE;
@@ -13,6 +13,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
@@ -128,9 +129,9 @@ public class RecipeResource {
 
     @GET
     @Path("/external")
-    @Operation(summary = "List external recipes", description = "Returns recipes fetched from the currently configured external source.")
+    @Operation(summary = "List external recipes", description = "Returns recipes fetched from TheMealDB. Optional search query filters the external source.")
     @APIResponse(responseCode = "200", description = "External recipes returned")
-    public List<RecipeResponse> getExternal() {
-        return mapper.toResponseList(externalService.fetchExternalRecipes());
+    public List<RecipeResponse> getExternal(@QueryParam("search") String search) {
+        return mapper.toResponseList(externalService.fetchExternalRecipes(search));
     }
 }
