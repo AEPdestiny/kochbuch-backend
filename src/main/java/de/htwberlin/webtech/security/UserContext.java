@@ -22,4 +22,15 @@ public class UserContext {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UnauthorizedException("Authenticated user could not be found."));
     }
+
+    public AppUser currentUserOrNull(String authorizationHeader) {
+        if (authorizationHeader == null || authorizationHeader.isBlank()) {
+            return null;
+        }
+        try {
+            return requireUser(authorizationHeader);
+        } catch (UnauthorizedException exception) {
+            return null;
+        }
+    }
 }

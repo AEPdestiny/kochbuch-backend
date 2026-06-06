@@ -39,7 +39,7 @@ public class RecipeService {
     }
 
     public List<Recipe> findAll() {
-        return repo.listAll();
+        return findAllPublished();
     }
 
     public List<Recipe> findAllPublished() {
@@ -56,6 +56,14 @@ public class RecipeService {
             throw new RecipeNotFoundException(id);
         }
         return recipe;
+    }
+
+    public Recipe findVisibleById(Long id, AppUser currentUser) {
+        Recipe recipe = findById(id);
+        if (recipe.isPublished() || isOwner(recipe, currentUser)) {
+            return recipe;
+        }
+        throw new RecipeNotFoundException(id);
     }
 
     @Transactional
@@ -108,8 +116,15 @@ public class RecipeService {
         if (recipe.getOwner() == null) {
             throw new ForbiddenException("Only the recipe owner may access this recipe.");
         }
-        if (currentUser == null || currentUser.getId() == null || !currentUser.getId().equals(recipe.getOwner().getId())) {
+        if (!isOwner(recipe, currentUser)) {
             throw new ForbiddenException("Only the recipe owner may access this recipe.");
         }
+    }
+
+    private boolean isOwner(Recipe recipe, AppUser currentUser) {
+        return recipe.getOwner() != null
+                && currentUser != null
+                && currentUser.getId() != null
+                && currentUser.getId().equals(recipe.getOwner().getId());
     }
 }

@@ -27,15 +27,15 @@ class RecipeServiceTest {
     private final RecipeService underTest = new RecipeService(repo, new RecipeMapper());
 
     @Test
-    @DisplayName("findAll should delegate to repository")
-    void findAll_should_delegate_to_repository() {
+    @DisplayName("findAll should return only published recipes")
+    void findAll_should_return_only_published_recipes() {
         var r1 = recipe("Pasta");
         var r2 = recipe("Soup");
-        doReturn(List.of(r1, r2)).when(repo).listAll();
+        doReturn(List.of(r1, r2)).when(repo).findPublished();
 
         var result = underTest.findAll();
 
-        verify(repo).listAll();
+        verify(repo).findPublished();
         verifyNoMoreInteractions(repo);
         assertEquals(2, result.size());
     }
@@ -106,6 +106,62 @@ class RecipeServiceTest {
 
         assertTrue(thrown.getMessage().contains("Recipe with ID " + id));
         verify(repo).findById(id);
+        verifyNoMoreInteractions(repo);
+    }
+
+    @Test
+    @DisplayName("findVisibleById should allow published recipe without user")
+    void findVisibleById_should_allow_published_recipe_without_user() {
+        var published = recipe("Published");
+        doReturn(published).when(repo).findById(1L);
+
+        var result = underTest.findVisibleById(1L, null);
+
+        verify(repo).findById(1L);
+        verifyNoMoreInteractions(repo);
+        assertSame(published, result);
+    }
+
+    @Test
+    @DisplayName("findVisibleById should hide private recipe without user")
+    void findVisibleById_should_hide_private_recipe_without_user() {
+        var privateRecipe = recipe("Private");
+        privateRecipe.setPublished(false);
+        doReturn(privateRecipe).when(repo).findById(1L);
+
+        assertThrows(RecipeNotFoundException.class, () -> underTest.findVisibleById(1L, null));
+
+        verify(repo).findById(1L);
+        verifyNoMoreInteractions(repo);
+    }
+
+    @Test
+    @DisplayName("findVisibleById should allow private recipe for owner")
+    void findVisibleById_should_allow_private_recipe_for_owner() {
+        var owner = user(1L, "owner@example.com");
+        var privateRecipe = recipe("Private");
+        privateRecipe.setPublished(false);
+        privateRecipe.setOwner(owner);
+        doReturn(privateRecipe).when(repo).findById(1L);
+
+        var result = underTest.findVisibleById(1L, owner);
+
+        verify(repo).findById(1L);
+        verifyNoMoreInteractions(repo);
+        assertSame(privateRecipe, result);
+    }
+
+    @Test
+    @DisplayName("findVisibleById should hide private recipe from other user")
+    void findVisibleById_should_hide_private_recipe_from_other_user() {
+        var privateRecipe = recipe("Private");
+        privateRecipe.setPublished(false);
+        privateRecipe.setOwner(user(1L, "owner@example.com"));
+        doReturn(privateRecipe).when(repo).findById(1L);
+
+        assertThrows(RecipeNotFoundException.class, () -> underTest.findVisibleById(1L, user(2L, "other@example.com")));
+
+        verify(repo).findById(1L);
         verifyNoMoreInteractions(repo);
     }
 

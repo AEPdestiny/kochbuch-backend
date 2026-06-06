@@ -59,7 +59,7 @@ public class RecipeResource {
     }
 
     @GET
-    @Operation(summary = "List recipes", description = "Returns all stored recipes.")
+    @Operation(summary = "List public recipes", description = "Returns recipes marked as published.")
     @APIResponse(
             responseCode = "200",
             description = "Recipes returned",
@@ -91,8 +91,11 @@ public class RecipeResource {
     @Operation(summary = "Get recipe by id", description = "Returns one recipe by its technical id.")
     @APIResponse(responseCode = "200", description = "Recipe returned")
     @APIResponse(responseCode = "404", description = "Recipe not found")
-    public RecipeResponse getById(@PathParam("id") Long id) {
-        return mapper.toResponse(service.findById(id));
+    public RecipeResponse getById(@PathParam("id") Long id, @HeaderParam("Authorization") String authorizationHeader) {
+        return mapper.toResponse(service.findVisibleById(
+                id,
+                userContext.currentUserOrNull(authorizationHeader)
+        ));
     }
 
     @PUT

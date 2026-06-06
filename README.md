@@ -4,7 +4,7 @@ Quarkus-Backend für die Rezeptverwaltung. Das aktuelle MVP stellt die
 bestehende Recipe-API unter `/recipes` bereit und verwendet PostgreSQL mit
 Hibernate ORM/Panache. `POST /recipes`, `PUT /recipes/{id}` und
 `DELETE /recipes/{id}` benötigen einen Bearer Token; Recipe-Read-Endpunkte
-bleiben öffentlich.
+bleiben für veröffentlichte Rezepte öffentlich.
 
 ## Tests
 
@@ -120,10 +120,15 @@ Recipe-Endpunkte bleiben im aktuellen Schritt öffentlich.
 
 JWT-Konfiguration:
 
-- `JWT_SECRET`: HS256-Signatur-Secret. In Produktion einen langen, zufälligen
-  Wert verwenden.
+- `JWT_SECRET`: HS256-Signatur-Secret. In Production ist diese Environment
+  Variable Pflicht. Der Wert muss mindestens 32 Zeichen lang sein. Fehlt
+  `JWT_SECRET` oder ist der Wert zu kurz, bricht der Backend-Start ab.
 - `JWT_ISSUER`: Token-Issuer, Standardwert ist `dishly-smart`.
 - `JWT_EXPIRES_IN_SECONDS`: Token-Laufzeit, Standardwert ist `3600` Sekunden.
+
+Im Dev- und Test-Profil ist ein lokales Default-Secret hinterlegt, damit die
+Anwendung ohne zusätzliche Konfiguration lokal gestartet werden kann. Dieses
+Default-Secret darf nicht für Production verwendet werden.
 
 Die Token-Laufzeit im MVP beträgt 1 Stunde.
 
@@ -359,12 +364,17 @@ GET /recipes/mine
 Authorization: Bearer <jwt>
 ```
 
-Öffentliche Recipe-Read-Endpunkte benötigen keinen Token:
+Öffentliche Recipe-Read-Endpunkte benötigen keinen Token, liefern aber nur
+veröffentlichte Rezepte:
 
 - `GET /recipes`
 - `GET /recipes/published`
-- `GET /recipes/{id}`
 - `GET /recipes/external`
+
+`GET /recipes/{id}` ist öffentlich nur für veröffentlichte Rezepte sichtbar.
+Private oder unveröffentlichte Rezepte werden für fremde oder anonyme Nutzer als
+`404 Not Found` behandelt. Eigene Rezepte des eingeloggten Users können über
+`GET /recipes/mine` abgerufen werden.
 
 ## Smoke-Test
 

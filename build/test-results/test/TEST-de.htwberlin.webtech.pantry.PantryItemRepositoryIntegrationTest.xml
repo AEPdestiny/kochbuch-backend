@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="de.htwberlin.webtech.pantry.PantryItemRepositoryIntegrationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-06-06T01:28:37.671Z" hostname="DESKTOP-JTGLLC2" time="0.104">
-  <properties/>
-  <testcase name="should_delete_pantry_item()" classname="de.htwberlin.webtech.pantry.PantryItemRepositoryIntegrationTest" time="0.058"/>
-  <testcase name="should_find_pantry_items_by_owner()" classname="de.htwberlin.webtech.pantry.PantryItemRepositoryIntegrationTest" time="0.032"/>
-  <testcase name="should_save_pantry_item()" classname="de.htwberlin.webtech.pantry.PantryItemRepositoryIntegrationTest" time="0.01"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

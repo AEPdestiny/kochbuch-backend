@@ -45,7 +45,7 @@ class RecipeResourceTest {
     }
 
     @Test
-    void getAll_should_return_ok() {
+    void getAll_should_return_only_published_recipes() {
         doReturn(List.of(recipe("Pasta"), recipe("Soup"))).when(recipeService).findAll();
 
         given()
@@ -53,10 +53,12 @@ class RecipeResourceTest {
                 .then()
                 .statusCode(200)
                 .body("$", hasSize(2));
+
+        verify(recipeService).findAll();
     }
 
     @Test
-    void getPublished_should_return_ok() {
+    void getPublished_should_return_only_published_recipes() {
         doReturn(List.of(recipe("Cake"))).when(recipeService).findAllPublished();
 
         given()
@@ -64,6 +66,8 @@ class RecipeResourceTest {
                 .then()
                 .statusCode(200)
                 .body("$", hasSize(1));
+
+        verify(recipeService).findAllPublished();
     }
 
     @Test
@@ -129,14 +133,66 @@ class RecipeResourceTest {
     }
 
     @Test
-    void getById_should_return_ok() {
-        doReturn(recipe("Pasta")).when(recipeService).findById(1L);
+    void getById_should_return_published_recipe_without_token() {
+        doReturn(recipe("Pasta")).when(recipeService).findVisibleById(1L, null);
 
         given()
                 .when().get("/recipes/1")
                 .then()
                 .statusCode(200)
                 .body("title", equalTo("Pasta"));
+    }
+
+    @Test
+    void getById_should_return_not_found_for_private_recipe_without_token() {
+        doThrow(new RecipeNotFoundException(2L))
+                .when(recipeService).findVisibleById(2L, null);
+
+        given()
+                .when().get("/recipes/2")
+                .then()
+                .statusCode(404)
+                .body("status", equalTo(404))
+                .body("error", equalTo("Not Found"))
+                .body("message", equalTo("Recipe with ID 2 not found."))
+                .body("path", equalTo("/recipes/2"));
+    }
+
+    @Test
+    void getById_should_return_private_recipe_for_owner_token() {
+        AppUser owner = user();
+        Recipe privateRecipe = recipe("Private");
+        privateRecipe.setPublished(false);
+        privateRecipe.setOwner(owner);
+        doReturn(owner).when(userContext).currentUserOrNull("Bearer owner-token");
+        doReturn(privateRecipe).when(recipeService).findVisibleById(3L, owner);
+
+        given()
+                .header("Authorization", "Bearer owner-token")
+                .when().get("/recipes/3")
+                .then()
+                .statusCode(200)
+                .body("title", equalTo("Private"))
+                .body("published", equalTo(false));
+    }
+
+    @Test
+    void getById_should_return_not_found_for_private_recipe_with_foreign_token() {
+        AppUser foreignUser = user();
+        foreignUser.setId(2L);
+        doReturn(foreignUser).when(userContext).currentUserOrNull("Bearer foreign-token");
+        doThrow(new RecipeNotFoundException(4L))
+                .when(recipeService).findVisibleById(4L, foreignUser);
+
+        given()
+                .header("Authorization", "Bearer foreign-token")
+                .when().get("/recipes/4")
+                .then()
+                .statusCode(404)
+                .body("status", equalTo(404))
+                .body("error", equalTo("Not Found"))
+                .body("message", equalTo("Recipe with ID 4 not found."))
+                .body("path", equalTo("/recipes/4"));
     }
 
     @Test
@@ -396,7 +452,7 @@ class RecipeResourceTest {
     @Test
     void getById_should_return_not_found_when_recipe_missing() {
         doThrow(new RecipeNotFoundException(99L))
-                .when(recipeService).findById(99L);
+                .when(recipeService).findVisibleById(99L, null);
 
         given()
                 .when().get("/recipes/99")
