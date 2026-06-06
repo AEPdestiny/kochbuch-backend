@@ -3,8 +3,10 @@ COPY --chown=gradle:gradle . /home/gradle/src
 WORKDIR /home/gradle/src
 RUN gradle build --no-daemon -x test
 
-LABEL authors="salmadarwiche"
+LABEL authors="salmadarwiche,ibrahimdanisman"
 
-FROM eclipse-temurin:21-jdk-jammy
-COPY --from=build /home/gradle/src/build/libs/webtech-0.0.1-SNAPSHOT.jar app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+COPY --from=build /home/gradle/src/build/quarkus-app/ /app/
+EXPOSE 8080
+ENTRYPOINT ["java","-Dquarkus.profile=prod","-jar","/app/quarkus-run.jar"]

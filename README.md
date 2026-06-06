@@ -67,6 +67,47 @@ konfiguriert:
 - `DB_USER`
 - `DB_PASSWORD`
 
+Für Production-CORS wird die erlaubte Frontend-Origin ebenfalls über eine
+Environment Variable konfiguriert:
+
+- `CORS_ORIGINS`
+
+Beispiel:
+
+```text
+CORS_ORIGINS=https://deine-frontend-url.onrender.com
+```
+
+## Lokaler Docker-Start
+
+Das Backend kann als Docker-Container gebaut werden. Der Container verwendet
+die Quarkus Fast-JAR-Struktur aus `build/quarkus-app` und startet im
+Production-Profil.
+
+Image bauen:
+
+```powershell
+docker build -t dishly-backend .
+```
+
+Container mit Production-Environment-Variables starten:
+
+```powershell
+docker run --rm -p 8080:8080 `
+  -e DB_URL="jdbc:postgresql://host.docker.internal:5433/dishly_prod_test" `
+  -e DB_USER="dishly" `
+  -e DB_PASSWORD="dishly" `
+  -e JWT_SECRET="local-prod-test-secret-local-prod-test-secret-123456" `
+  -e JWT_ISSUER="dishly-smart" `
+  -e JWT_EXPIRES_IN_SECONDS="3600" `
+  -e CORS_ORIGINS="http://localhost:5173" `
+  dishly-backend
+```
+
+Unter Windows und macOS kann `host.docker.internal` verwendet werden, damit der
+Container eine PostgreSQL-Instanz auf dem Host erreicht. Der Beispielport
+`5433` passt zu einer lokalen Testdatenbank, die außerhalb des Containers läuft.
+
 ## Authentifizierung
 
 Das Backend stellt JWT-basierte Authentifizierungsendpunkte bereit:
@@ -196,6 +237,62 @@ Fehlende oder ungültige Tokens geben `401 Unauthorized` zurück. Fremde Pantry
 Items geben bei `PUT` und `DELETE` `403 Forbidden` zurück. Nicht vorhandene
 Pantry Items geben `404 Not Found` zurück.
 
+## Shopping-List-Endpunkte
+
+Die Einkaufsliste ist eine persönliche manuelle Liste. Alle Shopping-List-
+Endpunkte benötigen einen Bearer Token. Nutzer sehen, ändern und löschen nur
+eigene Shopping List Items.
+
+Eigene Shopping List Items abrufen:
+
+```http
+GET /shopping-list/items
+Authorization: Bearer <jwt>
+```
+
+Shopping List Item erstellen:
+
+```http
+POST /shopping-list/items
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "name": "Tomatoes",
+  "quantity": 3,
+  "unit": "piece",
+  "category": "Vegetables",
+  "checked": false
+}
+```
+
+Eigenes Shopping List Item aktualisieren:
+
+```http
+PUT /shopping-list/items/1
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "name": "Cherry Tomatoes",
+  "quantity": 5,
+  "unit": "piece",
+  "category": "Vegetables",
+  "checked": true
+}
+```
+
+Eigenes Shopping List Item löschen:
+
+```http
+DELETE /shopping-list/items/1
+Authorization: Bearer <jwt>
+```
+
+Fehlende oder ungültige Tokens geben `401 Unauthorized` zurück. Fremde Shopping
+List Items geben bei `PUT` und `DELETE` `403 Forbidden` zurück. Nicht vorhandene
+Shopping List Items geben `404 Not Found` zurück.
+
 ## Recipe-Write-Endpunkte
 
 Das Erstellen von Rezepten erfordert jetzt einen authentifizierten User. Das
@@ -274,3 +371,11 @@ Authorization: Bearer <jwt>
 Eine manuelle Smoke-Test-Checkliste befindet sich im Frontend-Projekt unter:
 
 `../kochbuch-frontend/docs/SMOKE_TEST.md`
+
+Eine lokale Docker-Run-Testanleitung befindet sich unter:
+
+`docs/DOCKER_RUN_TEST.md`
+
+Eine Deployment-Anleitung für Vercel, Koyeb und Neon befindet sich unter:
+
+`docs/DEPLOYMENT_VERCEL_KOYEB_NEON.md`

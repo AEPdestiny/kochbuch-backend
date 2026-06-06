@@ -1,0 +1,12 @@
+.gradle
+build
+.idea
+.vscode
+.docker-test-config
+
+*.log
+*.tmp
+*.temp
+.DS_Store
+
+docker-compose*.yml
