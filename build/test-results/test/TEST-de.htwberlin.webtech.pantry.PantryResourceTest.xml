@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="de.htwberlin.webtech.pantry.PantryResourceTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-06-06T01:28:27.998Z" hostname="DESKTOP-JTGLLC2" time="0.896">
+  <properties/>
+  <testcase name="getMine_should_return_unauthorized_without_token()" classname="de.htwberlin.webtech.pantry.PantryResourceTest" time="0.253"/>
+  <testcase name="getMine_should_return_only_current_users_items()" classname="de.htwberlin.webtech.pantry.PantryResourceTest" time="0.079"/>
+  <testcase name="delete_should_return_no_content_for_own_item()" classname="de.htwberlin.webtech.pantry.PantryResourceTest" time="0.105"/>
+  <testcase name="delete_should_return_not_found_for_unknown_id()" classname="de.htwberlin.webtech.pantry.PantryResourceTest" time="0.081"/>
+  <testcase name="update_should_return_forbidden_for_foreign_item()" classname="de.htwberlin.webtech.pantry.PantryResourceTest" time="0.11"/>
+  <testcase name="delete_should_return_forbidden_for_foreign_item()" classname="de.htwberlin.webtech.pantry.PantryResourceTest" time="0.078"/>
+  <testcase name="update_should_return_ok_for_own_item()" classname="de.htwberlin.webtech.pantry.PantryResourceTest" time="0.054"/>
+  <testcase name="update_should_return_not_found_for_unknown_id()" classname="de.htwberlin.webtech.pantry.PantryResourceTest" time="0.069"/>
+  <testcase name="create_should_return_created_for_current_user()" classname="de.htwberlin.webtech.pantry.PantryResourceTest" time="0.049"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

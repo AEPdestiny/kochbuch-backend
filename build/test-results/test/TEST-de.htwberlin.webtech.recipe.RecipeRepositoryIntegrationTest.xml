@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-06-05T19:36:44.123Z" hostname="DESKTOP-JTGLLC2" time="0.067">
+<testsuite name="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-06-06T01:28:37.788Z" hostname="DESKTOP-JTGLLC2" time="0.079">
   <properties/>
-  <testcase name="should_filter_published_recipes()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.024"/>
-  <testcase name="should_delete_recipe()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.018"/>
-  <testcase name="should_find_recipe_by_id()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.005"/>
-  <testcase name="should_save_recipe()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.005"/>
-  <testcase name="should_save_and_read_recipe_with_owner()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.008"/>
+  <testcase name="should_filter_published_recipes()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.016"/>
+  <testcase name="should_delete_recipe()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.009"/>
+  <testcase name="should_find_recipe_by_id()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.006"/>
+  <testcase name="should_find_recipes_by_owner()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.023"/>
+  <testcase name="should_save_recipe()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.006"/>
+  <testcase name="should_save_and_read_recipe_with_owner()" classname="de.htwberlin.webtech.recipe.RecipeRepositoryIntegrationTest" time="0.01"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

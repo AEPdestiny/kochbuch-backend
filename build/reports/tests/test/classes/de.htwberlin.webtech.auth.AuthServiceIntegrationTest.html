@@ -41,7 +41,7 @@
 </td>
 <td>
 <div class="infoBox" id="duration">
-<div class="counter">1.454s</div>
+<div class="counter">1.607s</div>
 <p>duration</p>
 </div>
 </td>
@@ -79,12 +79,12 @@
 </thead>
 <tr>
 <td class="success">login_should_fail_with_wrong_password()</td>
-<td class="success">0.169s</td>
+<td class="success">0.177s</td>
 <td class="success">passed</td>
 </tr>
 <tr>
 <td class="success">login_should_succeed_with_correct_credentials()</td>
-<td class="success">0.173s</td>
+<td class="success">0.186s</td>
 <td class="success">passed</td>
 </tr>
 <tr>
@@ -99,17 +99,17 @@
 </tr>
 <tr>
 <td class="success">register_should_persist_app_user()</td>
-<td class="success">0.109s</td>
+<td class="success">0.150s</td>
 <td class="success">passed</td>
 </tr>
 <tr>
 <td class="success">register_should_return_auth_response_with_token()</td>
-<td class="success">0.652s</td>
+<td class="success">0.722s</td>
 <td class="success">passed</td>
 </tr>
 <tr>
 <td class="success">register_should_store_bcrypt_hash_instead_of_plain_password()</td>
-<td class="success">0.161s</td>
+<td class="success">0.182s</td>
 <td class="success">passed</td>
 </tr>
 </table>
@@ -117,21 +117,21 @@
 <div class="tab">
 <h2>Standard output</h2>
 <span class="code">
-<pre id="class-stdout">2026-06-05 21:36:37,471 INFO  [io.quarkus] (Test worker) webtech stopped in 0.023s
-2026-06-05 21:36:37,571 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Creating container for image: docker.io/library/postgres:18
-2026-06-05 21:36:37,671 INFO  [org.testcontainers.utility.RegistryAuthLocator] (ForkJoinPool.commonPool-worker-5) Credential helper/store (docker-credential-desktop) does not have credentials for docker.io
-2026-06-05 21:36:37,679 WARN  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Reuse was requested but the environment does not support the reuse of containers
+<pre id="class-stdout">2026-06-06 03:28:30,399 INFO  [io.quarkus] (Test worker) webtech stopped in 0.025s
+2026-06-06 03:28:30,491 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-11) Creating container for image: docker.io/library/postgres:18
+2026-06-06 03:28:30,604 INFO  [org.testcontainers.utility.RegistryAuthLocator] (ForkJoinPool.commonPool-worker-11) Credential helper/store (docker-credential-desktop) does not have credentials for docker.io
+2026-06-06 03:28:30,613 WARN  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-11) Reuse was requested but the environment does not support the reuse of containers
 To enable reuse of containers, you must set 'testcontainers.reuse.enable=true' in a file located at C:\Users\ibrah\.testcontainers.properties
-2026-06-05 21:36:37,680 INFO  [tc.testcontainers/ryuk:0.14.0] (ForkJoinPool.commonPool-worker-5) Creating container for image: testcontainers/ryuk:0.14.0
-2026-06-05 21:36:37,904 INFO  [tc.testcontainers/ryuk:0.14.0] (ForkJoinPool.commonPool-worker-5) Container testcontainers/ryuk:0.14.0 is starting: 8d8feb71efedd9eb79c6dcd66225987543e5fa7428e2951da22ce3b8f29a0cd8
-2026-06-05 21:36:38,369 INFO  [tc.testcontainers/ryuk:0.14.0] (ForkJoinPool.commonPool-worker-5) Container testcontainers/ryuk:0.14.0 started in PT0.6884318S
-2026-06-05 21:36:38,435 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Container docker.io/library/postgres:18 is starting: c32a9832d7c6f8a4da6fa9780d0b3e16e2bdb8fe50951bddac5af867d026130d
-2026-06-05 21:36:40,331 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Container docker.io/library/postgres:18 started in PT2.7593196S
-2026-06-05 21:36:40,331 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-5) Container is started (JDBC URL: jdbc:postgresql://localhost:51757/webtech_test?loggerLevel=OFF)
-2026-06-05 21:36:40,333 INFO  [io.quarkus.datasource.deployment.devservices.DevServicesDatasourceProcessor] (ForkJoinPool.commonPool-worker-5) Dev Services for default datasource (postgresql) started - container ID is c32a9832d7c6
-2026-06-05 21:36:42,641 INFO  [io.quarkus] (Test worker) webtech 0.0.1-SNAPSHOT on JVM (powered by Quarkus 3.35.2) started in 2.236s. Listening on: http://localhost:8081
-2026-06-05 21:36:42,641 INFO  [io.quarkus] (Test worker) Profile test activated. 
-2026-06-05 21:36:42,641 INFO  [io.quarkus] (Test worker) Installed features: [agroal, cdi, compose, hibernate-orm, hibernate-orm-panache, hibernate-validator, jdbc-postgresql, narayana-jta, rest, rest-jackson, security, smallrye-context-propagation, smallrye-jwt, smallrye-openapi, swagger-ui, vertx]
+2026-06-06 03:28:30,615 INFO  [tc.testcontainers/ryuk:0.14.0] (ForkJoinPool.commonPool-worker-11) Creating container for image: testcontainers/ryuk:0.14.0
+2026-06-06 03:28:30,834 INFO  [tc.testcontainers/ryuk:0.14.0] (ForkJoinPool.commonPool-worker-11) Container testcontainers/ryuk:0.14.0 is starting: 053570f1db959660c2d487a9025376d6e3d2bcdbab44242b875faa93fde2e9b6
+2026-06-06 03:28:31,384 INFO  [tc.testcontainers/ryuk:0.14.0] (ForkJoinPool.commonPool-worker-11) Container testcontainers/ryuk:0.14.0 started in PT0.7685641S
+2026-06-06 03:28:31,453 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-11) Container docker.io/library/postgres:18 is starting: 6b65387f871b7b9f06060fb1ce924d96ebb6fd398ed13e9f00abe6dc2728f3ee
+2026-06-06 03:28:33,632 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-11) Container docker.io/library/postgres:18 started in PT3.141378S
+2026-06-06 03:28:33,633 INFO  [tc.docker.io/library/postgres:18] (ForkJoinPool.commonPool-worker-11) Container is started (JDBC URL: jdbc:postgresql://localhost:59226/webtech_test?loggerLevel=OFF)
+2026-06-06 03:28:33,634 INFO  [io.quarkus.datasource.deployment.devservices.DevServicesDatasourceProcessor] (ForkJoinPool.commonPool-worker-11) Dev Services for default datasource (postgresql) started - container ID is 6b65387f871b
+2026-06-06 03:28:36,015 INFO  [io.quarkus] (Test worker) webtech 0.0.1-SNAPSHOT on JVM (powered by Quarkus 3.35.2) started in 2.332s. Listening on: http://localhost:8081
+2026-06-06 03:28:36,015 INFO  [io.quarkus] (Test worker) Profile test activated. 
+2026-06-06 03:28:36,015 INFO  [io.quarkus] (Test worker) Installed features: [agroal, cdi, compose, hibernate-orm, hibernate-orm-panache, hibernate-validator, jdbc-postgresql, narayana-jta, rest, rest-jackson, security, smallrye-context-propagation, smallrye-jwt, smallrye-openapi, swagger-ui, vertx]
 </pre>
 <button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="class-stdout">Copy</button>
 </span>
@@ -144,7 +144,7 @@ To enable reuse of containers, you must set 'testcontainers.reuse.enable=true' i
 <input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
 </label>
 </div>Generated by 
-<a href="https://www.gradle.org">Gradle 9.1.0</a> at 05.06.2026, 21:36:45</p>
+<a href="https://www.gradle.org">Gradle 9.1.0</a> at 06.06.2026, 03:28:38</p>
 </div>
 </div>
 </body>

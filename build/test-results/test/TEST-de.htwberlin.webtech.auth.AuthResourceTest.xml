@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="de.htwberlin.webtech.auth.AuthResourceTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-06-05T19:36:31.400Z" hostname="DESKTOP-JTGLLC2" time="4.44">
+<testsuite name="de.htwberlin.webtech.auth.AuthResourceTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-06-06T01:28:22.718Z" hostname="DESKTOP-JTGLLC2" time="5.199">
   <properties/>
-  <testcase name="me_should_return_unauthorized_without_token()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="3.011"/>
-  <testcase name="register_should_return_conflict_when_email_exists()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.871"/>
-  <testcase name="me_should_return_current_user_with_valid_token()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.234"/>
-  <testcase name="login_should_return_ok_with_token()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.112"/>
-  <testcase name="login_should_return_unauthorized_when_password_is_wrong()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.103"/>
-  <testcase name="register_should_return_created_with_token()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.092"/>
-  <system-out><![CDATA[2026-06-05 21:36:30,152 INFO  [org.hibernate.orm.jpa] (Test worker) HHH008540: Processing PersistenceUnitInfo [name: <default>]
-2026-06-05 21:36:30,281 INFO  [org.hibernate.orm.core] (Test worker) HHH000001: Hibernate ORM core version 7.3.2.Final
-2026-06-05 21:36:30,460 INFO  [org.hibernate.orm.connections.pooling] (Test worker) HHH10001005: Database info:
+  <testcase name="me_should_return_unauthorized_without_token()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="3.69"/>
+  <testcase name="register_should_return_conflict_when_email_exists()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.9"/>
+  <testcase name="me_should_return_current_user_with_valid_token()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.26"/>
+  <testcase name="login_should_return_ok_with_token()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.119"/>
+  <testcase name="login_should_return_unauthorized_when_password_is_wrong()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.104"/>
+  <testcase name="register_should_return_created_with_token()" classname="de.htwberlin.webtech.auth.AuthResourceTest" time="0.103"/>
+  <system-out><![CDATA[2026-06-06 03:28:21,316 INFO  [org.hibernate.orm.jpa] (Test worker) HHH008540: Processing PersistenceUnitInfo [name: <default>]
+2026-06-06 03:28:21,455 INFO  [org.hibernate.orm.core] (Test worker) HHH000001: Hibernate ORM core version 7.3.2.Final
+2026-06-06 03:28:21,640 INFO  [org.hibernate.orm.connections.pooling] (Test worker) HHH10001005: Database info:
 	Database JDBC URL [undefined/unknown]
 	Database driver: undefined/unknown
 	Database dialect: PostgreSQLDialect
@@ -21,10 +21,10 @@
 	Pool: undefined/unknown
 	Minimum pool size: undefined/unknown
 	Maximum pool size: undefined/unknown
-2026-06-05 21:36:30,612 INFO  [org.hibernate.validator.internal.util.Version] (Test worker) HV000001: Hibernate Validator 9.1.0.Final
-2026-06-05 21:36:31,379 INFO  [io.quarkus] (Test worker) webtech 0.0.1-SNAPSHOT on JVM (powered by Quarkus 3.35.2) started in 12.475s. Listening on: http://localhost:8081
-2026-06-05 21:36:31,380 INFO  [io.quarkus] (Test worker) Profile test activated. 
-2026-06-05 21:36:31,380 INFO  [io.quarkus] (Test worker) Installed features: [agroal, cdi, compose, hibernate-orm, hibernate-orm-panache, hibernate-validator, jdbc-postgresql, narayana-jta, rest, rest-jackson, security, smallrye-context-propagation, smallrye-jwt, smallrye-openapi, swagger-ui, vertx]
+2026-06-06 03:28:21,837 INFO  [org.hibernate.validator.internal.util.Version] (Test worker) HV000001: Hibernate Validator 9.1.0.Final
+2026-06-06 03:28:22,695 INFO  [io.quarkus] (Test worker) webtech 0.0.1-SNAPSHOT on JVM (powered by Quarkus 3.35.2) started in 22.586s. Listening on: http://localhost:8081
+2026-06-06 03:28:22,696 INFO  [io.quarkus] (Test worker) Profile test activated. 
+2026-06-06 03:28:22,696 INFO  [io.quarkus] (Test worker) Installed features: [agroal, cdi, compose, hibernate-orm, hibernate-orm-panache, hibernate-validator, jdbc-postgresql, narayana-jta, rest, rest-jackson, security, smallrye-context-propagation, smallrye-jwt, smallrye-openapi, swagger-ui, vertx]
 ]]></system-out>
   <system-err><![CDATA[Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
 WARNING: A Java agent has been loaded dynamically (C:\Users\ibrah\.gradle\caches\modules-2\files-2.1\net.bytebuddy\byte-buddy-agent\1.18.8\ed5c6c9b3a146b4aa376df3b6770d6cabed20482\byte-buddy-agent-1.18.8.jar)
