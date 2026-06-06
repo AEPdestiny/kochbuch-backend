@@ -298,6 +298,48 @@ Fehlende oder ungültige Tokens geben `401 Unauthorized` zurück. Fremde Shoppin
 List Items geben bei `PUT` und `DELETE` `403 Forbidden` zurück. Nicht vorhandene
 Shopping List Items geben `404 Not Found` zurück.
 
+## Meal-Plan-Endpunkte
+
+Der Wochenplaner erlaubt eingeloggten Nutzern, eigene Rezepte einzelnen Tagen
+einer Woche zuzuordnen. Alle Meal-Plan-Endpunkte benötigen einen Bearer Token.
+Nutzer sehen nur eigene MealPlan-Einträge und dürfen nur eigene Rezepte planen.
+Externe Rezepte und fremde Rezepte sind nicht planbar.
+
+Woche abrufen:
+
+```http
+GET /meal-plan/week?startDate=2026-06-03
+Authorization: Bearer <jwt>
+```
+
+Wenn `startDate` fehlt, verwendet das Backend die aktuelle Woche. Der
+Wochenstart wird immer auf Montag normalisiert, `weekEnd` ist der folgende
+Sonntag.
+
+Rezept für einen Tag setzen oder ersetzen:
+
+```http
+PUT /meal-plan/days/2026-06-03
+Authorization: Bearer <jwt>
+Content-Type: application/json
+
+{
+  "recipeId": 1
+}
+```
+
+Geplantes Rezept für einen Tag entfernen:
+
+```http
+DELETE /meal-plan/days/2026-06-03
+Authorization: Bearer <jwt>
+```
+
+Fehlende oder ungültige Tokens geben `401 Unauthorized` zurück. Fremde Rezepte
+geben beim Planen `403 Forbidden` zurück. Unbekannte Rezepte geben `404 Not
+Found` zurück. Wenn für den eigenen Tag kein MealPlan-Eintrag existiert, gibt
+`DELETE /meal-plan/days/{date}` im MVP `404 Not Found` zurück.
+
 ## Recipe-Write-Endpunkte
 
 Das Erstellen von Rezepten erfordert jetzt einen authentifizierten User. Das

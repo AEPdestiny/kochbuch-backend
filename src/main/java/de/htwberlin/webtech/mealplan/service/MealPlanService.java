@@ -1,0 +1,75 @@
+package de.htwberlin.webtech.mealplan.service;
+
+import de.htwberlin.webtech.mealplan.dto.MealPlanEntryRequest;
+import de.htwberlin.webtech.mealplan.entity.MealPlan;
+import de.htwberlin.webtech.mealplan.exception.MealPlanEntryNotFoundException;
+import de.htwberlin.webtech.mealplan.repository.MealPlanRepository;
+import de.htwberlin.webtech.recipe.entity.Recipe;
+import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
+import de.htwberlin.webtech.recipe.repository.RecipeRepository;
+import de.htwberlin.webtech.shared.exception.ForbiddenException;
+import de.htwberlin.webtech.user.entity.AppUser;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
+
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
+import java.util.List;
+
+@ApplicationScoped
+public class MealPlanService {
+
+    private final MealPlanRepository mealPlanRepository;
+    private final RecipeRepository recipeRepository;
+
+    public MealPlanService(MealPlanRepository mealPlanRepository, RecipeRepository recipeRepository) {
+        this.mealPlanRepository = mealPlanRepository;
+        this.recipeRepository = recipeRepository;
+    }
+
+    public List<MealPlan> getWeek(AppUser currentUser, LocalDate startDate) {
+        LocalDate weekStart = normalizeWeekStart(startDate);
+        LocalDate weekEnd = weekStart.plusDays(6);
+        return mealPlanRepository.findByOwnerAndPlannedDateBetween(currentUser, weekStart, weekEnd);
+    }
+
+    @Transactional
+    public MealPlan setRecipeForDay(AppUser currentUser, LocalDate plannedDate, MealPlanEntryRequest request) {
+        Recipe recipe = recipeRepository.findById(request.getRecipeId());
+        if (recipe == null) {
+            throw new RecipeNotFoundException(request.getRecipeId());
+        }
+        ensureRecipeOwner(recipe, currentUser);
+
+        MealPlan mealPlan = mealPlanRepository.findByOwnerAndPlannedDate(currentUser, plannedDate)
+                .orElseGet(() -> {
+                    MealPlan created = new MealPlan();
+                    created.setOwner(currentUser);
+                    created.setPlannedDate(plannedDate);
+                    mealPlanRepository.persist(created);
+                    return created;
+                });
+        mealPlan.setRecipe(recipe);
+        return mealPlan;
+    }
+
+    @Transactional
+    public void deleteForDay(AppUser currentUser, LocalDate plannedDate) {
+        MealPlan mealPlan = mealPlanRepository.findByOwnerAndPlannedDate(currentUser, plannedDate)
+                .orElseThrow(() -> new MealPlanEntryNotFoundException(plannedDate));
+        mealPlanRepository.delete(mealPlan);
+    }
+
+    public LocalDate normalizeWeekStart(LocalDate date) {
+        LocalDate baseDate = date == null ? LocalDate.now() : date;
+        return baseDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    }
+
+    private void ensureRecipeOwner(Recipe recipe, AppUser currentUser) {
+        if (recipe.getOwner() == null || currentUser == null || currentUser.getId() == null
+                || !currentUser.getId().equals(recipe.getOwner().getId())) {
+            throw new ForbiddenException("Only own recipes can be planned.");
+        }
+    }
+}
