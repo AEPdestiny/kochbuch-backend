@@ -36,6 +36,10 @@ public class MealPlanService {
 
     @Transactional
     public MealPlan setRecipeForDay(AppUser currentUser, LocalDate plannedDate, MealPlanEntryRequest request) {
+        if (request == null || request.getRecipeId() == null) {
+            throw new IllegalArgumentException("recipeId must not be null.");
+        }
+
         Recipe recipe = recipeRepository.findById(request.getRecipeId());
         if (recipe == null) {
             throw new RecipeNotFoundException(request.getRecipeId());
@@ -47,10 +51,12 @@ public class MealPlanService {
                     MealPlan created = new MealPlan();
                     created.setOwner(currentUser);
                     created.setPlannedDate(plannedDate);
-                    mealPlanRepository.persist(created);
                     return created;
                 });
         mealPlan.setRecipe(recipe);
+        if (mealPlan.getId() == null) {
+            mealPlanRepository.persist(mealPlan);
+        }
         return mealPlan;
     }
 

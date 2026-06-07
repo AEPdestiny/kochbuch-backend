@@ -19,8 +19,11 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -63,6 +66,11 @@ class MealPlanServiceTest {
         LocalDate date = LocalDate.of(2026, 6, 1);
         doReturn(recipe).when(recipeRepository).findById(10L);
         doReturn(Optional.empty()).when(mealPlanRepository).findByOwnerAndPlannedDate(owner, date);
+        doAnswer(invocation -> {
+            MealPlan mealPlan = invocation.getArgument(0);
+            assertNotNull(mealPlan.getRecipe());
+            return null;
+        }).when(mealPlanRepository).persist(any(MealPlan.class));
 
         MealPlan result = underTest.setRecipeForDay(owner, date, request(10L));
 
@@ -75,6 +83,7 @@ class MealPlanServiceTest {
         assertSame(recipe, result.getRecipe());
         assertEquals(date, result.getPlannedDate());
         assertSame(result, captor.getValue());
+        assertSame(recipe, captor.getValue().getRecipe());
     }
 
     @Test
@@ -118,6 +127,15 @@ class MealPlanServiceTest {
         assertThrows(RecipeNotFoundException.class, () -> underTest.setRecipeForDay(user(1L), LocalDate.of(2026, 6, 1), request(99L)));
 
         verify(recipeRepository).findById(99L);
+        verifyNoMoreInteractions(mealPlanRepository, recipeRepository);
+    }
+
+    @Test
+    @DisplayName("setRecipeForDay should reject missing recipe id")
+    void setRecipeForDay_should_reject_missing_recipe_id() {
+        assertThrows(IllegalArgumentException.class,
+                () -> underTest.setRecipeForDay(user(1L), LocalDate.of(2026, 6, 1), request(null)));
+
         verifyNoMoreInteractions(mealPlanRepository, recipeRepository);
     }
 

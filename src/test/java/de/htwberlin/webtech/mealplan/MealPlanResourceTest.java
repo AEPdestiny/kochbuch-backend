@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @QuarkusTest
@@ -167,6 +168,27 @@ class MealPlanResourceTest {
                 .then()
                 .statusCode(400)
                 .body("message", equalTo("Date must use ISO format YYYY-MM-DD."));
+    }
+
+    @Test
+    void putDay_should_return_bad_request_for_missing_recipe_id() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "recipeId": null
+                        }
+                        """)
+                .when().put("/meal-plan/days/2026-06-01")
+                .then()
+                .statusCode(400)
+                .body("message", equalTo("Validation failed: recipeId must not be null"));
+
+        verify(mealPlanService, never()).setRecipeForDay(any(), any(), any());
     }
 
     @Test
