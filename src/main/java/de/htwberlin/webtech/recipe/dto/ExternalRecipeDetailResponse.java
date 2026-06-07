@@ -1,6 +1,8 @@
 package de.htwberlin.webtech.recipe.dto;
 
-public class RecipeResponse {
+import java.util.List;
+
+public class ExternalRecipeDetailResponse {
 
     private Long id;
     private String externalId;
@@ -9,15 +11,14 @@ public class RecipeResponse {
     private String imageUrl;
     private int prepTimeMinutes;
     private int cookTimeMinutes;
+    private int readyInMinutes;
     private int servings;
-    private String difficulty;
     private String category;
-    private double rating;
-    private String ingredients;
-    private String instructions;
-    private boolean favorite;
-    private boolean published;
+    private List<String> tags;
     private Integer calories;
+    private List<ExternalRecipeIngredientResponse> ingredients;
+    private String instructions;
+    private List<String> steps;
     private String sourceUrl;
 
     public Long getId() {
@@ -76,20 +77,20 @@ public class RecipeResponse {
         this.cookTimeMinutes = cookTimeMinutes;
     }
 
+    public int getReadyInMinutes() {
+        return readyInMinutes;
+    }
+
+    public void setReadyInMinutes(int readyInMinutes) {
+        this.readyInMinutes = readyInMinutes;
+    }
+
     public int getServings() {
         return servings;
     }
 
     public void setServings(int servings) {
         this.servings = servings;
-    }
-
-    public String getDifficulty() {
-        return difficulty;
-    }
-
-    public void setDifficulty(String difficulty) {
-        this.difficulty = difficulty;
     }
 
     public String getCategory() {
@@ -100,19 +101,27 @@ public class RecipeResponse {
         this.category = category;
     }
 
-    public double getRating() {
-        return rating;
+    public List<String> getTags() {
+        return tags;
     }
 
-    public void setRating(double rating) {
-        this.rating = rating;
+    public void setTags(List<String> tags) {
+        this.tags = tags;
     }
 
-    public String getIngredients() {
+    public Integer getCalories() {
+        return calories;
+    }
+
+    public void setCalories(Integer calories) {
+        this.calories = calories;
+    }
+
+    public List<ExternalRecipeIngredientResponse> getIngredients() {
         return ingredients;
     }
 
-    public void setIngredients(String ingredients) {
+    public void setIngredients(List<ExternalRecipeIngredientResponse> ingredients) {
         this.ingredients = ingredients;
     }
 
@@ -124,28 +133,12 @@ public class RecipeResponse {
         this.instructions = instructions;
     }
 
-    public boolean isFavorite() {
-        return favorite;
+    public List<String> getSteps() {
+        return steps;
     }
 
-    public void setFavorite(boolean favorite) {
-        this.favorite = favorite;
-    }
-
-    public boolean isPublished() {
-        return published;
-    }
-
-    public void setPublished(boolean published) {
-        this.published = published;
-    }
-
-    public Integer getCalories() {
-        return calories;
-    }
-
-    public void setCalories(Integer calories) {
-        this.calories = calories;
+    public void setSteps(List<String> steps) {
+        this.steps = steps;
     }
 
     public String getSourceUrl() {

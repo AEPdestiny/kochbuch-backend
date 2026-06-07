@@ -2,6 +2,7 @@ package de.htwberlin.webtech.recipe.resource;
 
 import de.htwberlin.webtech.recipe.dto.RecipeRequest;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
+import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
 import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
 import de.htwberlin.webtech.recipe.mapper.RecipeMapper;
 import de.htwberlin.webtech.recipe.service.RecipeService;
@@ -129,9 +130,20 @@ public class RecipeResource {
 
     @GET
     @Path("/external")
-    @Operation(summary = "List external recipes", description = "Returns recipes fetched from TheMealDB. Optional search query filters the external source.")
+    @Operation(summary = "List external recipes", description = "Returns recipes fetched from Spoonacular. Optional search query filters the external source.")
     @APIResponse(responseCode = "200", description = "External recipes returned")
     public List<RecipeResponse> getExternal(@QueryParam("search") String search) {
-        return mapper.toResponseList(externalService.fetchExternalRecipes(search));
+        return externalService.fetchExternalRecipes(search);
+    }
+
+    @GET
+    @Path("/external/{id}")
+    @Operation(summary = "Get external recipe detail", description = "Returns one external Spoonacular recipe with detail fields.")
+    @APIResponse(responseCode = "200", description = "External recipe returned")
+    @APIResponse(responseCode = "404", description = "External recipe not found")
+    public Response getExternalById(@PathParam("id") Long id) {
+        return externalService.fetchExternalRecipeDetail(id)
+                .map(detail -> Response.ok(detail).build())
+                .orElseThrow(() -> new RecipeNotFoundException(id));
     }
 }

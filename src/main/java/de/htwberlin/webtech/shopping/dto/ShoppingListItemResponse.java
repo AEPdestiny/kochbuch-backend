@@ -10,6 +10,8 @@ public class ShoppingListItemResponse {
     private BigDecimal quantity;
     private String unit;
     private String category;
+    private String recipeId;
+    private String recipeTitle;
     private boolean checked;
     private Instant createdAt;
     private Instant updatedAt;
@@ -52,6 +54,22 @@ public class ShoppingListItemResponse {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getRecipeId() {
+        return recipeId;
+    }
+
+    public void setRecipeId(String recipeId) {
+        this.recipeId = recipeId;
+    }
+
+    public String getRecipeTitle() {
+        return recipeTitle;
+    }
+
+    public void setRecipeTitle(String recipeTitle) {
+        this.recipeTitle = recipeTitle;
     }
 
     public boolean isChecked() {

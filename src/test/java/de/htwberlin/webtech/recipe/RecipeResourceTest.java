@@ -3,6 +3,8 @@ package de.htwberlin.webtech.recipe;
 import de.htwberlin.webtech.recipe.entity.Recipe;
 import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
 import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
+import de.htwberlin.webtech.recipe.dto.ExternalRecipeDetailResponse;
+import de.htwberlin.webtech.recipe.dto.RecipeResponse;
 import de.htwberlin.webtech.recipe.service.RecipeService;
 import de.htwberlin.webtech.security.UserContext;
 import de.htwberlin.webtech.shared.exception.ForbiddenException;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
@@ -123,18 +126,19 @@ class RecipeResourceTest {
 
     @Test
     void getExternal_should_return_ok() {
-        doReturn(List.of(recipe("Ext"))).when(externalRecipeService).fetchExternalRecipes(null);
+        doReturn(List.of(externalRecipe("Ext"))).when(externalRecipeService).fetchExternalRecipes(null);
 
         given()
                 .when().get("/recipes/external")
                 .then()
                 .statusCode(200)
-                .body("$", hasSize(1));
+                .body("$", hasSize(1))
+                .body("[0].source", equalTo("spoonacular"));
     }
 
     @Test
     void getExternal_should_pass_search_query() {
-        doReturn(List.of(recipe("Pasta"))).when(externalRecipeService).fetchExternalRecipes("pasta");
+        doReturn(List.of(externalRecipe("Pasta"))).when(externalRecipeService).fetchExternalRecipes("pasta");
 
         given()
                 .queryParam("search", "pasta")
@@ -145,6 +149,35 @@ class RecipeResourceTest {
                 .body("[0].title", equalTo("Pasta"));
 
         verify(externalRecipeService).fetchExternalRecipes("pasta");
+    }
+
+    @Test
+    void getExternalById_should_return_detail() {
+        ExternalRecipeDetailResponse detail = new ExternalRecipeDetailResponse();
+        detail.setId(716429L);
+        detail.setExternalId("716429");
+        detail.setSource("spoonacular");
+        detail.setTitle("Pasta");
+        doReturn(Optional.of(detail)).when(externalRecipeService).fetchExternalRecipeDetail(716429L);
+
+        given()
+                .when().get("/recipes/external/716429")
+                .then()
+                .statusCode(200)
+                .body("title", equalTo("Pasta"))
+                .body("source", equalTo("spoonacular"));
+    }
+
+    @Test
+    void getExternalById_should_return_not_found_when_missing() {
+        doReturn(Optional.empty()).when(externalRecipeService).fetchExternalRecipeDetail(99L);
+
+        given()
+                .when().get("/recipes/external/99")
+                .then()
+                .statusCode(404)
+                .body("status", equalTo(404))
+                .body("error", equalTo("Not Found"));
     }
 
     @Test
@@ -618,6 +651,19 @@ class RecipeResourceTest {
         return new Recipe(title, "", 10, 20, 2,
                 "easy", "Italian", 4.5,
                 "noodles", "cook", false, true);
+    }
+
+    private RecipeResponse externalRecipe(String title) {
+        RecipeResponse response = new RecipeResponse();
+        response.setId(716429L);
+        response.setExternalId("716429");
+        response.setSource("spoonacular");
+        response.setTitle(title);
+        response.setImageUrl("");
+        response.setIngredients("noodles");
+        response.setInstructions("cook");
+        response.setPublished(true);
+        return response;
     }
 
     private AppUser user() {

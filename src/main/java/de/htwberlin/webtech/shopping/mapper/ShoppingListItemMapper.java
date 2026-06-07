@@ -23,6 +23,8 @@ public class ShoppingListItemMapper {
         response.setQuantity(item.getQuantity());
         response.setUnit(item.getUnit());
         response.setCategory(item.getCategory());
+        response.setRecipeId(item.getRecipeId());
+        response.setRecipeTitle(item.getRecipeTitle());
         response.setChecked(item.isChecked());
         response.setCreatedAt(item.getCreatedAt());
         response.setUpdatedAt(item.getUpdatedAt());
@@ -40,6 +42,8 @@ public class ShoppingListItemMapper {
         item.setQuantity(request.getQuantity());
         item.setUnit(request.getUnit());
         item.setCategory(request.getCategory());
+        item.setRecipeId(request.getRecipeId());
+        item.setRecipeTitle(request.getRecipeTitle());
         item.setChecked(request.isChecked());
     }
 }

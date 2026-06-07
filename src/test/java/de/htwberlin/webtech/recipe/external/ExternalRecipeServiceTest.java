@@ -1,44 +1,51 @@
 package de.htwberlin.webtech.recipe.external;
 
-import de.htwberlin.webtech.recipe.entity.Recipe;
-import de.htwberlin.webtech.recipe.external.dto.TheMealDbMeal;
+import de.htwberlin.webtech.recipe.dto.ExternalRecipeDetailResponse;
+import de.htwberlin.webtech.recipe.dto.RecipeResponse;
+import de.htwberlin.webtech.recipe.external.dto.SpoonacularAnalyzedInstruction;
+import de.htwberlin.webtech.recipe.external.dto.SpoonacularIngredient;
+import de.htwberlin.webtech.recipe.external.dto.SpoonacularInstructionStep;
+import de.htwberlin.webtech.recipe.external.dto.SpoonacularNutrient;
+import de.htwberlin.webtech.recipe.external.dto.SpoonacularNutrition;
+import de.htwberlin.webtech.recipe.external.dto.SpoonacularRecipe;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExternalRecipeServiceTest {
 
     @Test
-    void fetchExternalRecipes_should_map_the_meal_db_meals_to_recipes() {
-        ExternalRecipeService service = new ExternalRecipeService(search -> List.of(meal()));
+    void fetchExternalRecipes_should_map_spoonacular_recipes_to_recipe_responses() {
+        ExternalRecipeService service = new ExternalRecipeService(new StaticClient(List.of(recipe())));
 
-        List<Recipe> recipes = service.fetchExternalRecipes("pasta");
+        List<RecipeResponse> recipes = service.fetchExternalRecipes("pasta");
 
         assertEquals(1, recipes.size());
-        Recipe recipe = recipes.getFirst();
-        assertEquals("Arrabiata", recipe.getTitle());
-        assertEquals("https://example.com/arrabiata.jpg", recipe.getImageUrl());
-        assertEquals("Vegetarian", recipe.getCategory());
-        assertEquals("Boil pasta and mix with sauce.", recipe.getInstructions());
-        assertEquals("1 pound penne rigate, 1/4 cup olive oil, garlic", recipe.getIngredients());
-        assertEquals(0, recipe.getPrepTimeMinutes());
-        assertEquals(0, recipe.getCookTimeMinutes());
-        assertEquals(0, recipe.getServings());
-        assertEquals(0.0, recipe.getRating());
-        assertFalse(recipe.isFavorite());
-        assertTrue(recipe.isPublished());
+        RecipeResponse recipe = recipes.getFirst();
+        assertEquals(716429L, recipe.getId());
+        assertEquals("716429", recipe.getExternalId());
+        assertEquals("spoonacular", recipe.getSource());
+        assertEquals("Pasta with Garlic", recipe.getTitle());
+        assertEquals("https://example.com/pasta.jpg", recipe.getImageUrl());
+        assertEquals("main course", recipe.getCategory());
+        assertEquals("2 cups pasta, 1 tbsp olive oil", recipe.getIngredients());
+        assertEquals("Cook pasta. Serve warm.", recipe.getInstructions());
+        assertEquals(20, recipe.getCookTimeMinutes());
+        assertEquals(2, recipe.getServings());
+        assertEquals(510, recipe.getCalories());
     }
 
     @Test
     void fetchExternalRecipes_should_use_default_search_when_search_is_blank() {
-        CapturingClient client = new CapturingClient(List.of(meal()));
+        CapturingClient client = new CapturingClient(List.of(recipe()));
         ExternalRecipeService service = new ExternalRecipeService(client);
 
         service.fetchExternalRecipes(" ");
@@ -48,20 +55,20 @@ class ExternalRecipeServiceTest {
 
     @Test
     void fetchExternalRecipes_should_cache_same_search_term() {
-        CountingClient client = new CountingClient(List.of(meal("Arrabiata")));
+        CountingClient client = new CountingClient(List.of(recipe("Pasta One")));
         ExternalRecipeService service = new ExternalRecipeService(client);
 
-        List<Recipe> first = service.fetchExternalRecipes("chicken");
-        List<Recipe> second = service.fetchExternalRecipes("chicken");
+        List<RecipeResponse> first = service.fetchExternalRecipes("chicken");
+        List<RecipeResponse> second = service.fetchExternalRecipes("chicken");
 
         assertEquals(1, client.callCount);
-        assertEquals("Arrabiata", first.getFirst().getTitle());
-        assertEquals("Arrabiata", second.getFirst().getTitle());
+        assertEquals("Pasta One", first.getFirst().getTitle());
+        assertEquals("Pasta One", second.getFirst().getTitle());
     }
 
     @Test
     void fetchExternalRecipes_should_normalize_search_terms_for_cache_key() {
-        CountingClient client = new CountingClient(List.of(meal("Chicken Curry")));
+        CountingClient client = new CountingClient(List.of(recipe("Chicken Curry")));
         ExternalRecipeService service = new ExternalRecipeService(client);
 
         service.fetchExternalRecipes("Chicken");
@@ -76,14 +83,14 @@ class ExternalRecipeServiceTest {
     void fetchExternalRecipes_should_reload_after_ttl_expires() {
         MutableClock clock = new MutableClock(Instant.parse("2026-06-06T10:00:00Z"));
         CountingClient client = new CountingClient(
-                List.of(meal("First Chicken")),
-                List.of(meal("Fresh Chicken"))
+                List.of(recipe("First Chicken")),
+                List.of(recipe("Fresh Chicken"))
         );
         ExternalRecipeService service = new ExternalRecipeService(client, clock);
 
-        List<Recipe> first = service.fetchExternalRecipes("chicken");
+        List<RecipeResponse> first = service.fetchExternalRecipes("chicken");
         clock.advanceMinutes(16);
-        List<Recipe> second = service.fetchExternalRecipes("chicken");
+        List<RecipeResponse> second = service.fetchExternalRecipes("chicken");
 
         assertEquals(2, client.callCount);
         assertEquals("First Chicken", first.getFirst().getTitle());
@@ -93,13 +100,13 @@ class ExternalRecipeServiceTest {
     @Test
     void fetchExternalRecipes_should_return_stale_cache_when_refresh_fails() {
         MutableClock clock = new MutableClock(Instant.parse("2026-06-06T10:00:00Z"));
-        CountingClient client = new CountingClient(List.of(meal("Cached Chicken")));
+        CountingClient client = new CountingClient(List.of(recipe("Cached Chicken")));
         ExternalRecipeService service = new ExternalRecipeService(client, clock);
 
         service.fetchExternalRecipes("chicken");
         clock.advanceMinutes(16);
         client.fail = true;
-        List<Recipe> stale = service.fetchExternalRecipes("chicken");
+        List<RecipeResponse> stale = service.fetchExternalRecipes("chicken");
 
         assertEquals(2, client.callCount);
         assertEquals("Cached Chicken", stale.getFirst().getTitle());
@@ -107,73 +114,157 @@ class ExternalRecipeServiceTest {
 
     @Test
     void fetchExternalRecipes_should_return_empty_list_when_client_fails() {
-        ExternalRecipeService service = new ExternalRecipeService(search -> {
-            throw new ExternalRecipeClientException("TheMealDB unavailable");
-        });
+        ExternalRecipeService service = new ExternalRecipeService(new FailingClient());
 
-        List<Recipe> recipes = service.fetchExternalRecipes("pasta");
+        List<RecipeResponse> recipes = service.fetchExternalRecipes("pasta");
 
         assertTrue(recipes.isEmpty());
     }
 
-    private TheMealDbMeal meal() {
-        return meal("Arrabiata");
+    @Test
+    void fetchExternalRecipeDetail_should_return_ingredients_and_steps() {
+        ExternalRecipeService service = new ExternalRecipeService(new StaticClient(List.of(recipe())));
+
+        Optional<ExternalRecipeDetailResponse> detail = service.fetchExternalRecipeDetail(716429L);
+
+        assertTrue(detail.isPresent());
+        assertEquals("Pasta with Garlic", detail.get().getTitle());
+        assertEquals(2, detail.get().getIngredients().size());
+        assertEquals("pasta", detail.get().getIngredients().getFirst().getName());
+        assertEquals("Cook pasta.", detail.get().getSteps().getFirst());
+        assertEquals(510, detail.get().getCalories());
     }
 
-    private TheMealDbMeal meal(String title) {
-        TheMealDbMeal meal = new TheMealDbMeal();
-        meal.setIdMeal("52771");
-        meal.setStrMeal(title);
-        meal.setStrMealThumb("https://example.com/arrabiata.jpg");
-        meal.setStrCategory("Vegetarian");
-        meal.setStrArea("Italian");
-        meal.setStrInstructions("Boil pasta and mix with sauce.");
-        meal.putNumberedField("strIngredient1", "penne rigate");
-        meal.putNumberedField("strMeasure1", "1 pound");
-        meal.putNumberedField("strIngredient2", "olive oil");
-        meal.putNumberedField("strMeasure2", "1/4 cup");
-        meal.putNumberedField("strIngredient3", "garlic");
-        meal.putNumberedField("strMeasure3", "");
-        return meal;
+    @Test
+    void fetchExternalRecipeDetail_should_return_empty_when_client_fails() {
+        ExternalRecipeService service = new ExternalRecipeService(new FailingClient());
+
+        Optional<ExternalRecipeDetailResponse> detail = service.fetchExternalRecipeDetail(1L);
+
+        assertTrue(detail.isEmpty());
     }
 
-    private static class CapturingClient implements ExternalRecipeClient {
+    private SpoonacularRecipe recipe() {
+        return recipe("Pasta with Garlic");
+    }
 
-        private final List<TheMealDbMeal> meals;
-        private String search;
+    private SpoonacularRecipe recipe(String title) {
+        SpoonacularRecipe recipe = new SpoonacularRecipe();
+        recipe.setId(716429L);
+        recipe.setTitle(title);
+        recipe.setImage("https://example.com/pasta.jpg");
+        recipe.setReadyInMinutes(20);
+        recipe.setServings(2);
+        recipe.setDishTypes(List.of("main course"));
+        recipe.setDiets(List.of("vegetarian"));
+        recipe.setInstructions("<p>Cook pasta. Serve warm.</p>");
+        recipe.setSourceUrl("https://example.com/source");
+        recipe.setExtendedIngredients(List.of(ingredient("pasta", "2 cups pasta", "2", "cups"), ingredient("olive oil", "1 tbsp olive oil", "1", "tbsp")));
+        recipe.setAnalyzedInstructions(List.of(instruction("Cook pasta."), instruction("Serve warm.")));
+        recipe.setNutrition(nutrition());
+        return recipe;
+    }
 
-        private CapturingClient(List<TheMealDbMeal> meals) {
-            this.meals = meals;
+    private SpoonacularIngredient ingredient(String name, String original, String amount, String unit) {
+        SpoonacularIngredient ingredient = new SpoonacularIngredient();
+        ingredient.setName(name);
+        ingredient.setOriginal(original);
+        ingredient.setAmount(new BigDecimal(amount));
+        ingredient.setUnit(unit);
+        return ingredient;
+    }
+
+    private SpoonacularAnalyzedInstruction instruction(String text) {
+        SpoonacularInstructionStep step = new SpoonacularInstructionStep();
+        step.setStep(text);
+        SpoonacularAnalyzedInstruction instruction = new SpoonacularAnalyzedInstruction();
+        instruction.setSteps(List.of(step));
+        return instruction;
+    }
+
+    private SpoonacularNutrition nutrition() {
+        SpoonacularNutrient calories = new SpoonacularNutrient();
+        calories.setName("Calories");
+        calories.setAmount(new BigDecimal("510.4"));
+        calories.setUnit("kcal");
+        SpoonacularNutrition nutrition = new SpoonacularNutrition();
+        nutrition.setNutrients(List.of(calories));
+        return nutrition;
+    }
+
+    private static class StaticClient implements ExternalRecipeClient {
+
+        private final List<SpoonacularRecipe> recipes;
+
+        private StaticClient(List<SpoonacularRecipe> recipes) {
+            this.recipes = recipes;
         }
 
         @Override
-        public List<TheMealDbMeal> searchMeals(String search) {
+        public List<SpoonacularRecipe> searchRecipes(String search) {
+            return recipes;
+        }
+
+        @Override
+        public Optional<SpoonacularRecipe> getRecipeInformation(Long id) {
+            return recipes.stream().filter(recipe -> id.equals(recipe.getId())).findFirst();
+        }
+    }
+
+    private static class CapturingClient extends StaticClient {
+
+        private String search;
+
+        private CapturingClient(List<SpoonacularRecipe> recipes) {
+            super(recipes);
+        }
+
+        @Override
+        public List<SpoonacularRecipe> searchRecipes(String search) {
             this.search = search;
-            return meals;
+            return super.searchRecipes(search);
         }
     }
 
     private static class CountingClient implements ExternalRecipeClient {
 
-        private final List<List<TheMealDbMeal>> responses;
+        private final List<List<SpoonacularRecipe>> responses;
         private int callCount;
         private boolean fail;
         private String lastSearch;
 
         @SafeVarargs
-        private CountingClient(List<TheMealDbMeal>... responses) {
+        private CountingClient(List<SpoonacularRecipe>... responses) {
             this.responses = List.of(responses);
         }
 
         @Override
-        public List<TheMealDbMeal> searchMeals(String search) {
+        public List<SpoonacularRecipe> searchRecipes(String search) {
             callCount++;
             lastSearch = search;
             if (fail) {
-                throw new ExternalRecipeClientException("TheMealDB unavailable");
+                throw new ExternalRecipeClientException("Spoonacular unavailable");
             }
             int index = Math.min(callCount - 1, responses.size() - 1);
             return responses.get(index);
+        }
+
+        @Override
+        public Optional<SpoonacularRecipe> getRecipeInformation(Long id) {
+            return Optional.empty();
+        }
+    }
+
+    private static class FailingClient implements ExternalRecipeClient {
+
+        @Override
+        public List<SpoonacularRecipe> searchRecipes(String search) {
+            throw new ExternalRecipeClientException("Spoonacular unavailable");
+        }
+
+        @Override
+        public Optional<SpoonacularRecipe> getRecipeInformation(Long id) {
+            throw new ExternalRecipeClientException("Spoonacular unavailable");
         }
     }
 
