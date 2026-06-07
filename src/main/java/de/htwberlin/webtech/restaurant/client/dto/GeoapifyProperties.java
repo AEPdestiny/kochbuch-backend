@@ -3,12 +3,16 @@ package de.htwberlin.webtech.restaurant.client.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class GeoapifyProperties {
 
     private String name;
     private String formatted;
     private Integer distance;
+    private List<String> categories = new ArrayList<>();
 
     @JsonProperty("address_line1")
     private String addressLine1;
@@ -35,6 +39,14 @@ public class GeoapifyProperties {
 
     public void setDistance(Integer distance) {
         this.distance = distance;
+    }
+
+    public List<String> getCategories() {
+        return categories;
+    }
+
+    public void setCategories(List<String> categories) {
+        this.categories = categories == null ? new ArrayList<>() : categories;
     }
 
     public String getAddressLine1() {

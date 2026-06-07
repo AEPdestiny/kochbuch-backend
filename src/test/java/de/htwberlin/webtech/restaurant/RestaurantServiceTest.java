@@ -28,17 +28,16 @@ class RestaurantServiceTest {
 
     @Test
     void search_should_map_geoapify_restaurants() {
-        doReturn(response(feature("Pasta Place", "Pasta Street 1, Berlin", 850, 13.4052, 52.5201)))
-                .when(geoapifyClient).searchRestaurants("Pizza", 52.52, 13.405, 5000, 5);
+        doReturn(response(feature("Pizza Place", "Pizza Street 1, Berlin", 850, 13.4052, 52.5201)))
+                .when(geoapifyClient).searchRestaurants("pizza", 52.52, 13.405, 5000, 5);
 
         List<RestaurantResponse> result = underTest.search(request(" Pizza ", 52.52, 13.405));
 
-        verify(geoapifyClient).searchRestaurants("Pizza", 52.52, 13.405, 5000, 5);
-        verifyNoMoreInteractions(geoapifyClient);
+        verify(geoapifyClient).searchRestaurants("pizza", 52.52, 13.405, 5000, 5);
         assertEquals(1, result.size());
         RestaurantResponse restaurant = result.getFirst();
-        assertEquals("Pasta Place", restaurant.getName());
-        assertEquals("Pasta Street 1, Berlin", restaurant.getAddress());
+        assertEquals("Pizza Place", restaurant.getName());
+        assertEquals("Pizza Street 1, Berlin", restaurant.getAddress());
         assertEquals(850, restaurant.getDistanceMeters());
         assertEquals(52.5201, restaurant.getLatitude());
         assertEquals(13.4052, restaurant.getLongitude());
@@ -46,13 +45,63 @@ class RestaurantServiceTest {
     }
 
     @Test
+    void search_should_normalize_pizza_recipe_title_to_pizza_search_term() {
+        doReturn(response(feature("Pizza Napoli", "Pizza Street 1", 300, 13.4052, 52.5201)))
+                .when(geoapifyClient).searchRestaurants("pizza", 52.52, 13.405, 5000, 5);
+
+        List<RestaurantResponse> result = underTest.search(request("Pizza Margherita", 52.52, 13.405));
+
+        verify(geoapifyClient).searchRestaurants("pizza", 52.52, 13.405, 5000, 5);
+        assertEquals("Pizza Napoli", result.getFirst().getName());
+    }
+
+    @Test
+    void search_should_normalize_sushi_recipe_title_to_sushi_search_term() {
+        doReturn(response(feature("Sushi House", "Sushi Street 1", 300, 13.4052, 52.5201)))
+                .when(geoapifyClient).searchRestaurants("sushi", 52.52, 13.405, 5000, 5);
+
+        List<RestaurantResponse> result = underTest.search(request("Sushi Bowl", 52.52, 13.405));
+
+        verify(geoapifyClient).searchRestaurants("sushi", 52.52, 13.405, 5000, 5);
+        assertEquals("Sushi House", result.getFirst().getName());
+    }
+
+    @Test
+    void search_should_prefer_matching_restaurants() {
+        doReturn(response(
+                feature("Generic Restaurant", "Main Street 1", 100, 13.4052, 52.5201),
+                feature("Pizza Napoli", "Pizza Street 1", 500, 13.4062, 52.5211)
+        )).when(geoapifyClient).searchRestaurants("pizza", 52.52, 13.405, 5000, 5);
+
+        List<RestaurantResponse> result = underTest.search(request("Pizza Margherita", 52.52, 13.405));
+
+        assertEquals("Pizza Napoli", result.getFirst().getName());
+        assertEquals("Generic Restaurant", result.get(1).getName());
+    }
+
+    @Test
+    void search_should_fallback_to_general_restaurants_when_recipe_search_has_no_matching_results() {
+        doReturn(response(feature("Generic Restaurant", "Main Street 1", 100, 13.4052, 52.5201)))
+                .when(geoapifyClient).searchRestaurants("sushi", 52.52, 13.405, 5000, 5);
+        doReturn(response(feature("Nearby Restaurant", "Nearby Street 1", 200, 13.4062, 52.5211)))
+                .when(geoapifyClient).searchRestaurants("", 52.52, 13.405, 5000, 5);
+
+        List<RestaurantResponse> result = underTest.search(request("Sushi Bowl", 52.52, 13.405));
+
+        verify(geoapifyClient).searchRestaurants("sushi", 52.52, 13.405, 5000, 5);
+        verify(geoapifyClient).searchRestaurants("", 52.52, 13.405, 5000, 5);
+        assertEquals(1, result.size());
+        assertEquals("Nearby Restaurant", result.getFirst().getName());
+    }
+
+    @Test
     void search_should_return_empty_list_for_geoapify_error() {
         doThrow(new GeoapifyClientException("Geoapify API key is not configured."))
-                .when(geoapifyClient).searchRestaurants("Pizza", 52.52, 13.405, 5000, 5);
+                .when(geoapifyClient).searchRestaurants("pizza", 52.52, 13.405, 5000, 5);
 
         List<RestaurantResponse> result = underTest.search(request("Pizza", 52.52, 13.405));
 
-        verify(geoapifyClient).searchRestaurants("Pizza", 52.52, 13.405, 5000, 5);
+        verify(geoapifyClient).searchRestaurants("pizza", 52.52, 13.405, 5000, 5);
         verifyNoMoreInteractions(geoapifyClient);
         assertTrue(result.isEmpty());
     }
@@ -61,7 +110,8 @@ class RestaurantServiceTest {
     void search_should_skip_results_without_coordinates() {
         GeoapifyFeature feature = feature("No Coordinates", "Unknown", 100, 13.4052, 52.5201);
         feature.setGeometry(new GeoapifyGeometry());
-        doReturn(response(feature)).when(geoapifyClient).searchRestaurants("Pizza", 52.52, 13.405, 5000, 5);
+        doReturn(response(feature)).when(geoapifyClient).searchRestaurants("pizza", 52.52, 13.405, 5000, 5);
+        doReturn(response()).when(geoapifyClient).searchRestaurants("", 52.52, 13.405, 5000, 5);
 
         List<RestaurantResponse> result = underTest.search(request("Pizza", 52.52, 13.405));
 
@@ -87,6 +137,7 @@ class RestaurantServiceTest {
         properties.setName(name);
         properties.setFormatted(address);
         properties.setDistance(distance);
+        properties.setCategories(List.of("catering.restaurant"));
 
         GeoapifyGeometry geometry = new GeoapifyGeometry();
         geometry.setCoordinates(List.of(longitude, latitude));

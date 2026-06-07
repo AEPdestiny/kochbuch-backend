@@ -11,7 +11,11 @@ import de.htwberlin.webtech.restaurant.dto.RestaurantResponse;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 @ApplicationScoped
@@ -20,6 +24,15 @@ public class RestaurantService {
     private static final Logger LOG = Logger.getLogger(RestaurantService.class);
     private static final int SEARCH_RADIUS_METERS = 5000;
     private static final int SEARCH_LIMIT = 5;
+    private static final Map<String, List<String>> FOOD_KEYWORDS = Map.ofEntries(
+            Map.entry("pizza", List.of("pizza", "italian", "italienisch", "pizzeria")),
+            Map.entry("sushi", List.of("sushi", "japanese", "japanisch")),
+            Map.entry("pasta", List.of("pasta", "carbonara", "bolognese", "italian", "italienisch")),
+            Map.entry("burger", List.of("burger", "hamburger")),
+            Map.entry("kebab", List.of("döner", "doener", "doner", "kebab")),
+            Map.entry("curry", List.of("curry", "indian", "indisch")),
+            Map.entry("tacos", List.of("taco", "tacos", "mexican", "mexikanisch"))
+    );
 
     private final GeoapifyClient geoapifyClient;
 
@@ -28,17 +41,26 @@ public class RestaurantService {
     }
 
     public List<RestaurantResponse> search(RestaurantSearchRequest request) {
+        String searchTerm = searchTerm(request.getQuery());
         try {
-            GeoapifyResponse response = geoapifyClient.searchRestaurants(
-                    request.getQuery().trim(),
+            List<RankedRestaurant> rankedRestaurants = fetchRanked(
+                    searchTerm,
                     request.getLatitude(),
-                    request.getLongitude(),
-                    SEARCH_RADIUS_METERS,
-                    SEARCH_LIMIT
+                    request.getLongitude()
             );
-            return response.getFeatures().stream()
-                    .map(this::toResponse)
-                    .filter(Objects::nonNull)
+
+            boolean hasMatchingResult = rankedRestaurants.stream()
+                    .anyMatch(restaurant -> restaurant.score() > 0);
+            if (searchTerm.isBlank() || hasMatchingResult) {
+                return rankedRestaurants.stream()
+                        .sorted(Comparator.comparingInt(RankedRestaurant::score).reversed()
+                                .thenComparing(restaurant -> restaurant.response().getDistanceMeters()))
+                        .map(RankedRestaurant::response)
+                        .toList();
+            }
+
+            return fetchRanked("", request.getLatitude(), request.getLongitude()).stream()
+                    .map(RankedRestaurant::response)
                     .toList();
         } catch (GeoapifyClientException exception) {
             LOG.warnf("Geoapify restaurant search failed: %s", exception.getMessage());
@@ -46,7 +68,21 @@ public class RestaurantService {
         }
     }
 
-    private RestaurantResponse toResponse(GeoapifyFeature feature) {
+    private List<RankedRestaurant> fetchRanked(String searchTerm, double latitude, double longitude) {
+        GeoapifyResponse response = geoapifyClient.searchRestaurants(
+                searchTerm,
+                latitude,
+                longitude,
+                SEARCH_RADIUS_METERS,
+                SEARCH_LIMIT
+        );
+        return response.getFeatures().stream()
+                .map(feature -> toRankedResponse(feature, searchTerm))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private RankedRestaurant toRankedResponse(GeoapifyFeature feature, String searchTerm) {
         if (feature == null || feature.getGeometry() == null || feature.getProperties() == null) {
             return null;
         }
@@ -64,7 +100,36 @@ public class RestaurantService {
         response.setLatitude(coordinates.latitude());
         response.setLongitude(coordinates.longitude());
         response.setGoogleMapsUrl(googleMapsUrl(coordinates.latitude(), coordinates.longitude()));
-        return response;
+        return new RankedRestaurant(response, score(properties, searchTerm));
+    }
+
+    private String searchTerm(String query) {
+        String normalized = normalize(query);
+        return FOOD_KEYWORDS.entrySet().stream()
+                .filter(entry -> entry.getValue().stream().anyMatch(normalized::contains))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(normalized);
+    }
+
+    private int score(GeoapifyProperties properties, String searchTerm) {
+        if (searchTerm == null || searchTerm.isBlank()) {
+            return 0;
+        }
+        List<String> aliases = new ArrayList<>();
+        aliases.add(searchTerm);
+        aliases.addAll(FOOD_KEYWORDS.getOrDefault(searchTerm, List.of()));
+        String haystack = normalize(String.join(" ",
+                valueOrDefault(properties.getName(), ""),
+                valueOrDefault(properties.getFormatted(), ""),
+                valueOrDefault(properties.getAddressLine1(), ""),
+                String.join(" ", properties.getCategories())
+        ));
+        return aliases.stream().anyMatch(alias -> haystack.contains(normalize(alias))) ? 1 : 0;
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private Coordinates coordinates(GeoapifyGeometry geometry) {
@@ -84,5 +149,8 @@ public class RestaurantService {
     }
 
     private record Coordinates(double latitude, double longitude) {
+    }
+
+    private record RankedRestaurant(RestaurantResponse response, int score) {
     }
 }

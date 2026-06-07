@@ -74,8 +74,10 @@ public class GeoapifyClient {
                 + "&filter=circle:" + longitude + "," + latitude + "," + radiusMeters
                 + "&bias=proximity:" + longitude + "," + latitude
                 + "&limit=" + limit
-                + "&text=" + encode(query)
                 + "&apiKey=" + encode(configuredApiKey);
+        if (query != null && !query.isBlank()) {
+            url += "&name=" + encode(query);
+        }
         return URI.create(url);
     }
 
