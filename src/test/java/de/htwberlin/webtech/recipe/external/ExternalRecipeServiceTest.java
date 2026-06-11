@@ -1,9 +1,11 @@
 package de.htwberlin.webtech.recipe.external;
 
 import de.htwberlin.webtech.recipe.dto.ExternalRecipeDetailResponse;
+import de.htwberlin.webtech.recipe.dto.ExternalRecipeMatchResponse;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularAnalyzedInstruction;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularIngredient;
+import de.htwberlin.webtech.recipe.external.dto.SpoonacularIngredientMatch;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularInstructionStep;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularNutrient;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularNutrition;
@@ -144,6 +146,20 @@ class ExternalRecipeServiceTest {
         assertTrue(detail.isEmpty());
     }
 
+    @Test
+    void findRecipesByIngredients_should_map_matches() {
+        ExternalRecipeService service = new ExternalRecipeService(new StaticClient(List.of(recipe())));
+
+        List<ExternalRecipeMatchResponse> matches = service.findRecipesByIngredients(List.of("pasta", "tomato"));
+
+        assertEquals(1, matches.size());
+        assertEquals("Pasta with Garlic", matches.getFirst().getTitle());
+        assertEquals(1, matches.getFirst().getUsedIngredientCount());
+        assertEquals(1, matches.getFirst().getMissedIngredientCount());
+        assertEquals("pasta", matches.getFirst().getUsedIngredients().getFirst());
+        assertEquals("garlic", matches.getFirst().getMissedIngredients().getFirst());
+    }
+
     private SpoonacularRecipe recipe() {
         return recipe("Pasta with Garlic");
     }
@@ -209,6 +225,26 @@ class ExternalRecipeServiceTest {
         public Optional<SpoonacularRecipe> getRecipeInformation(Long id) {
             return recipes.stream().filter(recipe -> id.equals(recipe.getId())).findFirst();
         }
+
+        @Override
+        public List<SpoonacularIngredientMatch> findByIngredients(List<String> ingredients) {
+            SpoonacularIngredientMatch match = new SpoonacularIngredientMatch();
+            match.setId(716429L);
+            match.setTitle("Pasta with Garlic");
+            match.setImage("https://example.com/pasta.jpg");
+            match.setUsedIngredientCount(1);
+            match.setMissedIngredientCount(1);
+            match.setUsedIngredients(List.of(matchIngredient("pasta")));
+            match.setMissedIngredients(List.of(matchIngredient("garlic")));
+            return List.of(match);
+        }
+
+        private SpoonacularIngredient matchIngredient(String name) {
+            SpoonacularIngredient ingredient = new SpoonacularIngredient();
+            ingredient.setName(name);
+            ingredient.setOriginal(name);
+            return ingredient;
+        }
     }
 
     private static class CapturingClient extends StaticClient {
@@ -253,6 +289,11 @@ class ExternalRecipeServiceTest {
         public Optional<SpoonacularRecipe> getRecipeInformation(Long id) {
             return Optional.empty();
         }
+
+        @Override
+        public List<SpoonacularIngredientMatch> findByIngredients(List<String> ingredients) {
+            return List.of();
+        }
     }
 
     private static class FailingClient implements ExternalRecipeClient {
@@ -264,6 +305,11 @@ class ExternalRecipeServiceTest {
 
         @Override
         public Optional<SpoonacularRecipe> getRecipeInformation(Long id) {
+            throw new ExternalRecipeClientException("Spoonacular unavailable");
+        }
+
+        @Override
+        public List<SpoonacularIngredientMatch> findByIngredients(List<String> ingredients) {
             throw new ExternalRecipeClientException("Spoonacular unavailable");
         }
     }

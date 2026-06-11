@@ -2,6 +2,7 @@ package de.htwberlin.webtech.recipe.resource;
 
 import de.htwberlin.webtech.recipe.dto.RecipeRequest;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
+import de.htwberlin.webtech.recipe.dto.ExternalRecipeMatchResponse;
 import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
 import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
 import de.htwberlin.webtech.recipe.mapper.RecipeMapper;
@@ -28,6 +29,7 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.List;
+import java.util.Arrays;
 
 @Path("/recipes")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -145,5 +147,17 @@ public class RecipeResource {
         return externalService.fetchExternalRecipeDetail(id)
                 .map(detail -> Response.ok(detail).build())
                 .orElseThrow(() -> new RecipeNotFoundException(id));
+    }
+
+    @GET
+    @Path("/external/by-ingredients")
+    @Operation(summary = "Find external recipes by ingredients", description = "Returns Spoonacular recipe matches for a comma separated ingredient list.")
+    @APIResponse(responseCode = "200", description = "External recipe matches returned")
+    public List<ExternalRecipeMatchResponse> findExternalByIngredients(@QueryParam("ingredients") String ingredients) {
+        List<String> ingredientList = ingredients == null ? List.of() : Arrays.stream(ingredients.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList();
+        return externalService.findRecipesByIngredients(ingredientList);
     }
 }

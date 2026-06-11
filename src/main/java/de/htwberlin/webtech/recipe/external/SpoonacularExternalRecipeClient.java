@@ -3,6 +3,7 @@ package de.htwberlin.webtech.recipe.external;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularRecipe;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularSearchResponse;
+import de.htwberlin.webtech.recipe.external.dto.SpoonacularIngredientMatch;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -82,6 +83,27 @@ public class SpoonacularExternalRecipeClient implements ExternalRecipeClient {
             }
 
             return Optional.of(objectMapper.readValue(response.body(), SpoonacularRecipe.class));
+        } catch (IOException e) {
+            throw new ExternalRecipeClientException("Could not read Spoonacular response.", e);
+        }
+    }
+
+    @Override
+    public List<SpoonacularIngredientMatch> findByIngredients(List<String> ingredients) {
+        String key = requireApiKey();
+        URI uri = URI.create(BASE_URL + "/findByIngredients"
+                + "?ingredients=" + encode(String.join(",", ingredients))
+                + "&number=12"
+                + "&ranking=1"
+                + "&ignorePantry=true"
+                + "&apiKey=" + encode(key));
+
+        try {
+            HttpResponse<String> response = send(uri);
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new ExternalRecipeClientException("Spoonacular returned HTTP " + response.statusCode());
+            }
+            return List.of(objectMapper.readValue(response.body(), SpoonacularIngredientMatch[].class));
         } catch (IOException e) {
             throw new ExternalRecipeClientException("Could not read Spoonacular response.", e);
         }

@@ -2,7 +2,9 @@ package de.htwberlin.webtech.recipe.external;
 
 import de.htwberlin.webtech.recipe.dto.ExternalRecipeDetailResponse;
 import de.htwberlin.webtech.recipe.dto.ExternalRecipeIngredientResponse;
+import de.htwberlin.webtech.recipe.dto.ExternalRecipeMatchResponse;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
+import de.htwberlin.webtech.recipe.external.dto.SpoonacularIngredientMatch;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularIngredient;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularInstructionStep;
 import de.htwberlin.webtech.recipe.external.dto.SpoonacularNutrient;
@@ -84,6 +86,26 @@ public class ExternalRecipeService {
         }
     }
 
+    public List<ExternalRecipeMatchResponse> findRecipesByIngredients(List<String> ingredients) {
+        List<String> normalized = ingredients == null ? List.of() : ingredients.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (normalized.isEmpty()) {
+            return List.of();
+        }
+
+        try {
+            return client.findByIngredients(normalized).stream()
+                    .map(this::mapToMatchResponse)
+                    .toList();
+        } catch (RuntimeException e) {
+            LOG.warnf("Could not fetch external recipes by ingredients from Spoonacular: %s. Returning empty list.", e.getMessage());
+            return List.of();
+        }
+    }
+
     RecipeResponse mapToListResponse(SpoonacularRecipe recipe) {
         RecipeResponse response = new RecipeResponse();
         response.setId(recipe.getId());
@@ -127,6 +149,20 @@ public class ExternalRecipeService {
         return response;
     }
 
+    ExternalRecipeMatchResponse mapToMatchResponse(SpoonacularIngredientMatch match) {
+        ExternalRecipeMatchResponse response = new ExternalRecipeMatchResponse();
+        response.setId(match.getId());
+        response.setExternalId(match.getId() == null ? null : match.getId().toString());
+        response.setSource(SOURCE);
+        response.setTitle(valueOrDefault(match.getTitle(), "External recipe"));
+        response.setImageUrl(valueOrDefault(match.getImage(), ""));
+        response.setUsedIngredientCount(valueOrZero(match.getUsedIngredientCount()));
+        response.setMissedIngredientCount(valueOrZero(match.getMissedIngredientCount()));
+        response.setUsedIngredients(mapIngredientNames(match.getUsedIngredients()));
+        response.setMissedIngredients(mapIngredientNames(match.getMissedIngredients()));
+        return response;
+    }
+
     private String normalizeSearch(String search) {
         if (search == null || search.isBlank()) {
             return DEFAULT_SEARCH;
@@ -165,6 +201,16 @@ public class ExternalRecipeService {
         }
         return ingredients.stream()
                 .map(this::mapIngredient)
+                .toList();
+    }
+
+    private List<String> mapIngredientNames(List<SpoonacularIngredient> ingredients) {
+        if (ingredients == null) {
+            return List.of();
+        }
+        return ingredients.stream()
+                .map(ingredient -> firstNonBlank(ingredient.getName(), ingredient.getOriginal()))
+                .filter(value -> value != null && !value.isBlank())
                 .toList();
     }
 
