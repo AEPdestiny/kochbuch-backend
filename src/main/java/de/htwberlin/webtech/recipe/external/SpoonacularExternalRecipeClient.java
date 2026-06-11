@@ -41,14 +41,28 @@ public class SpoonacularExternalRecipeClient implements ExternalRecipeClient {
 
     @Override
     public List<SpoonacularRecipe> searchRecipes(String search) {
+        return searchRecipes(search, null, null, null, null);
+    }
+
+    @Override
+    public List<SpoonacularRecipe> searchRecipes(String search, String diet, String intolerances, Integer maxReadyTime, String type) {
         String key = requireApiKey();
-        URI uri = URI.create(BASE_URL + "/complexSearch"
+        StringBuilder uriBuilder = new StringBuilder(BASE_URL + "/complexSearch"
                 + "?query=" + encode(search)
                 + "&number=12"
                 + "&addRecipeInformation=true"
                 + "&fillIngredients=true"
                 + "&instructionsRequired=false"
                 + "&apiKey=" + encode(key));
+
+        appendIfPresent(uriBuilder, "diet", diet);
+        appendIfPresent(uriBuilder, "intolerances", intolerances);
+        appendIfPresent(uriBuilder, "type", type);
+        if (maxReadyTime != null && maxReadyTime > 0) {
+            uriBuilder.append("&maxReadyTime=").append(maxReadyTime);
+        }
+
+        URI uri = URI.create(uriBuilder.toString());
 
         try {
             HttpResponse<String> response = send(uri);
@@ -127,6 +141,12 @@ public class SpoonacularExternalRecipeClient implements ExternalRecipeClient {
 
     private String requireApiKey() {
         return apiKey.orElseThrow(() -> new ExternalRecipeClientException("Spoonacular API key is not configured."));
+    }
+
+    private void appendIfPresent(StringBuilder uriBuilder, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            uriBuilder.append("&").append(key).append("=").append(encode(value.trim()));
+        }
     }
 
     private String encode(String value) {

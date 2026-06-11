@@ -8,6 +8,7 @@ public class MealPlanEntryResponse {
 
     private Long id;
     private LocalDate plannedDate;
+    private String mealSlot;
     private RecipeResponse recipe;
 
     public Long getId() {
@@ -24,6 +25,14 @@ public class MealPlanEntryResponse {
 
     public void setPlannedDate(LocalDate plannedDate) {
         this.plannedDate = plannedDate;
+    }
+
+    public String getMealSlot() {
+        return mealSlot;
+    }
+
+    public void setMealSlot(String mealSlot) {
+        this.mealSlot = mealSlot;
     }
 
     public RecipeResponse getRecipe() {

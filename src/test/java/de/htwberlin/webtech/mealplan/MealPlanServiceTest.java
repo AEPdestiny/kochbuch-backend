@@ -2,6 +2,7 @@ package de.htwberlin.webtech.mealplan;
 
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryRequest;
 import de.htwberlin.webtech.mealplan.entity.MealPlan;
+import de.htwberlin.webtech.mealplan.entity.MealSlot;
 import de.htwberlin.webtech.mealplan.exception.MealPlanEntryNotFoundException;
 import de.htwberlin.webtech.mealplan.repository.MealPlanRepository;
 import de.htwberlin.webtech.mealplan.service.MealPlanService;
@@ -107,6 +108,25 @@ class MealPlanServiceTest {
     }
 
     @Test
+    @DisplayName("setRecipeForSlot should create entry for selected slot")
+    void setRecipeForSlot_should_create_entry_for_selected_slot() {
+        AppUser owner = user(1L);
+        Recipe recipe = recipe(10L, owner);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        doReturn(recipe).when(recipeRepository).findById(10L);
+        doReturn(Optional.empty()).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.BREAKFAST);
+
+        MealPlan result = underTest.setRecipeForSlot(owner, date, MealSlot.BREAKFAST, request(10L));
+
+        verify(recipeRepository).findById(10L);
+        verify(mealPlanRepository).findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.BREAKFAST);
+        verify(mealPlanRepository).persist(result);
+        assertEquals(MealSlot.BREAKFAST, result.getMealSlot());
+        assertSame(recipe, result.getRecipe());
+    }
+
+    @Test
     @DisplayName("setRecipeForDay should reject foreign recipe")
     void setRecipeForDay_should_reject_foreign_recipe() {
         AppUser owner = user(1L);
@@ -165,6 +185,22 @@ class MealPlanServiceTest {
 
         verify(mealPlanRepository).findByOwnerAndPlannedDate(owner, date);
         verifyNoMoreInteractions(mealPlanRepository, recipeRepository);
+    }
+
+    @Test
+    @DisplayName("deleteForSlot should delete selected slot")
+    void deleteForSlot_should_delete_selected_slot() {
+        AppUser owner = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        MealPlan existing = mealPlan(owner, recipe(10L, owner), date);
+        existing.setMealSlot(MealSlot.SNACK);
+        doReturn(Optional.of(existing)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.SNACK);
+
+        underTest.deleteForSlot(owner, date, MealSlot.SNACK);
+
+        verify(mealPlanRepository).findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.SNACK);
+        verify(mealPlanRepository).delete(existing);
     }
 
     private MealPlanEntryRequest request(Long recipeId) {

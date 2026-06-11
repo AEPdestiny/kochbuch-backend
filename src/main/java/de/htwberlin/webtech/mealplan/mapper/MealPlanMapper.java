@@ -22,6 +22,7 @@ public class MealPlanMapper {
         MealPlanEntryResponse response = new MealPlanEntryResponse();
         response.setId(mealPlan.getId());
         response.setPlannedDate(mealPlan.getPlannedDate());
+        response.setMealSlot(mealPlan.getMealSlot().name().toLowerCase());
         response.setRecipe(recipeMapper.toResponse(mealPlan.getRecipe()));
         return response;
     }

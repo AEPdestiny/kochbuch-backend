@@ -126,7 +126,7 @@ class RecipeResourceTest {
 
     @Test
     void getExternal_should_return_ok() {
-        doReturn(List.of(externalRecipe("Ext"))).when(externalRecipeService).fetchExternalRecipes(null);
+        doReturn(List.of(externalRecipe("Ext"))).when(externalRecipeService).fetchExternalRecipes(null, null, null, null, null);
 
         given()
                 .when().get("/recipes/external")
@@ -138,7 +138,7 @@ class RecipeResourceTest {
 
     @Test
     void getExternal_should_pass_search_query() {
-        doReturn(List.of(externalRecipe("Pasta"))).when(externalRecipeService).fetchExternalRecipes("pasta");
+        doReturn(List.of(externalRecipe("Pasta"))).when(externalRecipeService).fetchExternalRecipes("pasta", null, null, null, null);
 
         given()
                 .queryParam("search", "pasta")
@@ -148,7 +148,7 @@ class RecipeResourceTest {
                 .body("$", hasSize(1))
                 .body("[0].title", equalTo("Pasta"));
 
-        verify(externalRecipeService).fetchExternalRecipes("pasta");
+        verify(externalRecipeService).fetchExternalRecipes("pasta", null, null, null, null);
     }
 
     @Test

@@ -3,6 +3,7 @@ package de.htwberlin.webtech.mealplan.resource;
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryRequest;
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryResponse;
 import de.htwberlin.webtech.mealplan.dto.MealPlanWeekResponse;
+import de.htwberlin.webtech.mealplan.entity.MealSlot;
 import de.htwberlin.webtech.mealplan.mapper.MealPlanMapper;
 import de.htwberlin.webtech.mealplan.service.MealPlanService;
 import de.htwberlin.webtech.security.UserContext;
@@ -82,6 +83,39 @@ public class MealPlanResource {
     public Response deleteDay(@PathParam("date") String date,
                               @HeaderParam("Authorization") String authorizationHeader) {
         service.deleteForDay(userContext.requireUser(authorizationHeader), parseDate(date));
+        return Response.noContent().build();
+    }
+
+    @PUT
+    @Path("/days/{date}/slots/{slot}")
+    @Operation(summary = "Set recipe for day slot", description = "Sets or replaces one owned recipe for a day and meal slot.")
+    @APIResponse(responseCode = "200", description = "Meal plan entry saved")
+    @APIResponse(responseCode = "400", description = "Invalid date, slot or request body")
+    @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
+    @APIResponse(responseCode = "403", description = "Only own recipes can be planned")
+    @APIResponse(responseCode = "404", description = "Recipe not found")
+    public MealPlanEntryResponse setSlot(@PathParam("date") String date,
+                                         @PathParam("slot") String slot,
+                                         @HeaderParam("Authorization") String authorizationHeader,
+                                         @Valid MealPlanEntryRequest request) {
+        return mapper.toResponse(service.setRecipeForSlot(
+                userContext.requireUser(authorizationHeader),
+                parseDate(date),
+                MealSlot.fromPath(slot),
+                request
+        ));
+    }
+
+    @DELETE
+    @Path("/days/{date}/slots/{slot}")
+    @Operation(summary = "Delete recipe for day slot", description = "Deletes the authenticated user's meal plan entry for a day and meal slot.")
+    @APIResponse(responseCode = "204", description = "Meal plan entry deleted")
+    @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
+    @APIResponse(responseCode = "404", description = "Meal plan entry not found")
+    public Response deleteSlot(@PathParam("date") String date,
+                               @PathParam("slot") String slot,
+                               @HeaderParam("Authorization") String authorizationHeader) {
+        service.deleteForSlot(userContext.requireUser(authorizationHeader), parseDate(date), MealSlot.fromPath(slot));
         return Response.noContent().build();
     }
 

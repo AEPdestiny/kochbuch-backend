@@ -10,6 +10,10 @@ public interface ExternalRecipeClient {
 
     List<SpoonacularRecipe> searchRecipes(String search);
 
+    default List<SpoonacularRecipe> searchRecipes(String search, String diet, String intolerances, Integer maxReadyTime, String type) {
+        return searchRecipes(search);
+    }
+
     Optional<SpoonacularRecipe> getRecipeInformation(Long id);
 
     List<SpoonacularIngredientMatch> findByIngredients(List<String> ingredients);

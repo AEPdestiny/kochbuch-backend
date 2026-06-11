@@ -54,25 +54,30 @@ public class ExternalRecipeService {
     }
 
     public List<RecipeResponse> fetchExternalRecipes(String search) {
+        return fetchExternalRecipes(search, null, null, null, null);
+    }
+
+    public List<RecipeResponse> fetchExternalRecipes(String search, String diet, String intolerances, Integer maxReadyTime, String type) {
         String query = normalizeSearch(search);
-        CacheEntry cached = cache.get(query);
+        String cacheKey = cacheKey(query, diet, intolerances, maxReadyTime, type);
+        CacheEntry cached = cache.get(cacheKey);
         if (cached != null && !cached.isExpired(now())) {
             return cached.recipes();
         }
 
         try {
-            List<RecipeResponse> recipes = client.searchRecipes(query).stream()
+            List<RecipeResponse> recipes = client.searchRecipes(query, normalizeOptional(diet), normalizeOptional(intolerances), maxReadyTime, normalizeOptional(type)).stream()
                     .map(this::mapToListResponse)
                     .toList();
-            cache.put(query, new CacheEntry(recipes, now()));
+            cache.put(cacheKey, new CacheEntry(recipes, now()));
             evictOldestEntriesIfNecessary();
             return recipes;
         } catch (RuntimeException e) {
             if (cached != null) {
-                LOG.warnf("Could not refresh external recipes from Spoonacular for search '%s': %s. Returning stale cache.", query, e.getMessage());
+                LOG.warnf("Could not refresh external recipes from Spoonacular for search '%s': %s. Returning stale cache.", cacheKey, e.getMessage());
                 return cached.recipes();
             }
-            LOG.warnf("Could not fetch external recipes from Spoonacular for search '%s': %s. Returning empty list.", query, e.getMessage());
+            LOG.warnf("Could not fetch external recipes from Spoonacular for search '%s': %s. Returning empty list.", cacheKey, e.getMessage());
             return List.of();
         }
     }
@@ -168,6 +173,20 @@ public class ExternalRecipeService {
             return DEFAULT_SEARCH;
         }
         return search.trim().toLowerCase();
+    }
+
+    private String normalizeOptional(String value) {
+        return value == null || value.isBlank() ? null : value.trim().toLowerCase();
+    }
+
+    private String cacheKey(String search, String diet, String intolerances, Integer maxReadyTime, String type) {
+        return String.join("|",
+                search,
+                valueOrDefault(normalizeOptional(diet), ""),
+                valueOrDefault(normalizeOptional(intolerances), ""),
+                maxReadyTime == null ? "" : maxReadyTime.toString(),
+                valueOrDefault(normalizeOptional(type), "")
+        );
     }
 
     private Instant now() {

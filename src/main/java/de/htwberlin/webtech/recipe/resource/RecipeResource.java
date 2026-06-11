@@ -134,8 +134,14 @@ public class RecipeResource {
     @Path("/external")
     @Operation(summary = "List external recipes", description = "Returns recipes fetched from Spoonacular. Optional search query filters the external source.")
     @APIResponse(responseCode = "200", description = "External recipes returned")
-    public List<RecipeResponse> getExternal(@QueryParam("search") String search) {
-        return externalService.fetchExternalRecipes(search);
+    public List<RecipeResponse> getExternal(
+            @QueryParam("search") String search,
+            @QueryParam("diet") String diet,
+            @QueryParam("intolerances") String intolerances,
+            @QueryParam("maxReadyTime") Integer maxReadyTime,
+            @QueryParam("type") String type
+    ) {
+        return externalService.fetchExternalRecipes(search, diet, intolerances, maxReadyTime, type);
     }
 
     @GET

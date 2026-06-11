@@ -2,6 +2,7 @@ package de.htwberlin.webtech.mealplan;
 
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryRequest;
 import de.htwberlin.webtech.mealplan.entity.MealPlan;
+import de.htwberlin.webtech.mealplan.entity.MealSlot;
 import de.htwberlin.webtech.mealplan.exception.MealPlanEntryNotFoundException;
 import de.htwberlin.webtech.mealplan.service.MealPlanService;
 import de.htwberlin.webtech.recipe.entity.Recipe;
@@ -192,6 +193,50 @@ class MealPlanResourceTest {
     }
 
     @Test
+    void putSlot_should_return_ok_for_own_recipe() {
+        AppUser currentUser = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        MealPlan mealPlan = mealPlan(currentUser, recipe(10L, currentUser), date);
+        mealPlan.setMealSlot(MealSlot.BREAKFAST);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(mealPlan)
+                .when(mealPlanService).setRecipeForSlot(eq(currentUser), eq(date), eq(MealSlot.BREAKFAST), any(MealPlanEntryRequest.class));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "recipeId": 10
+                        }
+                        """)
+                .when().put("/meal-plan/days/2026-06-01/slots/breakfast")
+                .then()
+                .statusCode(200)
+                .body("mealSlot", equalTo("breakfast"))
+                .body("recipe.id", equalTo(10));
+    }
+
+    @Test
+    void putSlot_should_return_bad_request_for_invalid_slot() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "recipeId": 10
+                        }
+                        """)
+                .when().put("/meal-plan/days/2026-06-01/slots/brunch")
+                .then()
+                .statusCode(400)
+                .body("message", equalTo("mealSlot must be breakfast, lunch, dinner or snack."));
+    }
+
+    @Test
     void deleteDay_should_return_no_content_for_own_entry() {
         AppUser currentUser = user(1L);
         LocalDate date = LocalDate.of(2026, 6, 1);
@@ -219,6 +264,21 @@ class MealPlanResourceTest {
                 .then()
                 .statusCode(404)
                 .body("message", equalTo("Meal plan entry for date 2026-06-01 not found."));
+    }
+
+    @Test
+    void deleteSlot_should_return_no_content_for_own_entry() {
+        AppUser currentUser = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .when().delete("/meal-plan/days/2026-06-01/slots/snack")
+                .then()
+                .statusCode(204);
+
+        verify(mealPlanService).deleteForSlot(currentUser, date, MealSlot.SNACK);
     }
 
     private MealPlan mealPlan(AppUser owner, Recipe recipe, LocalDate plannedDate) {

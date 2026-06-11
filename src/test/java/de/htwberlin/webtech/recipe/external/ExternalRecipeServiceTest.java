@@ -56,6 +56,20 @@ class ExternalRecipeServiceTest {
     }
 
     @Test
+    void fetchExternalRecipes_should_pass_supported_filters_to_client() {
+        CapturingClient client = new CapturingClient(List.of(recipe()));
+        ExternalRecipeService service = new ExternalRecipeService(client);
+
+        service.fetchExternalRecipes("Bowl", "vegan", "gluten", 25, "lunch");
+
+        assertEquals("bowl", client.search);
+        assertEquals("vegan", client.diet);
+        assertEquals("gluten", client.intolerances);
+        assertEquals(25, client.maxReadyTime);
+        assertEquals("lunch", client.type);
+    }
+
+    @Test
     void fetchExternalRecipes_should_cache_same_search_term() {
         CountingClient client = new CountingClient(List.of(recipe("Pasta One")));
         ExternalRecipeService service = new ExternalRecipeService(client);
@@ -250,6 +264,10 @@ class ExternalRecipeServiceTest {
     private static class CapturingClient extends StaticClient {
 
         private String search;
+        private String diet;
+        private String intolerances;
+        private Integer maxReadyTime;
+        private String type;
 
         private CapturingClient(List<SpoonacularRecipe> recipes) {
             super(recipes);
@@ -258,6 +276,16 @@ class ExternalRecipeServiceTest {
         @Override
         public List<SpoonacularRecipe> searchRecipes(String search) {
             this.search = search;
+            return super.searchRecipes(search);
+        }
+
+        @Override
+        public List<SpoonacularRecipe> searchRecipes(String search, String diet, String intolerances, Integer maxReadyTime, String type) {
+            this.search = search;
+            this.diet = diet;
+            this.intolerances = intolerances;
+            this.maxReadyTime = maxReadyTime;
+            this.type = type;
             return super.searchRecipes(search);
         }
     }

@@ -2,6 +2,7 @@ package de.htwberlin.webtech.mealplan.service;
 
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryRequest;
 import de.htwberlin.webtech.mealplan.entity.MealPlan;
+import de.htwberlin.webtech.mealplan.entity.MealSlot;
 import de.htwberlin.webtech.mealplan.exception.MealPlanEntryNotFoundException;
 import de.htwberlin.webtech.mealplan.repository.MealPlanRepository;
 import de.htwberlin.webtech.recipe.entity.Recipe;
@@ -36,6 +37,11 @@ public class MealPlanService {
 
     @Transactional
     public MealPlan setRecipeForDay(AppUser currentUser, LocalDate plannedDate, MealPlanEntryRequest request) {
+        return setRecipeForSlot(currentUser, plannedDate, MealSlot.DINNER, request);
+    }
+
+    @Transactional
+    public MealPlan setRecipeForSlot(AppUser currentUser, LocalDate plannedDate, MealSlot mealSlot, MealPlanEntryRequest request) {
         if (request == null || request.getRecipeId() == null) {
             throw new IllegalArgumentException("recipeId must not be null.");
         }
@@ -46,14 +52,16 @@ public class MealPlanService {
         }
         ensureRecipeOwner(recipe, currentUser);
 
-        MealPlan mealPlan = mealPlanRepository.findByOwnerAndPlannedDate(currentUser, plannedDate)
+        MealPlan mealPlan = findEntry(currentUser, plannedDate, mealSlot)
                 .orElseGet(() -> {
                     MealPlan created = new MealPlan();
                     created.setOwner(currentUser);
                     created.setPlannedDate(plannedDate);
+                    created.setMealSlot(mealSlot);
                     return created;
                 });
         mealPlan.setRecipe(recipe);
+        mealPlan.setMealSlot(mealSlot);
         if (mealPlan.getId() == null) {
             mealPlanRepository.persist(mealPlan);
         }
@@ -62,7 +70,12 @@ public class MealPlanService {
 
     @Transactional
     public void deleteForDay(AppUser currentUser, LocalDate plannedDate) {
-        MealPlan mealPlan = mealPlanRepository.findByOwnerAndPlannedDate(currentUser, plannedDate)
+        deleteForSlot(currentUser, plannedDate, MealSlot.DINNER);
+    }
+
+    @Transactional
+    public void deleteForSlot(AppUser currentUser, LocalDate plannedDate, MealSlot mealSlot) {
+        MealPlan mealPlan = findEntry(currentUser, plannedDate, mealSlot)
                 .orElseThrow(() -> new MealPlanEntryNotFoundException(plannedDate));
         mealPlanRepository.delete(mealPlan);
     }
@@ -77,5 +90,12 @@ public class MealPlanService {
                 || !currentUser.getId().equals(recipe.getOwner().getId())) {
             throw new ForbiddenException("Only own recipes can be planned.");
         }
+    }
+
+    private java.util.Optional<MealPlan> findEntry(AppUser currentUser, LocalDate plannedDate, MealSlot mealSlot) {
+        if (mealSlot == MealSlot.DINNER) {
+            return mealPlanRepository.findByOwnerAndPlannedDate(currentUser, plannedDate);
+        }
+        return mealPlanRepository.findByOwnerAndPlannedDateAndMealSlot(currentUser, plannedDate, mealSlot);
     }
 }
