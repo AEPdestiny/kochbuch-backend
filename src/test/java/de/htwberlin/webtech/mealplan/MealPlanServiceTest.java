@@ -145,6 +145,27 @@ class MealPlanServiceTest {
     }
 
     @Test
+    @DisplayName("setRecipeForSlot should create custom title entry for every slot")
+    void setRecipeForSlot_should_create_custom_title_entry_for_every_slot() {
+        AppUser owner = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        for (MealSlot slot : MealSlot.values()) {
+            if (slot == MealSlot.DINNER) {
+                doReturn(Optional.empty()).when(mealPlanRepository).findByOwnerAndPlannedDate(owner, date);
+            } else {
+                doReturn(Optional.empty()).when(mealPlanRepository)
+                        .findByOwnerAndPlannedDateAndMealSlot(owner, date, slot);
+            }
+
+            MealPlan result = underTest.setRecipeForSlot(owner, date, slot, customRequest("Freitext " + slot.name()));
+
+            assertEquals(slot, result.getMealSlot());
+            assertEquals("Freitext " + slot.name(), result.getCustomTitle());
+            assertEquals(null, result.getRecipe());
+        }
+    }
+
+    @Test
     @DisplayName("setRecipeForSlot should reject missing recipe and custom title")
     void setRecipeForSlot_should_reject_missing_recipe_and_custom_title() {
         assertThrows(IllegalArgumentException.class,

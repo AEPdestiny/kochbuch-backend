@@ -39,16 +39,23 @@ class MealPlanRepositoryIntegrationTest {
     void should_save_custom_title_without_recipe() {
         AppUser owner = user("mealplan-custom-owner", "mealplan-custom-owner@example.com");
         userRepository.persistAndFlush(owner);
-        MealPlan entry = mealPlan(owner, LocalDate.of(2026, 6, 8), MealSlot.BREAKFAST);
-        entry.setCustomTitle("Lasagna Silvia");
+        LocalDate date = LocalDate.of(2026, 6, 8);
 
-        repository.persistAndFlush(entry);
-        MealPlan found = repository.findById(entry.getId());
+        for (MealSlot slot : MealSlot.values()) {
+            MealPlan entry = mealPlan(owner, date, slot);
+            entry.setCustomTitle("Lasagna Silvia " + slot.name());
+            repository.persist(entry);
+        }
+        repository.flush();
 
-        assertNotNull(found);
-        assertNull(found.getRecipe());
-        assertEquals("Lasagna Silvia", found.getCustomTitle());
-        assertEquals(MealSlot.BREAKFAST, found.getMealSlot());
+        var entries = repository.findByOwnerAndPlannedDateBetween(owner, date, date);
+
+        assertEquals(4, entries.size());
+        for (MealPlan entry : entries) {
+            assertNotNull(entry.getId());
+            assertNull(entry.getRecipe());
+            assertEquals("Lasagna Silvia " + entry.getMealSlot().name(), entry.getCustomTitle());
+        }
     }
 
     @Test
