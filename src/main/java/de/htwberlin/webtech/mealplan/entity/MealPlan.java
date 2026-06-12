@@ -34,9 +34,12 @@ public class MealPlan {
     @JoinColumn(name = "owner_id", nullable = false)
     private AppUser owner;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "recipe_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recipe_id")
     private Recipe recipe;
+
+    @Column(name = "custom_title")
+    private String customTitle;
 
     @Column(name = "planned_date", nullable = false)
     private LocalDate plannedDate;
@@ -88,6 +91,14 @@ public class MealPlan {
 
     public void setRecipe(Recipe recipe) {
         this.recipe = recipe;
+    }
+
+    public String getCustomTitle() {
+        return customTitle;
+    }
+
+    public void setCustomTitle(String customTitle) {
+        this.customTitle = customTitle;
     }
 
     public LocalDate getPlannedDate() {

@@ -23,7 +23,10 @@ public class MealPlanMapper {
         response.setId(mealPlan.getId());
         response.setPlannedDate(mealPlan.getPlannedDate());
         response.setMealSlot(mealPlan.getMealSlot().name().toLowerCase());
-        response.setRecipe(recipeMapper.toResponse(mealPlan.getRecipe()));
+        if (mealPlan.getRecipe() != null) {
+            response.setRecipe(recipeMapper.toResponse(mealPlan.getRecipe()));
+        }
+        response.setCustomTitle(mealPlan.getCustomTitle());
         return response;
     }
 

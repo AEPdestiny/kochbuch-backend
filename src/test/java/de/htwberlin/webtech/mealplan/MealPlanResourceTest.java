@@ -92,22 +92,28 @@ class MealPlanResourceTest {
         MealPlan lunch = mealPlan(currentUser, recipe(11L, currentUser), monday);
         lunch.setId(2L);
         lunch.setMealSlot(MealSlot.LUNCH);
+        MealPlan snack = mealPlan(currentUser, null, monday);
+        snack.setId(3L);
+        snack.setMealSlot(MealSlot.SNACK);
+        snack.setCustomTitle("Sushi frei");
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
         doReturn(monday).when(mealPlanService).normalizeWeekStart(null);
-        doReturn(List.of(breakfast, lunch)).when(mealPlanService).getWeek(currentUser, monday);
+        doReturn(List.of(breakfast, lunch, snack)).when(mealPlanService).getWeek(currentUser, monday);
 
         given()
                 .header("Authorization", "Bearer valid-token")
                 .when().get("/meal-plan/week")
                 .then()
                 .statusCode(200)
-                .body("entries", hasSize(2))
+                .body("entries", hasSize(3))
                 .body("entries[0].plannedDate", equalTo("2026-06-01"))
                 .body("entries[0].mealSlot", equalTo("breakfast"))
                 .body("entries[0].recipe.title", equalTo("Pasta 10"))
                 .body("entries[1].plannedDate", equalTo("2026-06-01"))
                 .body("entries[1].mealSlot", equalTo("lunch"))
-                .body("entries[1].recipe.title", equalTo("Pasta 11"));
+                .body("entries[1].recipe.title", equalTo("Pasta 11"))
+                .body("entries[2].mealSlot", equalTo("snack"))
+                .body("entries[2].customTitle", equalTo("Sushi frei"));
     }
 
     @Test
@@ -201,7 +207,10 @@ class MealPlanResourceTest {
     @Test
     void putDay_should_return_bad_request_for_missing_recipe_id() {
         AppUser currentUser = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doThrow(new IllegalArgumentException("recipeId or customTitle must be provided."))
+                .when(mealPlanService).setRecipeForDay(eq(currentUser), eq(date), any(MealPlanEntryRequest.class));
 
         given()
                 .contentType(ContentType.JSON)
@@ -214,9 +223,7 @@ class MealPlanResourceTest {
                 .when().put("/meal-plan/days/2026-06-01")
                 .then()
                 .statusCode(400)
-                .body("message", equalTo("Validation failed: recipeId must not be null"));
-
-        verify(mealPlanService, never()).setRecipeForDay(any(), any(), any());
+                .body("message", equalTo("recipeId or customTitle must be provided."));
     }
 
     @Test
@@ -242,6 +249,32 @@ class MealPlanResourceTest {
                 .statusCode(200)
                 .body("mealSlot", equalTo("breakfast"))
                 .body("recipe.id", equalTo(10));
+    }
+
+    @Test
+    void putSlot_should_return_ok_for_custom_title() {
+        AppUser currentUser = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        MealPlan mealPlan = mealPlan(currentUser, null, date);
+        mealPlan.setMealSlot(MealSlot.SNACK);
+        mealPlan.setCustomTitle("Sushi frei");
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(mealPlan)
+                .when(mealPlanService).setRecipeForSlot(eq(currentUser), eq(date), eq(MealSlot.SNACK), any(MealPlanEntryRequest.class));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "customTitle": "Sushi frei"
+                        }
+                        """)
+                .when().put("/meal-plan/days/2026-06-01/slots/snack")
+                .then()
+                .statusCode(200)
+                .body("mealSlot", equalTo("snack"))
+                .body("customTitle", equalTo("Sushi frei"));
     }
 
     @Test

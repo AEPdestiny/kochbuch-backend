@@ -10,6 +10,7 @@ public class MealPlanEntryResponse {
     private LocalDate plannedDate;
     private String mealSlot;
     private RecipeResponse recipe;
+    private String customTitle;
 
     public Long getId() {
         return id;
@@ -41,5 +42,13 @@ public class MealPlanEntryResponse {
 
     public void setRecipe(RecipeResponse recipe) {
         this.recipe = recipe;
+    }
+
+    public String getCustomTitle() {
+        return customTitle;
+    }
+
+    public void setCustomTitle(String customTitle) {
+        this.customTitle = customTitle;
     }
 }

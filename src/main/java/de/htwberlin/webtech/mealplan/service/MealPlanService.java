@@ -42,15 +42,22 @@ public class MealPlanService {
 
     @Transactional
     public MealPlan setRecipeForSlot(AppUser currentUser, LocalDate plannedDate, MealSlot mealSlot, MealPlanEntryRequest request) {
-        if (request == null || request.getRecipeId() == null) {
-            throw new IllegalArgumentException("recipeId must not be null.");
+        if (request == null) {
+            throw new IllegalArgumentException("recipeId or customTitle must be provided.");
         }
-
-        Recipe recipe = recipeRepository.findById(request.getRecipeId());
-        if (recipe == null) {
-            throw new RecipeNotFoundException(request.getRecipeId());
+        Recipe recipe = null;
+        String customTitle = cleanCustomTitle(request.getCustomTitle());
+        if (request.getRecipeId() == null && customTitle == null) {
+            throw new IllegalArgumentException("recipeId or customTitle must be provided.");
         }
-        ensureRecipeOwner(recipe, currentUser);
+        if (request.getRecipeId() != null) {
+            recipe = recipeRepository.findById(request.getRecipeId());
+            if (recipe == null) {
+                throw new RecipeNotFoundException(request.getRecipeId());
+            }
+            ensureRecipeOwner(recipe, currentUser);
+            customTitle = null;
+        }
 
         MealPlan mealPlan = findEntry(currentUser, plannedDate, mealSlot)
                 .orElseGet(() -> {
@@ -61,6 +68,7 @@ public class MealPlanService {
                     return created;
                 });
         mealPlan.setRecipe(recipe);
+        mealPlan.setCustomTitle(customTitle);
         mealPlan.setMealSlot(mealSlot);
         if (mealPlan.getId() == null) {
             mealPlanRepository.persist(mealPlan);
@@ -90,6 +98,17 @@ public class MealPlanService {
                 || !currentUser.getId().equals(recipe.getOwner().getId())) {
             throw new ForbiddenException("Only own recipes can be planned.");
         }
+    }
+
+    private String cleanCustomTitle(String customTitle) {
+        if (customTitle == null || customTitle.isBlank()) {
+            return null;
+        }
+        String value = customTitle.trim();
+        if (value.length() > 160) {
+            throw new IllegalArgumentException("customTitle must be at most 160 characters.");
+        }
+        return value;
     }
 
     private java.util.Optional<MealPlan> findEntry(AppUser currentUser, LocalDate plannedDate, MealSlot mealSlot) {

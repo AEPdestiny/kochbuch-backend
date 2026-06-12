@@ -127,6 +127,33 @@ class MealPlanServiceTest {
     }
 
     @Test
+    @DisplayName("setRecipeForSlot should create custom title entry")
+    void setRecipeForSlot_should_create_custom_title_entry() {
+        AppUser owner = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        doReturn(Optional.empty()).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.LUNCH);
+
+        MealPlan result = underTest.setRecipeForSlot(owner, date, MealSlot.LUNCH, customRequest("Sushi Abend"));
+
+        verify(mealPlanRepository).findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.LUNCH);
+        verify(mealPlanRepository).persist(result);
+        verifyNoMoreInteractions(recipeRepository);
+        assertEquals(MealSlot.LUNCH, result.getMealSlot());
+        assertEquals("Sushi Abend", result.getCustomTitle());
+        assertEquals(null, result.getRecipe());
+    }
+
+    @Test
+    @DisplayName("setRecipeForSlot should reject missing recipe and custom title")
+    void setRecipeForSlot_should_reject_missing_recipe_and_custom_title() {
+        assertThrows(IllegalArgumentException.class,
+                () -> underTest.setRecipeForSlot(user(1L), LocalDate.of(2026, 6, 1), MealSlot.SNACK, customRequest(" ")));
+
+        verifyNoMoreInteractions(mealPlanRepository, recipeRepository);
+    }
+
+    @Test
     @DisplayName("setRecipeForDay should reject foreign recipe")
     void setRecipeForDay_should_reject_foreign_recipe() {
         AppUser owner = user(1L);
@@ -206,6 +233,12 @@ class MealPlanServiceTest {
     private MealPlanEntryRequest request(Long recipeId) {
         MealPlanEntryRequest request = new MealPlanEntryRequest();
         request.setRecipeId(recipeId);
+        return request;
+    }
+
+    private MealPlanEntryRequest customRequest(String customTitle) {
+        MealPlanEntryRequest request = new MealPlanEntryRequest();
+        request.setCustomTitle(customTitle);
         return request;
     }
 
