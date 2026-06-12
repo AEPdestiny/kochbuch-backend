@@ -34,11 +34,11 @@ public class MealPlan {
     @JoinColumn(name = "owner_id", nullable = false)
     private AppUser owner;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "recipe_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "recipe_id", nullable = true)
     private Recipe recipe;
 
-    @Column(name = "custom_title")
+    @Column(name = "custom_title", length = 160)
     private String customTitle;
 
     @Column(name = "planned_date", nullable = false)
