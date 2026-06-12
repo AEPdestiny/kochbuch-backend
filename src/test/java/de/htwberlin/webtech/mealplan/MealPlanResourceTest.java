@@ -84,6 +84,33 @@ class MealPlanResourceTest {
     }
 
     @Test
+    void getWeek_should_return_multiple_slots_for_same_day() {
+        AppUser currentUser = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        MealPlan breakfast = mealPlan(currentUser, recipe(10L, currentUser), monday);
+        breakfast.setMealSlot(MealSlot.BREAKFAST);
+        MealPlan lunch = mealPlan(currentUser, recipe(11L, currentUser), monday);
+        lunch.setId(2L);
+        lunch.setMealSlot(MealSlot.LUNCH);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(monday).when(mealPlanService).normalizeWeekStart(null);
+        doReturn(List.of(breakfast, lunch)).when(mealPlanService).getWeek(currentUser, monday);
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .when().get("/meal-plan/week")
+                .then()
+                .statusCode(200)
+                .body("entries", hasSize(2))
+                .body("entries[0].plannedDate", equalTo("2026-06-01"))
+                .body("entries[0].mealSlot", equalTo("breakfast"))
+                .body("entries[0].recipe.title", equalTo("Pasta 10"))
+                .body("entries[1].plannedDate", equalTo("2026-06-01"))
+                .body("entries[1].mealSlot", equalTo("lunch"))
+                .body("entries[1].recipe.title", equalTo("Pasta 11"));
+    }
+
+    @Test
     void putDay_should_return_ok_for_own_recipe() {
         AppUser currentUser = user(1L);
         LocalDate date = LocalDate.of(2026, 6, 1);
