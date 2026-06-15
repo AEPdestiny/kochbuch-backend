@@ -38,6 +38,7 @@ public class Recipe {
     private String instructions;
     private boolean favorite;
     private boolean published;
+    private Integer calories;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     private AppUser owner;
@@ -173,6 +174,14 @@ public class Recipe {
 
     public void setPublished(boolean published) {
         this.published = published;
+    }
+
+    public Integer getCalories() {
+        return calories;
+    }
+
+    public void setCalories(Integer calories) {
+        this.calories = calories;
     }
 
     public AppUser getOwner() {

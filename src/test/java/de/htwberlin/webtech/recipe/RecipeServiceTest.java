@@ -31,25 +31,25 @@ class RecipeServiceTest {
     void findAll_should_return_only_published_recipes() {
         var r1 = recipe("Pasta");
         var r2 = recipe("Soup");
-        doReturn(List.of(r1, r2)).when(repo).findPublished();
+        doReturn(List.of(r1, r2)).when(repo).findRandomPublished(20);
 
         var result = underTest.findAll();
 
-        verify(repo).findPublished();
+        verify(repo).findRandomPublished(20);
         verifyNoMoreInteractions(repo);
         assertEquals(2, result.size());
     }
 
     @Test
-    @DisplayName("findAllPublished should call repo.findPublished")
-    void findAllPublished_should_call_findPublished() {
+    @DisplayName("findAllPublished should call repo.findRandomPublished")
+    void findAllPublished_should_call_findRandomPublished() {
         var published = recipe("Cake");
         published.setPublished(true);
-        doReturn(List.of(published)).when(repo).findPublished();
+        doReturn(List.of(published)).when(repo).findRandomPublished(20);
 
         var result = underTest.findAllPublished();
 
-        verify(repo).findPublished();
+        verify(repo).findRandomPublished(20);
         verifyNoMoreInteractions(repo);
         assertEquals(1, result.size());
         assertTrue(result.get(0).isPublished());

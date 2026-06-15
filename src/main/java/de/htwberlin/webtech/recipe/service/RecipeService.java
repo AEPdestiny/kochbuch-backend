@@ -43,7 +43,7 @@ public class RecipeService {
     }
 
     public List<Recipe> findAllPublished() {
-        return repo.findPublished();
+        return repo.findRandomPublished(20);
     }
 
     public List<Recipe> findMine(AppUser currentUser) {

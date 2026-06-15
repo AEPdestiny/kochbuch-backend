@@ -6,6 +6,7 @@ import io.quarkus.hibernate.orm.panache.PanacheRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
+import java.util.Optional;
 
 @ApplicationScoped
 public class RecipeRepository implements PanacheRepository<Recipe> {
@@ -14,7 +15,19 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
         return list("published", true);
     }
 
+    public List<Recipe> findRandomPublished(int limit) {
+        return getEntityManager()
+                .createQuery("from Recipe r where r.published = true order by function('random')", Recipe.class)
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
     public List<Recipe> findByOwner(AppUser owner) {
         return list("owner", owner);
+    }
+
+    public Optional<Recipe> findByTitleAndCategory(String title, String category) {
+        return find("lower(title) = ?1 and lower(category) = ?2", title.toLowerCase(), category.toLowerCase())
+                .firstResultOptional();
     }
 }

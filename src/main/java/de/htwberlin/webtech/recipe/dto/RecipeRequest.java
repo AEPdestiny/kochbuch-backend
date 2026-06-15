@@ -27,6 +27,7 @@ public class RecipeRequest {
     private String instructions;
     private boolean favorite;
     private boolean published;
+    private Integer calories;
 
     public Long getId() {
         return id;
@@ -130,5 +131,13 @@ public class RecipeRequest {
 
     public void setPublished(boolean published) {
         this.published = published;
+    }
+
+    public Integer getCalories() {
+        return calories;
+    }
+
+    public void setCalories(Integer calories) {
+        this.calories = calories;
     }
 }

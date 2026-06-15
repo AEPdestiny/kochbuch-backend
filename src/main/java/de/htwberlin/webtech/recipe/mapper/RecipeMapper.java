@@ -31,6 +31,7 @@ public class RecipeMapper {
         response.setInstructions(recipe.getInstructions());
         response.setFavorite(recipe.isFavorite());
         response.setPublished(recipe.isPublished());
+        response.setCalories(recipe.getCalories());
         return response;
     }
 
@@ -53,6 +54,7 @@ public class RecipeMapper {
         recipe.setInstructions(request.getInstructions());
         recipe.setFavorite(request.isFavorite());
         recipe.setPublished(request.isPublished());
+        recipe.setCalories(request.getCalories());
     }
 
     public void updateEntity(Recipe recipe, Recipe source) {
@@ -68,5 +70,6 @@ public class RecipeMapper {
         recipe.setInstructions(source.getInstructions());
         recipe.setFavorite(source.isFavorite());
         recipe.setPublished(source.isPublished());
+        recipe.setCalories(source.getCalories());
     }
 }
