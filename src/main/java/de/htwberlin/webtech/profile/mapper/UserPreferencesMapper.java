@@ -3,6 +3,7 @@ package de.htwberlin.webtech.profile.mapper;
 import de.htwberlin.webtech.profile.dto.UserPreferencesRequest;
 import de.htwberlin.webtech.profile.dto.UserPreferencesResponse;
 import de.htwberlin.webtech.profile.entity.UserPreferences;
+import de.htwberlin.webtech.profile.entity.UserGoal;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.LinkedHashSet;
@@ -25,7 +26,12 @@ public class UserPreferencesMapper {
         response.setCalorieConscious(preferences.isCalorieConscious());
         response.setBudgetFriendly(preferences.isBudgetFriendly());
         response.setMaxPrepTimeMinutes(preferences.getMaxPrepTimeMinutes());
-        response.setCalorieGoal(preferences.getCalorieGoal());
+        Integer dailyTarget = preferences.getDailyCalorieTarget() != null
+                ? preferences.getDailyCalorieTarget()
+                : preferences.getCalorieGoal();
+        response.setCalorieGoal(dailyTarget);
+        response.setGoal(preferences.getGoal());
+        response.setDailyCalorieTarget(dailyTarget);
         return response;
     }
 
@@ -41,7 +47,26 @@ public class UserPreferencesMapper {
         preferences.setCalorieConscious(request.isCalorieConscious());
         preferences.setBudgetFriendly(request.isBudgetFriendly());
         preferences.setMaxPrepTimeMinutes(request.getMaxPrepTimeMinutes());
-        preferences.setCalorieGoal(request.getCalorieGoal());
+        UserGoal goal = request.getGoal();
+        Integer dailyTarget = request.getDailyCalorieTarget() != null
+                ? request.getDailyCalorieTarget()
+                : request.getCalorieGoal();
+        if (dailyTarget == null) {
+            dailyTarget = defaultTargetFor(goal);
+        }
+        preferences.setGoal(goal);
+        preferences.setDailyCalorieTarget(dailyTarget);
+        preferences.setCalorieGoal(dailyTarget);
+    }
+
+    private Integer defaultTargetFor(UserGoal goal) {
+        if (goal == UserGoal.WEIGHT_LOSS) {
+            return 1800;
+        }
+        if (goal == UserGoal.MUSCLE_GAIN) {
+            return 2600;
+        }
+        return 2200;
     }
 
     private Set<String> cleanValues(Set<String> values) {

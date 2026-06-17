@@ -1,5 +1,7 @@
 package de.htwberlin.webtech.profile.dto;
 
+import de.htwberlin.webtech.profile.entity.UserGoal;
+
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -17,6 +19,8 @@ public class UserPreferencesResponse {
     private boolean budgetFriendly;
     private Integer maxPrepTimeMinutes;
     private Integer calorieGoal;
+    private UserGoal goal = UserGoal.MAINTAIN;
+    private Integer dailyCalorieTarget;
 
     public Set<String> getLikes() {
         return likes;
@@ -112,5 +116,21 @@ public class UserPreferencesResponse {
 
     public void setCalorieGoal(Integer calorieGoal) {
         this.calorieGoal = calorieGoal;
+    }
+
+    public UserGoal getGoal() {
+        return goal == null ? UserGoal.MAINTAIN : goal;
+    }
+
+    public void setGoal(UserGoal goal) {
+        this.goal = goal == null ? UserGoal.MAINTAIN : goal;
+    }
+
+    public Integer getDailyCalorieTarget() {
+        return dailyCalorieTarget;
+    }
+
+    public void setDailyCalorieTarget(Integer dailyCalorieTarget) {
+        this.dailyCalorieTarget = dailyCalorieTarget;
     }
 }

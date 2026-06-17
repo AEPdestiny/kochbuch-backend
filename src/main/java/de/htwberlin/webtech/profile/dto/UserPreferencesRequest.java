@@ -1,6 +1,7 @@
 package de.htwberlin.webtech.profile.dto;
 
 import jakarta.validation.constraints.Min;
+import de.htwberlin.webtech.profile.entity.UserGoal;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -23,6 +24,11 @@ public class UserPreferencesRequest {
 
     @Min(value = 1, message = "must be greater than or equal to 1")
     private Integer calorieGoal;
+
+    private UserGoal goal = UserGoal.MAINTAIN;
+
+    @Min(value = 1, message = "must be greater than or equal to 1")
+    private Integer dailyCalorieTarget;
 
     public Set<String> getLikes() {
         return likes;
@@ -118,5 +124,21 @@ public class UserPreferencesRequest {
 
     public void setCalorieGoal(Integer calorieGoal) {
         this.calorieGoal = calorieGoal;
+    }
+
+    public UserGoal getGoal() {
+        return goal == null ? UserGoal.MAINTAIN : goal;
+    }
+
+    public void setGoal(UserGoal goal) {
+        this.goal = goal == null ? UserGoal.MAINTAIN : goal;
+    }
+
+    public Integer getDailyCalorieTarget() {
+        return dailyCalorieTarget;
+    }
+
+    public void setDailyCalorieTarget(Integer dailyCalorieTarget) {
+        this.dailyCalorieTarget = dailyCalorieTarget;
     }
 }

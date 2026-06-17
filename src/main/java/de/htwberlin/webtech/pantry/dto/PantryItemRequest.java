@@ -2,6 +2,7 @@ package de.htwberlin.webtech.pantry.dto;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 
@@ -11,6 +12,7 @@ public class PantryItemRequest {
     private String name;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "must be greater than or equal to 0")
+    @NotNull(message = "must not be null")
     private BigDecimal quantity;
 
     private String unit;

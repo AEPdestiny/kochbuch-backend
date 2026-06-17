@@ -5,6 +5,8 @@ import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -74,6 +76,12 @@ public class UserPreferences {
     private Integer maxPrepTimeMinutes;
     private Integer calorieGoal;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserGoal goal = UserGoal.MAINTAIN;
+
+    private Integer dailyCalorieTarget;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -83,6 +91,15 @@ public class UserPreferences {
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
+        if (goal == null) {
+            goal = UserGoal.MAINTAIN;
+        }
+        if (dailyCalorieTarget == null && calorieGoal != null) {
+            dailyCalorieTarget = calorieGoal;
+        }
+        if (calorieGoal == null && dailyCalorieTarget != null) {
+            calorieGoal = dailyCalorieTarget;
+        }
         if (createdAt == null) {
             createdAt = now;
         }
@@ -206,6 +223,22 @@ public class UserPreferences {
 
     public void setCalorieGoal(Integer calorieGoal) {
         this.calorieGoal = calorieGoal;
+    }
+
+    public UserGoal getGoal() {
+        return goal == null ? UserGoal.MAINTAIN : goal;
+    }
+
+    public void setGoal(UserGoal goal) {
+        this.goal = goal == null ? UserGoal.MAINTAIN : goal;
+    }
+
+    public Integer getDailyCalorieTarget() {
+        return dailyCalorieTarget;
+    }
+
+    public void setDailyCalorieTarget(Integer dailyCalorieTarget) {
+        this.dailyCalorieTarget = dailyCalorieTarget;
     }
 
     public Instant getCreatedAt() {
