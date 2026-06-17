@@ -91,14 +91,14 @@ public class UserPreferences {
     @PrePersist
     void prePersist() {
         Instant now = Instant.now();
-        if (goal == null) {
-            goal = UserGoal.MAINTAIN;
-        }
         if (dailyCalorieTarget == null && calorieGoal != null) {
             dailyCalorieTarget = calorieGoal;
         }
         if (calorieGoal == null && dailyCalorieTarget != null) {
             calorieGoal = dailyCalorieTarget;
+        }
+        if (goal == null) {
+            goal = UserGoal.MAINTAIN;
         }
         if (createdAt == null) {
             createdAt = now;

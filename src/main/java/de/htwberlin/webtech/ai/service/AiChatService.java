@@ -12,9 +12,9 @@ import de.htwberlin.webtech.profile.repository.UserPreferencesRepository;
 import de.htwberlin.webtech.user.entity.AppUser;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
-import java.time.DayOfWeek;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
@@ -40,10 +40,15 @@ public class AiChatService {
 
     public AiChatResponse answer(AppUser currentUser, String message) {
         String systemPrompt = """
-                Du bist Dishly AI, ein ehrlicher Koch- und Planungsassistent.
+                Du bist Dishly, ein smarter Koch-Assistent.
+                Du hilfst Nutzern Rezepte zu finden, Mahlzeiten zu planen und Einkäufe zu verwalten.
+                Wenn ein Nutzer beschreibt was er essen möchte, schlage ein Rezept vor und frage:
+                Möchtest du
+                (1) die Zutaten zur Einkaufsliste hinzufügen,
+                (2) ein Restaurant finden,
+                (3) es zum Wochenplan hinzufügen?
                 Nutze nur die bereitgestellten Nutzerdaten. Erfinde keine gespeicherten Aktionen.
-                Wenn Daten fehlen, sage klar, welche Daten fehlen.
-                Gib keine medizinische Beratung. Bei Gesundheitsfragen nur allgemeine Hinweise geben.
+                Wenn eine echte Aktion nicht eindeutig möglich ist, frage nach den fehlenden Angaben.
                 Antworte kurz, konkret und auf Deutsch.
                 """;
         String prompt = buildContext(currentUser) + "\n\nNutzerfrage: " + message;
@@ -89,15 +94,13 @@ public class AiChatService {
     }
 
     private String preferencesText(UserPreferences preferences) {
-        return "Ziel=" + preferences.getGoal()
-                + ", Kalorienziel=" + preferences.getDailyCalorieTarget()
+        return "Kalorienziel=" + preferences.getDailyCalorieTarget()
                 + ", vegan=" + preferences.isVegan()
                 + ", vegetarisch=" + preferences.isVegetarian()
                 + ", glutenfrei=" + preferences.isGlutenFree()
                 + ", laktosefrei=" + preferences.isLactoseFree()
                 + ", proteinreich=" + preferences.isHighProtein()
-                + ", kalorienbewusst=" + preferences.isCalorieConscious()
-                + ", günstig=" + preferences.isBudgetFriendly()
+                + ", kalorienarm=" + preferences.isCalorieConscious()
                 + ", Allergien=" + preferences.getAllergies()
                 + ", Vorlieben=" + preferences.getLikes()
                 + ", Abneigungen=" + preferences.getDislikes();

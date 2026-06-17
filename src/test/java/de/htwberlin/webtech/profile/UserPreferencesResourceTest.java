@@ -2,7 +2,6 @@ package de.htwberlin.webtech.profile;
 
 import de.htwberlin.webtech.profile.dto.UserPreferencesRequest;
 import de.htwberlin.webtech.profile.entity.UserPreferences;
-import de.htwberlin.webtech.profile.entity.UserGoal;
 import de.htwberlin.webtech.profile.service.UserPreferencesService;
 import de.htwberlin.webtech.security.UserContext;
 import de.htwberlin.webtech.shared.exception.UnauthorizedException;
@@ -67,7 +66,6 @@ class UserPreferencesResourceTest {
                 .body("allergies", hasItems("nuts"))
                 .body("vegan", equalTo(true))
                 .body("maxPrepTimeMinutes", equalTo(30))
-                .body("goal", equalTo("MUSCLE_GAIN"))
                 .body("dailyCalorieTarget", equalTo(2600));
     }
 
@@ -88,7 +86,6 @@ class UserPreferencesResourceTest {
                           "vegan": true,
                           "highProtein": true,
                           "maxPrepTimeMinutes": 30,
-                          "goal": "MUSCLE_GAIN",
                           "dailyCalorieTarget": 2600
                         }
                         """)
@@ -97,7 +94,6 @@ class UserPreferencesResourceTest {
                 .statusCode(200)
                 .body("likes", hasItems("pasta"))
                 .body("highProtein", equalTo(true))
-                .body("goal", equalTo("MUSCLE_GAIN"))
                 .body("dailyCalorieTarget", equalTo(2600));
     }
 
@@ -129,7 +125,6 @@ class UserPreferencesResourceTest {
         preferences.setVegan(true);
         preferences.setHighProtein(true);
         preferences.setMaxPrepTimeMinutes(30);
-        preferences.setGoal(UserGoal.MUSCLE_GAIN);
         preferences.setDailyCalorieTarget(2600);
         preferences.setCalorieGoal(2600);
         return preferences;

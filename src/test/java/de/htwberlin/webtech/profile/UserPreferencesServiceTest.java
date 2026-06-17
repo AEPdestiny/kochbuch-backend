@@ -2,7 +2,6 @@ package de.htwberlin.webtech.profile;
 
 import de.htwberlin.webtech.profile.dto.UserPreferencesRequest;
 import de.htwberlin.webtech.profile.entity.UserPreferences;
-import de.htwberlin.webtech.profile.entity.UserGoal;
 import de.htwberlin.webtech.profile.mapper.UserPreferencesMapper;
 import de.htwberlin.webtech.profile.repository.UserPreferencesRepository;
 import de.htwberlin.webtech.profile.service.UserPreferencesService;
@@ -55,7 +54,6 @@ class UserPreferencesServiceTest {
         assertTrue(result.isHighProtein());
         assertEquals(null, result.getMaxPrepTimeMinutes());
         assertEquals(2200, result.getCalorieGoal());
-        assertEquals(UserGoal.MAINTAIN, result.getGoal());
         assertEquals(2200, result.getDailyCalorieTarget());
     }
 
@@ -67,7 +65,6 @@ class UserPreferencesServiceTest {
         request.setVegan(true);
         request.setHighProtein(true);
         request.setMaxPrepTimeMinutes(30);
-        request.setGoal(UserGoal.MAINTAIN);
         request.setDailyCalorieTarget(2200);
         return request;
     }

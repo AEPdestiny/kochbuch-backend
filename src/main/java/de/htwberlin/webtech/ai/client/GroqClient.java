@@ -29,7 +29,7 @@ public class GroqClient {
     @Inject
     public GroqClient(ObjectMapper objectMapper,
                       @ConfigProperty(name = "groq.api.key") Optional<String> apiKey,
-                      @ConfigProperty(name = "groq.model", defaultValue = "llama-3.1-8b-instant") String model) {
+                      @ConfigProperty(name = "groq.model", defaultValue = "llama-3.3-70b-versatile") String model) {
         this(objectMapper, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(), apiKey.orElse(""), model);
     }
 
