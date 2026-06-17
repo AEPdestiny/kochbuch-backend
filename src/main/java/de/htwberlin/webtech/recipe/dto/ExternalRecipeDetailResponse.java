@@ -16,6 +16,7 @@ public class ExternalRecipeDetailResponse {
     private String category;
     private List<String> tags;
     private Integer calories;
+    private Double protein;
     private List<ExternalRecipeIngredientResponse> ingredients;
     private String instructions;
     private List<String> steps;
@@ -115,6 +116,14 @@ public class ExternalRecipeDetailResponse {
 
     public void setCalories(Integer calories) {
         this.calories = calories;
+    }
+
+    public Double getProtein() {
+        return protein;
+    }
+
+    public void setProtein(Double protein) {
+        this.protein = protein;
     }
 
     public List<ExternalRecipeIngredientResponse> getIngredients() {

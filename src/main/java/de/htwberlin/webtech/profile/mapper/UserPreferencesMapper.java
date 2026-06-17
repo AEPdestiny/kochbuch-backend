@@ -24,7 +24,7 @@ public class UserPreferencesMapper {
         response.setLactoseFree(preferences.isLactoseFree());
         response.setHighProtein(preferences.isHighProtein());
         response.setCalorieConscious(preferences.isCalorieConscious());
-        response.setBudgetFriendly(preferences.isBudgetFriendly());
+        response.setBudgetFriendly(false);
         response.setMaxPrepTimeMinutes(preferences.getMaxPrepTimeMinutes());
         Integer dailyTarget = preferences.getDailyCalorieTarget() != null
                 ? preferences.getDailyCalorieTarget()
@@ -40,13 +40,13 @@ public class UserPreferencesMapper {
         preferences.setDislikes(cleanValues(request.getDislikes()));
         preferences.setAllergies(cleanValues(request.getAllergies()));
         preferences.setVegan(request.isVegan());
-        preferences.setVegetarian(request.isVegetarian());
+        preferences.setVegetarian(!request.isVegan() && request.isVegetarian());
         preferences.setGlutenFree(request.isGlutenFree());
         preferences.setLactoseFree(request.isLactoseFree());
         preferences.setHighProtein(request.isHighProtein());
         preferences.setCalorieConscious(request.isCalorieConscious());
-        preferences.setBudgetFriendly(request.isBudgetFriendly());
-        preferences.setMaxPrepTimeMinutes(request.getMaxPrepTimeMinutes());
+        preferences.setBudgetFriendly(false);
+        preferences.setMaxPrepTimeMinutes(null);
         UserGoal goal = request.getGoal();
         Integer dailyTarget = request.getDailyCalorieTarget() != null
                 ? request.getDailyCalorieTarget()

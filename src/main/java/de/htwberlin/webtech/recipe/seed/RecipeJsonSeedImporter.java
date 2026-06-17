@@ -183,6 +183,7 @@ public class RecipeJsonSeedImporter {
         recipe.setIngredients(ingredients);
         recipe.setInstructions(instructions);
         recipe.setCalories(firstNonNull(firstNullableInt(node, "calories", "kcal"), caloriesFromNutrition(node)));
+        recipe.setProtein(firstNonNull(firstNullableDouble(node, "protein", "proteinGrams"), proteinFromNutrition(node)));
         recipe.setFavorite(false);
         recipe.setPublished(true);
         return recipe;
@@ -222,7 +223,21 @@ public class RecipeJsonSeedImporter {
         return null;
     }
 
+    private Double firstNullableDouble(JsonNode node, String... names) {
+        for (String name : names) {
+            JsonNode value = node.get(name);
+            if (value != null && value.isNumber()) {
+                return value.asDouble();
+            }
+        }
+        return null;
+    }
+
     private Integer firstNonNull(Integer first, Integer second) {
+        return first == null ? second : first;
+    }
+
+    private Double firstNonNull(Double first, Double second) {
         return first == null ? second : first;
     }
 
@@ -236,6 +251,22 @@ public class RecipeJsonSeedImporter {
                 JsonNode amount = nutrient.get("amount");
                 if (amount != null && amount.isNumber()) {
                     return (int) Math.round(amount.asDouble());
+                }
+            }
+        }
+        return null;
+    }
+
+    private Double proteinFromNutrition(JsonNode node) {
+        JsonNode nutrients = node.path("nutrition").path("nutrients");
+        if (!nutrients.isArray()) {
+            return null;
+        }
+        for (JsonNode nutrient : nutrients) {
+            if ("protein".equalsIgnoreCase(nutrient.path("name").asText())) {
+                JsonNode amount = nutrient.get("amount");
+                if (amount != null && amount.isNumber()) {
+                    return amount.asDouble();
                 }
             }
         }

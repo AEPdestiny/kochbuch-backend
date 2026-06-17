@@ -3,11 +3,13 @@ package de.htwberlin.webtech.recipe.resource;
 import de.htwberlin.webtech.recipe.dto.RecipeRequest;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
 import de.htwberlin.webtech.recipe.dto.ExternalRecipeMatchResponse;
+import de.htwberlin.webtech.recipe.entity.Recipe;
 import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
 import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
 import de.htwberlin.webtech.recipe.mapper.RecipeMapper;
 import de.htwberlin.webtech.recipe.service.RecipeService;
 import de.htwberlin.webtech.security.UserContext;
+import de.htwberlin.webtech.user.entity.AppUser;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
@@ -70,7 +72,7 @@ public class RecipeResource {
             content = @Content(schema = @Schema(implementation = RecipeResponse.class, type = SchemaType.ARRAY))
     )
     public List<RecipeResponse> getAll(@QueryParam("language") String language) {
-        return mapper.toResponseList(service.findAll(language));
+        return publicResponses(service.findAll(language));
     }
 
     @GET
@@ -78,7 +80,7 @@ public class RecipeResource {
     @Operation(summary = "List published recipes", description = "Returns recipes marked as published.")
     @APIResponse(responseCode = "200", description = "Published recipes returned")
     public List<RecipeResponse> getPublished(@QueryParam("language") String language) {
-        return mapper.toResponseList(service.findAllPublished(language));
+        return publicResponses(service.findAllPublished(language));
     }
 
     @GET
@@ -96,10 +98,13 @@ public class RecipeResource {
     @APIResponse(responseCode = "200", description = "Recipe returned")
     @APIResponse(responseCode = "404", description = "Recipe not found")
     public RecipeResponse getById(@PathParam("id") Long id, @HeaderParam("Authorization") String authorizationHeader) {
-        return mapper.toResponse(service.findVisibleById(
-                id,
-                userContext.currentUserOrNull(authorizationHeader)
-        ));
+        AppUser currentUser = userContext.currentUserOrNull(authorizationHeader);
+        Recipe recipe = service.findVisibleById(id, currentUser);
+        RecipeResponse response = mapper.toResponse(recipe);
+        if (!isOwner(recipe, currentUser)) {
+            response.setFavorite(false);
+        }
+        return response;
     }
 
     @PUT
@@ -150,6 +155,19 @@ public class RecipeResource {
 
     private String normalizeLanguage(String language) {
         return language == null || language.isBlank() ? "en" : language.trim().toLowerCase();
+    }
+
+    private List<RecipeResponse> publicResponses(List<Recipe> recipes) {
+        return mapper.toResponseList(recipes).stream()
+                .peek(response -> response.setFavorite(false))
+                .toList();
+    }
+
+    private boolean isOwner(Recipe recipe, AppUser currentUser) {
+        return recipe.getOwner() != null
+                && currentUser != null
+                && currentUser.getId() != null
+                && currentUser.getId().equals(recipe.getOwner().getId());
     }
 
     @GET

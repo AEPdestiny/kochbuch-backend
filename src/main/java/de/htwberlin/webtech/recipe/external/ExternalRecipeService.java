@@ -68,6 +68,7 @@ public class ExternalRecipeService {
         try {
             List<RecipeResponse> recipes = client.searchRecipes(query, normalizeOptional(diet), normalizeOptional(intolerances), maxReadyTime, normalizeOptional(type)).stream()
                     .map(this::mapToListResponse)
+                    .filter(this::hasIngredients)
                     .toList();
             cache.put(cacheKey, new CacheEntry(recipes, now()));
             evictOldestEntriesIfNecessary();
@@ -129,6 +130,7 @@ public class ExternalRecipeService {
         response.setFavorite(false);
         response.setPublished(true);
         response.setCalories(findCalories(recipe));
+        response.setProtein(findProtein(recipe));
         response.setSourceUrl(recipe.getSourceUrl());
         return response;
     }
@@ -147,6 +149,7 @@ public class ExternalRecipeService {
         response.setCategory(firstString(recipe.getDishTypes()));
         response.setTags(mapTags(recipe));
         response.setCalories(findCalories(recipe));
+        response.setProtein(findProtein(recipe));
         response.setIngredients(mapIngredients(recipe.getExtendedIngredients()));
         response.setInstructions(firstNonBlank(stripHtml(recipe.getInstructions()), stripHtml(recipe.getSummary()), ""));
         response.setSteps(mapSteps(recipe));
@@ -280,6 +283,23 @@ public class ExternalRecipeService {
                 .findFirst()
                 .map(amount -> amount.setScale(0, RoundingMode.HALF_UP).intValue())
                 .orElse(null);
+    }
+
+    private Double findProtein(SpoonacularRecipe recipe) {
+        if (recipe.getNutrition() == null || recipe.getNutrition().getNutrients() == null) {
+            return null;
+        }
+        return recipe.getNutrition().getNutrients().stream()
+                .filter(nutrient -> nutrient.getName() != null && nutrient.getName().equalsIgnoreCase("Protein"))
+                .map(SpoonacularNutrient::getAmount)
+                .filter(amount -> amount != null)
+                .findFirst()
+                .map(BigDecimal::doubleValue)
+                .orElse(null);
+    }
+
+    private boolean hasIngredients(RecipeResponse recipe) {
+        return recipe.getIngredients() != null && !recipe.getIngredients().isBlank();
     }
 
     private String firstString(List<String> values) {

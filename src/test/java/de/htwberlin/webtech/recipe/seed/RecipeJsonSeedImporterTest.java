@@ -64,6 +64,7 @@ class RecipeJsonSeedImporterTest {
         assertEquals("breakfast", recipe.getCategory());
         assertEquals("en", recipe.getLanguage());
         assertEquals(420, recipe.getCalories());
+        assertEquals(18.5, recipe.getProtein());
     }
 
     @Test

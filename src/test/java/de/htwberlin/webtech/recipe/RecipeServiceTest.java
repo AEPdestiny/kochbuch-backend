@@ -31,11 +31,19 @@ class RecipeServiceTest {
     void findAll_should_return_only_published_recipes() {
         var r1 = recipe("Pasta");
         var r2 = recipe("Soup");
-        doReturn(List.of(r1, r2)).when(repo).findRandomPublished(20);
+        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 13);
+        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 13);
+        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 13);
+        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 13);
+        doReturn(List.of(r1, r2)).when(repo).findRandomPublishedByLanguage("en", 50);
 
         var result = underTest.findAll();
 
-        verify(repo).findRandomPublished(20);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 13);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 13);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 13);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 13);
+        verify(repo).findRandomPublishedByLanguage("en", 50);
         verifyNoMoreInteractions(repo);
         assertEquals(2, result.size());
     }
@@ -45,11 +53,15 @@ class RecipeServiceTest {
     void findAllPublished_should_call_findRandomPublished() {
         var published = recipe("Cake");
         published.setPublished(true);
-        doReturn(List.of(published)).when(repo).findRandomPublished(20);
+        doReturn(List.of(published)).when(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 13);
 
         var result = underTest.findAllPublished();
 
-        verify(repo).findRandomPublished(20);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 13);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 13);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 13);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 13);
+        verify(repo).findRandomPublishedByLanguage("en", 50);
         verifyNoMoreInteractions(repo);
         assertEquals(1, result.size());
         assertTrue(result.get(0).isPublished());
@@ -60,11 +72,15 @@ class RecipeServiceTest {
     void findAllPublished_should_filter_by_language() {
         var published = recipe("Deutsches Rezept");
         published.setLanguage("de");
-        doReturn(List.of(published)).when(repo).findRandomPublishedByLanguage("de", 20);
+        doReturn(List.of(published)).when(repo).findRandomPublishedByLanguageAndCategory("de", "lunch", 13);
 
         var result = underTest.findAllPublished("de");
 
-        verify(repo).findRandomPublishedByLanguage("de", 20);
+        verify(repo).findRandomPublishedByLanguageAndCategory("de", "breakfast", 13);
+        verify(repo).findRandomPublishedByLanguageAndCategory("de", "lunch", 13);
+        verify(repo).findRandomPublishedByLanguageAndCategory("de", "dinner", 13);
+        verify(repo).findRandomPublishedByLanguageAndCategory("de", "snack", 13);
+        verify(repo).findRandomPublishedByLanguage("de", 50);
         verifyNoMoreInteractions(repo);
         assertEquals(1, result.size());
         assertEquals("de", result.get(0).getLanguage());

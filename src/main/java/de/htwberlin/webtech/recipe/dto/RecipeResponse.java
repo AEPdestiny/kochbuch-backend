@@ -18,6 +18,8 @@ public class RecipeResponse {
     private boolean favorite;
     private boolean published;
     private Integer calories;
+    private Double protein;
+    private boolean userCreated;
     private String language;
     private String sourceUrl;
 
@@ -147,6 +149,22 @@ public class RecipeResponse {
 
     public void setCalories(Integer calories) {
         this.calories = calories;
+    }
+
+    public Double getProtein() {
+        return protein;
+    }
+
+    public void setProtein(Double protein) {
+        this.protein = protein;
+    }
+
+    public boolean isUserCreated() {
+        return userCreated;
+    }
+
+    public void setUserCreated(boolean userCreated) {
+        this.userCreated = userCreated;
     }
 
     public String getLanguage() {

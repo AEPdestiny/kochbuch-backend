@@ -9,6 +9,7 @@
     "rating": 4.5,
     "ingredients": ["oats", "milk"],
     "instructions": ["Mix ingredients", "Cook gently"],
-    "calories": 420
+    "calories": 420,
+    "protein": 18.5
   }
 ]

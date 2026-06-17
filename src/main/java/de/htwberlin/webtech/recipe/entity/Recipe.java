@@ -39,6 +39,7 @@ public class Recipe {
     private boolean favorite;
     private boolean published;
     private Integer calories;
+    private Double protein;
     private String language = "en";
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
@@ -183,6 +184,14 @@ public class Recipe {
 
     public void setCalories(Integer calories) {
         this.calories = calories;
+    }
+
+    public Double getProtein() {
+        return protein;
+    }
+
+    public void setProtein(Double protein) {
+        this.protein = protein;
     }
 
     public String getLanguage() {

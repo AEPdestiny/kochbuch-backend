@@ -53,7 +53,7 @@ class UserPreferencesServiceTest {
         assertEquals(Set.of("nuts"), result.getAllergies());
         assertTrue(result.isVegan());
         assertTrue(result.isHighProtein());
-        assertEquals(30, result.getMaxPrepTimeMinutes());
+        assertEquals(null, result.getMaxPrepTimeMinutes());
         assertEquals(2200, result.getCalorieGoal());
         assertEquals(UserGoal.MAINTAIN, result.getGoal());
         assertEquals(2200, result.getDailyCalorieTarget());

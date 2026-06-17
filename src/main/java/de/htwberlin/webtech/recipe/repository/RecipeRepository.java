@@ -17,7 +17,12 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
 
     public List<Recipe> findRandomPublished(int limit) {
         return getEntityManager()
-                .createQuery("from Recipe r where r.published = true order by function('random')", Recipe.class)
+                .createQuery("""
+                        from Recipe r
+                        where r.published = true
+                          and length(trim(coalesce(r.ingredients, ''))) > 0
+                        order by function('random')
+                        """, Recipe.class)
                 .setMaxResults(limit)
                 .getResultList();
     }
@@ -28,9 +33,26 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                         from Recipe r
                         where r.published = true
                           and lower(coalesce(r.language, 'en')) = :language
+                          and length(trim(coalesce(r.ingredients, ''))) > 0
                         order by function('random')
                         """, Recipe.class)
                 .setParameter("language", normalizeLanguage(language))
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
+    public List<Recipe> findRandomPublishedByLanguageAndCategory(String language, String category, int limit) {
+        return getEntityManager()
+                .createQuery("""
+                        from Recipe r
+                        where r.published = true
+                          and lower(coalesce(r.language, 'en')) = :language
+                          and lower(coalesce(r.category, '')) = :category
+                          and length(trim(coalesce(r.ingredients, ''))) > 0
+                        order by function('random')
+                        """, Recipe.class)
+                .setParameter("language", normalizeLanguage(language))
+                .setParameter("category", category == null ? "" : category.trim().toLowerCase())
                 .setMaxResults(limit)
                 .getResultList();
     }

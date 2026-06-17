@@ -28,6 +28,7 @@ public class RecipeRequest {
     private boolean favorite;
     private boolean published;
     private Integer calories;
+    private Double protein;
     private String language;
 
     public Long getId() {
@@ -140,6 +141,14 @@ public class RecipeRequest {
 
     public void setCalories(Integer calories) {
         this.calories = calories;
+    }
+
+    public Double getProtein() {
+        return protein;
+    }
+
+    public void setProtein(Double protein) {
+        this.protein = protein;
     }
 
     public String getLanguage() {

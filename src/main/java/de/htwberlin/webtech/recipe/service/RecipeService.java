@@ -9,10 +9,17 @@ import de.htwberlin.webtech.user.entity.AppUser;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @ApplicationScoped
 public class RecipeService {
+
+    private static final int PUBLIC_RECIPE_LIMIT = 50;
+    private static final int CATEGORY_TARGET = 13;
+    private static final List<String> PUBLIC_CATEGORIES = List.of("breakfast", "lunch", "dinner", "snack");
 
     private final RecipeRepository repo;
     private final RecipeMapper mapper;
@@ -47,11 +54,25 @@ public class RecipeService {
     }
 
     public List<Recipe> findAllPublished() {
-        return repo.findRandomPublished(20);
+        return findAllPublished("en");
     }
 
     public List<Recipe> findAllPublished(String language) {
-        return repo.findRandomPublishedByLanguage(normalizeLanguage(language), 20);
+        String normalizedLanguage = normalizeLanguage(language);
+        List<Recipe> balanced = new ArrayList<>();
+        Set<Long> seenIds = new LinkedHashSet<>();
+
+        for (String category : PUBLIC_CATEGORIES) {
+            addUnique(balanced, seenIds, repo.findRandomPublishedByLanguageAndCategory(normalizedLanguage, category, CATEGORY_TARGET));
+        }
+
+        if (balanced.size() < PUBLIC_RECIPE_LIMIT) {
+            addUnique(balanced, seenIds, repo.findRandomPublishedByLanguage(normalizedLanguage, PUBLIC_RECIPE_LIMIT));
+        }
+
+        return balanced.stream()
+                .limit(PUBLIC_RECIPE_LIMIT)
+                .toList();
     }
 
     public List<Recipe> findMine(AppUser currentUser) {
@@ -138,5 +159,15 @@ public class RecipeService {
 
     private String normalizeLanguage(String language) {
         return language == null || language.isBlank() ? "en" : language.trim().toLowerCase();
+    }
+
+    private void addUnique(List<Recipe> target, Set<Long> seenIds, List<Recipe> candidates) {
+        for (Recipe candidate : candidates) {
+            Long id = candidate.getId();
+            if (id != null && !seenIds.add(id)) {
+                continue;
+            }
+            target.add(candidate);
+        }
     }
 }
