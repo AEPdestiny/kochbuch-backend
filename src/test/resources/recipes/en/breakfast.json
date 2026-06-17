@@ -1,0 +1,14 @@
+[
+  {
+    "title": "Seed Breakfast",
+    "imageUrl": "https://example.com/breakfast.jpg",
+    "prepTimeMinutes": 10,
+    "cookTimeMinutes": 15,
+    "servings": 2,
+    "difficulty": "easy",
+    "rating": 4.5,
+    "ingredients": ["oats", "milk"],
+    "instructions": ["Mix ingredients", "Cook gently"],
+    "calories": 420
+  }
+]

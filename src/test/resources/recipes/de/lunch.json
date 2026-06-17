@@ -1,0 +1,21 @@
+{
+  "recipes": [
+    {
+      "title": "Seed Mittagessen",
+      "image": "https://example.com/lunch.jpg",
+      "readyInMinutes": 25,
+      "servings": 1,
+      "difficulty": "mittel",
+      "ingredients": ["Kartoffeln", "Quark"],
+      "instructions": "Kartoffeln kochen und mit Quark servieren.",
+      "nutrition": {
+        "nutrients": [
+          {
+            "name": "Calories",
+            "amount": 510
+          }
+        ]
+      }
+    }
+  ]
+}

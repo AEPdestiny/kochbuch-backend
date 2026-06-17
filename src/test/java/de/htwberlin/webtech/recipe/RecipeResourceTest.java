@@ -49,28 +49,30 @@ class RecipeResourceTest {
 
     @Test
     void getAll_should_return_only_published_recipes() {
-        doReturn(List.of(recipe("Pasta"), recipe("Soup"))).when(recipeService).findAll();
+        doReturn(List.of(recipe("Pasta"), recipe("Soup"))).when(recipeService).findAll("en");
 
         given()
+                .queryParam("language", "en")
                 .when().get("/recipes")
                 .then()
                 .statusCode(200)
                 .body("$", hasSize(2));
 
-        verify(recipeService).findAll();
+        verify(recipeService).findAll("en");
     }
 
     @Test
     void getPublished_should_return_only_published_recipes() {
-        doReturn(List.of(recipe("Cake"))).when(recipeService).findAllPublished();
+        doReturn(List.of(recipe("Cake"))).when(recipeService).findAllPublished("de");
 
         given()
+                .queryParam("language", "de")
                 .when().get("/recipes/published")
                 .then()
                 .statusCode(200)
                 .body("$", hasSize(1));
 
-        verify(recipeService).findAllPublished();
+        verify(recipeService).findAllPublished("de");
     }
 
     @Test
@@ -129,6 +131,7 @@ class RecipeResourceTest {
         doReturn(List.of(externalRecipe("Ext"))).when(externalRecipeService).fetchExternalRecipes(null, null, null, null, null);
 
         given()
+                .queryParam("language", "en")
                 .when().get("/recipes/external")
                 .then()
                 .statusCode(200)
@@ -149,6 +152,16 @@ class RecipeResourceTest {
                 .body("[0].title", equalTo("Pasta"));
 
         verify(externalRecipeService).fetchExternalRecipes("pasta", null, null, null, null);
+    }
+
+    @Test
+    void getExternal_should_return_empty_for_non_english_language_without_calling_spoonacular() {
+        given()
+                .queryParam("language", "de")
+                .when().get("/recipes/external")
+                .then()
+                .statusCode(200)
+                .body("$", hasSize(0));
     }
 
     @Test

@@ -39,6 +39,7 @@ public class Recipe {
     private boolean favorite;
     private boolean published;
     private Integer calories;
+    private String language = "en";
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     private AppUser owner;
@@ -182,6 +183,14 @@ public class Recipe {
 
     public void setCalories(Integer calories) {
         this.calories = calories;
+    }
+
+    public String getLanguage() {
+        return language == null || language.isBlank() ? "en" : language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language == null || language.isBlank() ? "en" : language.trim().toLowerCase();
     }
 
     public AppUser getOwner() {

@@ -19,6 +19,13 @@ import java.util.List;
 public class RecipeJsonSeedImporter {
 
     private static final Logger LOG = Logger.getLogger(RecipeJsonSeedImporter.class);
+    private static final List<String> LANGUAGES = List.of("en", "de", "tr", "ar", "zh", "ru", "pl", "ja");
+    private static final List<CategoryFile> CATEGORY_FILES = List.of(
+            new CategoryFile("breakfast.json", "breakfast"),
+            new CategoryFile("lunch.json", "lunch"),
+            new CategoryFile("dinner.json", "dinner"),
+            new CategoryFile("snacks.json", "snack")
+    );
 
     private final RecipeRepository repository;
     private final ObjectMapper objectMapper;
@@ -34,22 +41,53 @@ public class RecipeJsonSeedImporter {
             return;
         }
 
-        int imported = 0;
-        imported += importFile(List.of("recipesbreakfast.json", "recipes_breakfast.json"), "breakfast");
-        imported += importFile(List.of("recipeslunch.json", "recipes_lunch.json"), "lunch");
-        imported += importFile(List.of("recipesDinner.json", "recipes_dinner.json"), "dinner");
-        imported += importFile(List.of("recipesSnack.json", "recipes_snacks.json"), "snack");
+        int imported = seedFiles().stream()
+                .mapToInt(file -> importFile(file.fileNames(), file.category(), file.language()))
+                .sum();
 
         if (imported > 0) {
             LOG.infof("Imported %d recipe seed entries.", imported);
         }
     }
 
-    private int importFile(List<String> fileNames, String category) {
+    List<SeedFile> seedFiles() {
+        List<SeedFile> files = new ArrayList<>();
+
+        for (String language : LANGUAGES) {
+            for (CategoryFile categoryFile : CATEGORY_FILES) {
+                files.add(new SeedFile(
+                        List.of("recipes/" + language + "/" + categoryFile.fileName()),
+                        categoryFile.category(),
+                        language
+                ));
+            }
+        }
+
+        files.add(new SeedFile(List.of("recipesbreakfast.json", "recipes_breakfast.json", "recipes_en_breakfast.json"), "breakfast", "en"));
+        files.add(new SeedFile(List.of("recipeslunch.json", "recipes_lunch.json", "recipes_en_lunch.json"), "lunch", "en"));
+        files.add(new SeedFile(List.of("recipesDinner.json", "recipes_dinner.json", "recipes_en_dinner.json"), "dinner", "en"));
+        files.add(new SeedFile(List.of("recipesSnack.json", "recipes_snacks.json", "recipes_en_snacks.json"), "snack", "en"));
+
+        for (String language : LANGUAGES) {
+            if (!"en".equals(language)) {
+                files.add(new SeedFile(List.of("recipes_" + language + "_breakfast.json"), "breakfast", language));
+                files.add(new SeedFile(List.of("recipes_" + language + "_lunch.json"), "lunch", language));
+                files.add(new SeedFile(List.of("recipes_" + language + "_dinner.json"), "dinner", language));
+                files.add(new SeedFile(List.of("recipes_" + language + "_snacks.json"), "snack", language));
+            }
+        }
+        return files;
+    }
+
+    int importFile(SeedFile seedFile) {
+        return importFile(seedFile.fileNames(), seedFile.category(), seedFile.language());
+    }
+
+    private int importFile(List<String> fileNames, String category, String language) {
         for (String fileName : fileNames) {
             try (InputStream stream = openResource(fileName)) {
                 if (stream != null) {
-                    return importFile(fileName, category);
+                    return importFile(fileName, category, language);
                 }
             } catch (Exception exception) {
                 LOG.warnf("Could not check recipe seed file '%s': %s", fileName, exception.getMessage());
@@ -59,7 +97,7 @@ public class RecipeJsonSeedImporter {
         return 0;
     }
 
-    private int importFile(String fileName, String category) {
+    private int importFile(String fileName, String category, String language) {
         try (InputStream stream = openResource(fileName)) {
             if (stream == null) {
                 LOG.debugf("Recipe seed file '%s' not found. Skipping.", fileName);
@@ -75,11 +113,11 @@ public class RecipeJsonSeedImporter {
 
             int imported = 0;
             for (JsonNode node : recipes) {
-                Recipe recipe = mapRecipe(node, category);
+                Recipe recipe = mapRecipe(node, category, language);
                 if (recipe == null) {
                     continue;
                 }
-                if (repository.findByTitleAndCategory(recipe.getTitle(), recipe.getCategory()).isPresent()) {
+                if (repository.findByTitleAndCategoryAndLanguage(recipe.getTitle(), recipe.getCategory(), recipe.getLanguage()).isPresent()) {
                     continue;
                 }
                 repository.persist(recipe);
@@ -117,7 +155,7 @@ public class RecipeJsonSeedImporter {
         return objectMapper.createArrayNode();
     }
 
-    private Recipe mapRecipe(JsonNode node, String category) {
+    private Recipe mapRecipe(JsonNode node, String category, String language) {
         String title = firstText(node, "title", "name");
         if (title.isBlank()) {
             return null;
@@ -140,6 +178,7 @@ public class RecipeJsonSeedImporter {
         recipe.setServings(firstInt(node, 1, "servings"));
         recipe.setDifficulty(firstText(node, "difficulty"));
         recipe.setCategory(category);
+        recipe.setLanguage(language);
         recipe.setRating(firstDouble(node, 0.0, "rating"));
         recipe.setIngredients(ingredients);
         recipe.setInstructions(instructions);
@@ -237,5 +276,11 @@ public class RecipeJsonSeedImporter {
             }
         }
         return value.asText("").trim();
+    }
+
+    record SeedFile(List<String> fileNames, String category, String language) {
+    }
+
+    record CategoryFile(String fileName, String category) {
     }
 }

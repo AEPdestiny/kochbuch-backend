@@ -42,8 +42,16 @@ public class RecipeService {
         return findAllPublished();
     }
 
+    public List<Recipe> findAll(String language) {
+        return findAllPublished(language);
+    }
+
     public List<Recipe> findAllPublished() {
         return repo.findRandomPublished(20);
+    }
+
+    public List<Recipe> findAllPublished(String language) {
+        return repo.findRandomPublishedByLanguage(normalizeLanguage(language), 20);
     }
 
     public List<Recipe> findMine(AppUser currentUser) {
@@ -126,5 +134,9 @@ public class RecipeService {
                 && currentUser != null
                 && currentUser.getId() != null
                 && currentUser.getId().equals(recipe.getOwner().getId());
+    }
+
+    private String normalizeLanguage(String language) {
+        return language == null || language.isBlank() ? "en" : language.trim().toLowerCase();
     }
 }

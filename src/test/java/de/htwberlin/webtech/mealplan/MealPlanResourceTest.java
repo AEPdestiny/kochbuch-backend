@@ -96,6 +96,8 @@ class MealPlanResourceTest {
         snack.setId(3L);
         snack.setMealSlot(MealSlot.SNACK);
         snack.setCustomTitle("Sushi frei");
+        snack.setCaloriesSnapshot(480);
+        snack.setImageUrlSnapshot("https://example.com/sushi.jpg");
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
         doReturn(monday).when(mealPlanService).normalizeWeekStart(null);
         doReturn(List.of(breakfast, lunch, snack)).when(mealPlanService).getWeek(currentUser, monday);
@@ -113,7 +115,10 @@ class MealPlanResourceTest {
                 .body("entries[1].mealSlot", equalTo("lunch"))
                 .body("entries[1].recipe.title", equalTo("Pasta 11"))
                 .body("entries[2].mealSlot", equalTo("snack"))
-                .body("entries[2].customTitle", equalTo("Sushi frei"));
+                .body("entries[2].customTitle", equalTo("Sushi frei"))
+                .body("entries[2].calories", equalTo(480))
+                .body("entries[2].caloriesSnapshot", equalTo(480))
+                .body("entries[2].imageUrlSnapshot", equalTo("https://example.com/sushi.jpg"));
     }
 
     @Test
@@ -258,6 +263,7 @@ class MealPlanResourceTest {
         MealPlan mealPlan = mealPlan(currentUser, null, date);
         mealPlan.setMealSlot(MealSlot.SNACK);
         mealPlan.setCustomTitle("Sushi frei");
+        mealPlan.setCaloriesSnapshot(480);
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
         doReturn(mealPlan)
                 .when(mealPlanService).setRecipeForSlot(eq(currentUser), eq(date), eq(MealSlot.SNACK), any(MealPlanEntryRequest.class));
@@ -267,14 +273,16 @@ class MealPlanResourceTest {
                 .header("Authorization", "Bearer valid-token")
                 .body("""
                         {
-                          "customTitle": "Sushi frei"
+                          "customTitle": "Sushi frei",
+                          "caloriesSnapshot": 480
                         }
                         """)
                 .when().put("/meal-plan/days/2026-06-01/slots/snack")
                 .then()
                 .statusCode(200)
                 .body("mealSlot", equalTo("snack"))
-                .body("customTitle", equalTo("Sushi frei"));
+                .body("customTitle", equalTo("Sushi frei"))
+                .body("calories", equalTo(480));
     }
 
     @Test

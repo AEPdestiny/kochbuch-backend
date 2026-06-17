@@ -50,7 +50,10 @@ public class AiChatService {
         try {
             return new AiChatResponse(groqClient.complete(systemPrompt, prompt), true);
         } catch (GroqClientException exception) {
-            return new AiChatResponse("Dishly AI ist noch nicht konfiguriert oder gerade nicht erreichbar. Setze GROQ_API_KEY im Backend, damit echte Groq-Antworten erzeugt werden.", false);
+            if (exception.getMessage() != null && exception.getMessage().contains("GROQ_API_KEY")) {
+                return new AiChatResponse("Dishly AI ist noch nicht konfiguriert. Setze GROQ_API_KEY im Backend, damit echte Antworten erzeugt werden.", false);
+            }
+            return new AiChatResponse("Dishly AI konnte Groq gerade nicht erreichen: " + exception.getMessage(), false);
         }
     }
 

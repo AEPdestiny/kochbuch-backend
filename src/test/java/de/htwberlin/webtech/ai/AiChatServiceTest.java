@@ -63,12 +63,27 @@ class AiChatServiceTest {
         doReturn(List.of()).when(pantryItemRepository).findByOwner(user);
         doReturn(List.of()).when(favoriteRepository).findByOwner(user);
         doReturn(List.of()).when(mealPlanRepository).findByOwnerAndPlannedDateBetween(any(), any(LocalDate.class), any(LocalDate.class));
-        doThrow(new GroqClientException("missing")).when(groqClient).complete(any(), any());
+        doThrow(new GroqClientException("GROQ_API_KEY is not configured.")).when(groqClient).complete(any(), any());
 
         AiChatResponse response = underTest.answer(user, "Hallo");
 
         assertFalse(response.isConfigured());
         assertTrue(response.getMessage().contains("GROQ_API_KEY"));
+    }
+
+    @Test
+    void answer_should_return_controlled_groq_error_message() {
+        AppUser user = user();
+        doReturn(Optional.empty()).when(preferencesRepository).findByOwner(user);
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(user);
+        doReturn(List.of()).when(favoriteRepository).findByOwner(user);
+        doReturn(List.of()).when(mealPlanRepository).findByOwnerAndPlannedDateBetween(any(), any(LocalDate.class), any(LocalDate.class));
+        doThrow(new GroqClientException("Groq request failed with status 401.")).when(groqClient).complete(any(), any());
+
+        AiChatResponse response = underTest.answer(user, "Hallo");
+
+        assertFalse(response.isConfigured());
+        assertTrue(response.getMessage().contains("Groq request failed with status 401."));
     }
 
     private AppUser user() {

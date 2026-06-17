@@ -134,14 +134,48 @@ class MealPlanServiceTest {
         doReturn(Optional.empty()).when(mealPlanRepository)
                 .findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.LUNCH);
 
-        MealPlan result = underTest.setRecipeForSlot(owner, date, MealSlot.LUNCH, customRequest("Sushi Abend"));
+        MealPlanEntryRequest request = customRequest("Sushi Abend");
+        request.setCaloriesSnapshot(520);
+        request.setImageUrlSnapshot("https://example.com/sushi.jpg");
+        request.setExternalRecipeId("spoon-99");
+        request.setExternalSource("spoonacular");
+
+        MealPlan result = underTest.setRecipeForSlot(owner, date, MealSlot.LUNCH, request);
 
         verify(mealPlanRepository).findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.LUNCH);
         verify(mealPlanRepository).persist(result);
         verifyNoMoreInteractions(recipeRepository);
         assertEquals(MealSlot.LUNCH, result.getMealSlot());
         assertEquals("Sushi Abend", result.getCustomTitle());
+        assertEquals(520, result.getCaloriesSnapshot());
+        assertEquals("https://example.com/sushi.jpg", result.getImageUrlSnapshot());
+        assertEquals("spoon-99", result.getExternalRecipeId());
+        assertEquals("spoonacular", result.getExternalSource());
         assertEquals(null, result.getRecipe());
+    }
+
+    @Test
+    @DisplayName("setRecipeForSlot should clear snapshots when replacing custom title with own recipe")
+    void setRecipeForSlot_should_clear_snapshots_when_replacing_custom_title_with_own_recipe() {
+        AppUser owner = user(1L);
+        Recipe recipe = recipe(10L, owner);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        MealPlan existing = mealPlan(owner, null, date);
+        existing.setMealSlot(MealSlot.SNACK);
+        existing.setCustomTitle("Sushi frei");
+        existing.setCaloriesSnapshot(500);
+        existing.setExternalRecipeId("external-1");
+        doReturn(recipe).when(recipeRepository).findById(10L);
+        doReturn(Optional.of(existing)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.SNACK);
+
+        MealPlan result = underTest.setRecipeForSlot(owner, date, MealSlot.SNACK, request(10L));
+
+        assertSame(existing, result);
+        assertSame(recipe, result.getRecipe());
+        assertEquals(null, result.getCustomTitle());
+        assertEquals(null, result.getCaloriesSnapshot());
+        assertEquals(null, result.getExternalRecipeId());
     }
 
     @Test

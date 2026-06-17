@@ -69,16 +69,16 @@ public class RecipeResource {
             description = "Recipes returned",
             content = @Content(schema = @Schema(implementation = RecipeResponse.class, type = SchemaType.ARRAY))
     )
-    public List<RecipeResponse> getAll() {
-        return mapper.toResponseList(service.findAll());
+    public List<RecipeResponse> getAll(@QueryParam("language") String language) {
+        return mapper.toResponseList(service.findAll(language));
     }
 
     @GET
     @Path("/published")
     @Operation(summary = "List published recipes", description = "Returns recipes marked as published.")
     @APIResponse(responseCode = "200", description = "Published recipes returned")
-    public List<RecipeResponse> getPublished() {
-        return mapper.toResponseList(service.findAllPublished());
+    public List<RecipeResponse> getPublished(@QueryParam("language") String language) {
+        return mapper.toResponseList(service.findAllPublished(language));
     }
 
     @GET
@@ -139,9 +139,17 @@ public class RecipeResource {
             @QueryParam("diet") String diet,
             @QueryParam("intolerances") String intolerances,
             @QueryParam("maxReadyTime") Integer maxReadyTime,
-            @QueryParam("type") String type
+            @QueryParam("type") String type,
+            @QueryParam("language") String language
     ) {
+        if (!"en".equals(normalizeLanguage(language))) {
+            return List.of();
+        }
         return externalService.fetchExternalRecipes(search, diet, intolerances, maxReadyTime, type);
+    }
+
+    private String normalizeLanguage(String language) {
+        return language == null || language.isBlank() ? "en" : language.trim().toLowerCase();
     }
 
     @GET

@@ -41,6 +41,21 @@ public class MealPlan {
     @Column(name = "custom_title", length = 160)
     private String customTitle;
 
+    @Column(name = "calories_snapshot")
+    private Integer caloriesSnapshot;
+
+    @Column(name = "protein_snapshot")
+    private Double proteinSnapshot;
+
+    @Column(name = "image_url_snapshot", length = 1000)
+    private String imageUrlSnapshot;
+
+    @Column(name = "external_recipe_id", length = 100)
+    private String externalRecipeId;
+
+    @Column(name = "external_source", length = 80)
+    private String externalSource;
+
     @Column(name = "planned_date", nullable = false)
     private LocalDate plannedDate;
 
@@ -99,6 +114,46 @@ public class MealPlan {
 
     public void setCustomTitle(String customTitle) {
         this.customTitle = customTitle;
+    }
+
+    public Integer getCaloriesSnapshot() {
+        return caloriesSnapshot;
+    }
+
+    public void setCaloriesSnapshot(Integer caloriesSnapshot) {
+        this.caloriesSnapshot = caloriesSnapshot;
+    }
+
+    public Double getProteinSnapshot() {
+        return proteinSnapshot;
+    }
+
+    public void setProteinSnapshot(Double proteinSnapshot) {
+        this.proteinSnapshot = proteinSnapshot;
+    }
+
+    public String getImageUrlSnapshot() {
+        return imageUrlSnapshot;
+    }
+
+    public void setImageUrlSnapshot(String imageUrlSnapshot) {
+        this.imageUrlSnapshot = imageUrlSnapshot;
+    }
+
+    public String getExternalRecipeId() {
+        return externalRecipeId;
+    }
+
+    public void setExternalRecipeId(String externalRecipeId) {
+        this.externalRecipeId = externalRecipeId;
+    }
+
+    public String getExternalSource() {
+        return externalSource;
+    }
+
+    public void setExternalSource(String externalSource) {
+        this.externalSource = externalSource;
     }
 
     public LocalDate getPlannedDate() {

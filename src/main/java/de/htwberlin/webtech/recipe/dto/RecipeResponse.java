@@ -18,6 +18,7 @@ public class RecipeResponse {
     private boolean favorite;
     private boolean published;
     private Integer calories;
+    private String language;
     private String sourceUrl;
 
     public Long getId() {
@@ -146,6 +147,14 @@ public class RecipeResponse {
 
     public void setCalories(Integer calories) {
         this.calories = calories;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
     }
 
     public String getSourceUrl() {

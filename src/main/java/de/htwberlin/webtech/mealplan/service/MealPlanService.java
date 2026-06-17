@@ -57,6 +57,9 @@ public class MealPlanService {
             }
             ensureRecipeOwner(recipe, currentUser);
             customTitle = null;
+            validateSnapshotValues(request);
+        } else {
+            validateSnapshotValues(request);
         }
 
         MealPlan mealPlan = findEntry(currentUser, plannedDate, mealSlot)
@@ -69,6 +72,7 @@ public class MealPlanService {
                 });
         mealPlan.setRecipe(recipe);
         mealPlan.setCustomTitle(customTitle);
+        applySnapshots(mealPlan, recipe, request);
         mealPlan.setMealSlot(mealSlot);
         if (mealPlan.getId() == null) {
             mealPlanRepository.persist(mealPlan);
@@ -109,6 +113,42 @@ public class MealPlanService {
             throw new IllegalArgumentException("customTitle must be at most 160 characters.");
         }
         return value;
+    }
+
+    private void validateSnapshotValues(MealPlanEntryRequest request) {
+        if (request.getCaloriesSnapshot() != null && request.getCaloriesSnapshot() < 0) {
+            throw new IllegalArgumentException("caloriesSnapshot must be greater than or equal to 0.");
+        }
+        if (request.getProteinSnapshot() != null && request.getProteinSnapshot() < 0) {
+            throw new IllegalArgumentException("proteinSnapshot must be greater than or equal to 0.");
+        }
+    }
+
+    private void applySnapshots(MealPlan mealPlan, Recipe recipe, MealPlanEntryRequest request) {
+        if (recipe != null) {
+            mealPlan.setCaloriesSnapshot(null);
+            mealPlan.setProteinSnapshot(null);
+            mealPlan.setImageUrlSnapshot(null);
+            mealPlan.setExternalRecipeId(null);
+            mealPlan.setExternalSource(null);
+            return;
+        }
+        mealPlan.setCaloriesSnapshot(request.getCaloriesSnapshot());
+        mealPlan.setProteinSnapshot(request.getProteinSnapshot());
+        mealPlan.setImageUrlSnapshot(cleanOptionalText(request.getImageUrlSnapshot(), 1000, "imageUrlSnapshot"));
+        mealPlan.setExternalRecipeId(cleanOptionalText(request.getExternalRecipeId(), 100, "externalRecipeId"));
+        mealPlan.setExternalSource(cleanOptionalText(request.getExternalSource(), 80, "externalSource"));
+    }
+
+    private String cleanOptionalText(String value, int maxLength, String fieldName) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + " must be at most " + maxLength + " characters.");
+        }
+        return trimmed;
     }
 
     private java.util.Optional<MealPlan> findEntry(AppUser currentUser, LocalDate plannedDate, MealSlot mealSlot) {

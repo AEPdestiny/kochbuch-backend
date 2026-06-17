@@ -56,6 +56,21 @@ class RecipeServiceTest {
     }
 
     @Test
+    @DisplayName("findAllPublished should filter by language")
+    void findAllPublished_should_filter_by_language() {
+        var published = recipe("Deutsches Rezept");
+        published.setLanguage("de");
+        doReturn(List.of(published)).when(repo).findRandomPublishedByLanguage("de", 20);
+
+        var result = underTest.findAllPublished("de");
+
+        verify(repo).findRandomPublishedByLanguage("de", 20);
+        verifyNoMoreInteractions(repo);
+        assertEquals(1, result.size());
+        assertEquals("de", result.get(0).getLanguage());
+    }
+
+    @Test
     @DisplayName("findMine should call repo.findByOwner")
     void findMine_should_call_findByOwner() {
         var owner = user(1L, "owner@example.com");

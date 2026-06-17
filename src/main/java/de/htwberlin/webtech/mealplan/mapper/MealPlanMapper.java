@@ -27,6 +27,12 @@ public class MealPlanMapper {
             response.setRecipe(recipeMapper.toResponse(mealPlan.getRecipe()));
         }
         response.setCustomTitle(mealPlan.getCustomTitle());
+        response.setCalories(resolveCalories(mealPlan));
+        response.setCaloriesSnapshot(mealPlan.getCaloriesSnapshot());
+        response.setProteinSnapshot(mealPlan.getProteinSnapshot());
+        response.setImageUrlSnapshot(mealPlan.getImageUrlSnapshot());
+        response.setExternalRecipeId(mealPlan.getExternalRecipeId());
+        response.setExternalSource(mealPlan.getExternalSource());
         return response;
     }
 
@@ -38,5 +44,12 @@ public class MealPlanMapper {
                 .map(this::toResponse)
                 .toList());
         return response;
+    }
+
+    private Integer resolveCalories(MealPlan mealPlan) {
+        if (mealPlan.getRecipe() != null && mealPlan.getRecipe().getCalories() != null) {
+            return mealPlan.getRecipe().getCalories();
+        }
+        return mealPlan.getCaloriesSnapshot();
     }
 }
