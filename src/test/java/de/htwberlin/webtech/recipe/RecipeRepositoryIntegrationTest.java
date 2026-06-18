@@ -64,6 +64,23 @@ class RecipeRepositoryIntegrationTest {
 
     @Test
     @TestTransaction
+    void should_not_return_owned_recipes_in_public_published_query() {
+        AppUser owner = user("public-owner", "public-owner@example.com");
+        userRepository.persistAndFlush(owner);
+        Recipe owned = recipe("Owned Published", true);
+        owned.setOwner(owner);
+        repository.persist(recipe("Seed Published", true));
+        repository.persist(owned);
+        repository.flush();
+
+        var published = repository.findPublished();
+
+        assertTrue(published.stream().anyMatch(recipe -> "Seed Published".equals(recipe.getTitle())));
+        assertTrue(published.stream().noneMatch(recipe -> "Owned Published".equals(recipe.getTitle())));
+    }
+
+    @Test
+    @TestTransaction
     void should_include_public_seed_recipe_without_ingredients() {
         Recipe recipe = recipe("Visible Empty Recipe", true);
         recipe.setCategory("breakfast");

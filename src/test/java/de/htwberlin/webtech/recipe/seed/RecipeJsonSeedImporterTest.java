@@ -150,7 +150,7 @@ class RecipeJsonSeedImporterTest {
         verify(persistence).upsertSeedRecipe(captor.capture());
         Recipe recipe = captor.getValue();
         assertEquals(1, imported);
-        assertEquals("rice, beans", recipe.getIngredients());
+        assertEquals("100 g rice, 200 g beans", recipe.getIngredients());
         assertEquals(22.7, recipe.getProtein());
     }
 

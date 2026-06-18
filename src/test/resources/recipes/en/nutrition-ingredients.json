@@ -11,10 +11,14 @@
       ],
       "ingredients": [
         {
-          "name": "rice"
+          "name": "rice",
+          "amount": 100,
+          "unit": "g"
         },
         {
-          "name": "beans"
+          "name": "beans",
+          "amount": 200,
+          "unit": "g"
         }
       ]
     }

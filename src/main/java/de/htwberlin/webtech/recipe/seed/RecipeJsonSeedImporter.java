@@ -11,8 +11,10 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class RecipeJsonSeedImporter {
@@ -396,10 +398,44 @@ public class RecipeJsonSeedImporter {
             return String.join(", ", parts);
         }
         if (value.isObject()) {
-            String original = firstText(value, "original", "step", "text", "name", "title");
-            if (!original.isBlank()) {
-                return original;
+            String ingredient = ingredientText(value);
+            if (!ingredient.isBlank()) {
+                return ingredient;
             }
+            String text = firstText(value, "step", "text", "title");
+            if (!text.isBlank()) {
+                return text;
+            }
+        }
+        return value.asText("").trim();
+    }
+
+    private String ingredientText(JsonNode value) {
+        String original = firstText(value, "original", "originalString");
+        if (!original.isBlank()) {
+            return stripHtml(original);
+        }
+        String name = firstText(value, "name");
+        if (name.isBlank()) {
+            return "";
+        }
+        String amount = numericText(value.get("amount"));
+        String unit = firstText(value, "unit", "unitShort", "unitLong");
+        return List.of(amount, unit, name).stream()
+                .filter(part -> part != null && !part.isBlank())
+                .collect(Collectors.joining(" "));
+    }
+
+    private String numericText(JsonNode value) {
+        if (value == null || value.isNull()) {
+            return "";
+        }
+        if (value.isNumber()) {
+            double number = value.asDouble();
+            if (number == Math.rint(number)) {
+                return String.valueOf((long) number);
+            }
+            return BigDecimal.valueOf(number).stripTrailingZeros().toPlainString();
         }
         return value.asText("").trim();
     }
