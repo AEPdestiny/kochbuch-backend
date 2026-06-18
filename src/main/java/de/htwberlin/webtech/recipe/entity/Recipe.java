@@ -43,6 +43,25 @@ public class Recipe {
     private boolean published;
     private Integer calories;
     private Double protein;
+    private Double alcohol;
+    @Column(name = "alcohol_percent")
+    private Double alcoholPercent;
+    @Column(name = "external_id")
+    private String externalId;
+    @Column(name = "source_url", length = 1000)
+    private String sourceUrl;
+    @Column(name = "source_name")
+    private String sourceName;
+    @Column(name = "dish_types", columnDefinition = "TEXT")
+    private String dishTypes;
+    @Column(columnDefinition = "TEXT")
+    private String diets;
+    private boolean vegetarian;
+    private boolean vegan;
+    @Column(name = "gluten_free")
+    private boolean glutenFree;
+    @Column(name = "dairy_free")
+    private boolean dairyFree;
     private String language = "en";
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
@@ -195,6 +214,94 @@ public class Recipe {
 
     public void setProtein(Double protein) {
         this.protein = protein;
+    }
+
+    public Double getAlcohol() {
+        return alcohol;
+    }
+
+    public void setAlcohol(Double alcohol) {
+        this.alcohol = alcohol;
+    }
+
+    public Double getAlcoholPercent() {
+        return alcoholPercent;
+    }
+
+    public void setAlcoholPercent(Double alcoholPercent) {
+        this.alcoholPercent = alcoholPercent;
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public void setExternalId(String externalId) {
+        this.externalId = externalId == null || externalId.isBlank() ? null : externalId.trim();
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
+    }
+
+    public String getSourceName() {
+        return sourceName;
+    }
+
+    public void setSourceName(String sourceName) {
+        this.sourceName = sourceName;
+    }
+
+    public String getDishTypes() {
+        return dishTypes;
+    }
+
+    public void setDishTypes(String dishTypes) {
+        this.dishTypes = dishTypes;
+    }
+
+    public String getDiets() {
+        return diets;
+    }
+
+    public void setDiets(String diets) {
+        this.diets = diets;
+    }
+
+    public boolean isVegetarian() {
+        return vegetarian;
+    }
+
+    public void setVegetarian(boolean vegetarian) {
+        this.vegetarian = vegetarian;
+    }
+
+    public boolean isVegan() {
+        return vegan;
+    }
+
+    public void setVegan(boolean vegan) {
+        this.vegan = vegan;
+    }
+
+    public boolean isGlutenFree() {
+        return glutenFree;
+    }
+
+    public void setGlutenFree(boolean glutenFree) {
+        this.glutenFree = glutenFree;
+    }
+
+    public boolean isDairyFree() {
+        return dairyFree;
+    }
+
+    public void setDairyFree(boolean dairyFree) {
+        this.dairyFree = dairyFree;
     }
 
     public String getLanguage() {

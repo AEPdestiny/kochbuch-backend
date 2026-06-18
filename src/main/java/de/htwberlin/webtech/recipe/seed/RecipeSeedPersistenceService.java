@@ -16,23 +16,56 @@ public class RecipeSeedPersistenceService implements RecipeSeedPersistence {
 
     @Override
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public long deleteInvalidSeedRecipesWithoutIngredients() {
-        return repository.deleteInvalidSeedRecipesWithoutIngredients();
-    }
+    public boolean upsertSeedRecipe(Recipe recipe) {
+        Recipe existing = repository.findSeedByExternalIdCategoryAndLanguage(
+                        recipe.getExternalId(),
+                        recipe.getCategory(),
+                        recipe.getLanguage()
+                )
+                .or(() -> repository.findSeedByTitleCategoryAndLanguage(
+                        recipe.getTitle(),
+                        recipe.getCategory(),
+                        recipe.getLanguage()
+                ))
+                .orElse(null);
 
-    @Override
-    @Transactional(Transactional.TxType.REQUIRES_NEW)
-    public boolean persistIfMissing(Recipe recipe) {
-        if (repository.findByTitleAndCategoryAndLanguage(
-                recipe.getTitle(),
-                recipe.getCategory(),
-                recipe.getLanguage()
-        ).isPresent()) {
+        if (existing != null) {
+            updateSeedRecipe(existing, recipe);
+            repository.flush();
             return false;
         }
 
         repository.persist(recipe);
         repository.flush();
         return true;
+    }
+
+    private void updateSeedRecipe(Recipe existing, Recipe source) {
+        existing.setExternalId(source.getExternalId());
+        existing.setTitle(source.getTitle());
+        existing.setImageUrl(source.getImageUrl());
+        existing.setPrepTimeMinutes(source.getPrepTimeMinutes());
+        existing.setCookTimeMinutes(source.getCookTimeMinutes());
+        existing.setServings(source.getServings());
+        existing.setDifficulty(source.getDifficulty());
+        existing.setCategory(source.getCategory());
+        existing.setLanguage(source.getLanguage());
+        existing.setRating(source.getRating());
+        existing.setIngredients(source.getIngredients());
+        existing.setInstructions(source.getInstructions());
+        existing.setCalories(source.getCalories());
+        existing.setProtein(source.getProtein());
+        existing.setAlcohol(source.getAlcohol());
+        existing.setAlcoholPercent(source.getAlcoholPercent());
+        existing.setSourceUrl(source.getSourceUrl());
+        existing.setSourceName(source.getSourceName());
+        existing.setDishTypes(source.getDishTypes());
+        existing.setDiets(source.getDiets());
+        existing.setVegetarian(source.isVegetarian());
+        existing.setVegan(source.isVegan());
+        existing.setGlutenFree(source.isGlutenFree());
+        existing.setDairyFree(source.isDairyFree());
+        existing.setFavorite(false);
+        existing.setPublished(true);
     }
 }

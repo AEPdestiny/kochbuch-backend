@@ -40,11 +40,6 @@ public class RecipeJsonSeedImporter {
             return;
         }
 
-        long removed = persistence.deleteInvalidSeedRecipesWithoutIngredients();
-        if (removed > 0) {
-            LOG.infof("Removed %d invalid seed recipe entries without ingredients.", removed);
-        }
-
         int imported = seedFiles().stream()
                 .mapToInt(file -> importFile(file.fileNames(), file.category(), file.language()))
                 .sum();
@@ -122,7 +117,7 @@ public class RecipeJsonSeedImporter {
                     continue;
                 }
                 try {
-                    if (persistence.persistIfMissing(recipe)) {
+                    if (persistence.upsertSeedRecipe(recipe)) {
                         imported++;
                     }
                 } catch (Exception exception) {
@@ -173,15 +168,13 @@ public class RecipeJsonSeedImporter {
         }
 
         String ingredients = ingredientsText(node);
-        String instructions = joinValues(firstNode(node, "instructions", "steps", "analyzedInstructions"));
-        if (!hasMeaningfulIngredients(ingredients)) {
-            return null;
-        }
+        String instructions = instructionsText(node);
         Recipe recipe = new Recipe();
+        recipe.setExternalId(firstText(node, "id"));
         recipe.setTitle(title);
-        recipe.setImageUrl(firstText(node, "imageUrl", "image"));
-        recipe.setPrepTimeMinutes(firstInt(node, 0, "prepTimeMinutes", "prepTime"));
-        recipe.setCookTimeMinutes(firstInt(node, firstInt(node, 0, "readyInMinutes"), "cookTimeMinutes", "cookTime"));
+        recipe.setImageUrl(firstImageUrl(node));
+        recipe.setPrepTimeMinutes(firstInt(node, 0, "prepTimeMinutes", "prepTime", "preparationMinutes"));
+        recipe.setCookTimeMinutes(firstInt(node, firstInt(node, 0, "readyInMinutes"), "cookTimeMinutes", "cookTime", "cookingMinutes"));
         recipe.setServings(firstInt(node, 1, "servings"));
         recipe.setDifficulty(firstText(node, "difficulty"));
         recipe.setCategory(category);
@@ -191,6 +184,16 @@ public class RecipeJsonSeedImporter {
         recipe.setInstructions(instructions);
         recipe.setCalories(firstNonNull(firstNullableInt(node, "calories", "kcal"), caloriesFromNutrition(node)));
         recipe.setProtein(firstNonNull(firstNullableDouble(node, "protein", "proteinGrams"), proteinFromNutrition(node)));
+        recipe.setAlcohol(nutrientFromNutrition(node, "Alcohol"));
+        recipe.setAlcoholPercent(nutrientFromNutrition(node, "Alcohol %"));
+        recipe.setSourceUrl(firstText(node, "sourceUrl", "spoonacularSourceUrl"));
+        recipe.setSourceName(firstText(node, "sourceName", "creditsText"));
+        recipe.setDishTypes(joinValues(node.get("dishTypes")));
+        recipe.setDiets(joinValues(node.get("diets")));
+        recipe.setVegetarian(firstBoolean(node, "vegetarian"));
+        recipe.setVegan(firstBoolean(node, "vegan"));
+        recipe.setGlutenFree(firstBoolean(node, "glutenFree"));
+        recipe.setDairyFree(firstBoolean(node, "dairyFree"));
         recipe.setFavorite(false);
         recipe.setPublished(true);
         return recipe;
@@ -207,19 +210,53 @@ public class RecipeJsonSeedImporter {
 
     private String ingredientsText(JsonNode node) {
         String ingredients = joinValues(firstNode(node, "ingredients", "extendedIngredients"));
-        if (hasMeaningfulIngredients(ingredients)) {
+        if (ingredients != null && !ingredients.isBlank() && !"[]".equals(ingredients.trim())) {
             return ingredients;
         }
         return joinValues(node.path("nutrition").path("ingredients"));
     }
 
-    private boolean hasMeaningfulIngredients(String value) {
-        if (value == null || value.isBlank()) {
-            return false;
+    private String instructionsText(JsonNode node) {
+        String analyzed = analyzedInstructionsText(node.path("analyzedInstructions"));
+        if (!analyzed.isBlank()) {
+            return analyzed;
         }
-        String normalized = value.trim();
-        return !normalized.equals("[]")
-                && !"Keine Zutaten angegeben.".equalsIgnoreCase(normalized);
+        String direct = stripHtml(firstText(node, "instructions"));
+        if (!direct.isBlank()) {
+            return direct;
+        }
+        String structured = stripHtml(joinValues(firstNode(node, "instructions")));
+        if (!structured.isBlank()) {
+            return structured;
+        }
+        return stripHtml(firstText(node, "summary"));
+    }
+
+    private String analyzedInstructionsText(JsonNode analyzedInstructions) {
+        if (!analyzedInstructions.isArray()) {
+            return "";
+        }
+        List<String> steps = new ArrayList<>();
+        for (JsonNode instructionGroup : analyzedInstructions) {
+            JsonNode groupSteps = instructionGroup.path("steps");
+            if (!groupSteps.isArray()) {
+                continue;
+            }
+            for (JsonNode step : groupSteps) {
+                String text = firstText(step, "step", "text");
+                if (!text.isBlank()) {
+                    steps.add(text);
+                }
+            }
+        }
+        if (steps.isEmpty()) {
+            return "";
+        }
+        List<String> numbered = new ArrayList<>();
+        for (int index = 0; index < steps.size(); index++) {
+            numbered.add((index + 1) + ". " + steps.get(index));
+        }
+        return String.join("\n", numbered);
     }
 
     private String firstText(JsonNode node, String... names) {
@@ -228,6 +265,18 @@ public class RecipeJsonSeedImporter {
             if (value != null && !value.isNull() && !value.asText("").isBlank()) {
                 return value.asText().trim();
             }
+        }
+        return "";
+    }
+
+    private String firstImageUrl(JsonNode node) {
+        String direct = firstText(node, "imageUrl", "image");
+        if (!direct.isBlank()) {
+            return direct;
+        }
+        JsonNode images = node.get("images");
+        if (images != null && images.isArray() && !images.isEmpty()) {
+            return images.get(0).asText("").trim();
         }
         return "";
     }
@@ -282,12 +331,16 @@ public class RecipeJsonSeedImporter {
     }
 
     private Double proteinFromNutrition(JsonNode node) {
+        return nutrientFromNutrition(node, "Protein");
+    }
+
+    private Double nutrientFromNutrition(JsonNode node, String nutrientName) {
         JsonNode nutrients = node.path("nutrition").path("nutrients");
         if (!nutrients.isArray()) {
             return null;
         }
         for (JsonNode nutrient : nutrients) {
-            if ("protein".equalsIgnoreCase(nutrient.path("name").asText())) {
+            if (nutrientName.equalsIgnoreCase(nutrient.path("name").asText())) {
                 JsonNode amount = nutrient.get("amount");
                 if (amount != null && amount.isNumber()) {
                     return amount.asDouble();
@@ -295,6 +348,24 @@ public class RecipeJsonSeedImporter {
             }
         }
         return null;
+    }
+
+    private boolean firstBoolean(JsonNode node, String name) {
+        JsonNode value = node.get(name);
+        return value != null && value.asBoolean(false);
+    }
+
+    private String stripHtml(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.replaceAll("<[^>]+>", " ")
+                .replace("&nbsp;", " ")
+                .replace("&amp;", "&")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private double firstDouble(JsonNode node, double defaultValue, String... names) {

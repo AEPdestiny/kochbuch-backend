@@ -1,15 +1,38 @@
 [
   {
+    "id": 12345,
     "title": "Seed Breakfast",
-    "imageUrl": "https://example.com/breakfast.jpg",
-    "prepTimeMinutes": 10,
-    "cookTimeMinutes": 15,
+    "image": "https://example.com/breakfast.jpg",
+    "readyInMinutes": 25,
     "servings": 2,
-    "difficulty": "easy",
+    "sourceUrl": "https://example.com/source",
+    "sourceName": "Example Kitchen",
+    "dishTypes": ["breakfast", "morning meal"],
+    "diets": ["vegetarian"],
+    "vegetarian": true,
+    "vegan": false,
+    "glutenFree": true,
+    "dairyFree": false,
     "rating": 4.5,
-    "ingredients": ["oats", "milk"],
-    "instructions": ["Mix ingredients", "Cook gently"],
-    "calories": 420,
-    "protein": 18.5
+    "extendedIngredients": [
+      { "original": "1 cup oats", "name": "oats", "amount": 1, "unit": "cup" },
+      { "original": "200 ml milk", "name": "milk", "amount": 200, "unit": "ml" }
+    ],
+    "analyzedInstructions": [
+      {
+        "steps": [
+          { "number": 1, "step": "Mix ingredients." },
+          { "number": 2, "step": "Cook gently." }
+        ]
+      }
+    ],
+    "nutrition": {
+      "nutrients": [
+        { "name": "Calories", "amount": 420, "unit": "kcal" },
+        { "name": "Protein", "amount": 18.5, "unit": "g" },
+        { "name": "Alcohol", "amount": 1.2, "unit": "g" },
+        { "name": "Alcohol %", "amount": 0.4, "unit": "%" }
+      ]
+    }
   }
 ]

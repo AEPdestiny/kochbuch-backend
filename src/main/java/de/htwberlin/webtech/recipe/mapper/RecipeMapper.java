@@ -33,8 +33,20 @@ public class RecipeMapper {
         response.setPublished(recipe.isPublished());
         response.setCalories(recipe.getCalories());
         response.setProtein(recipe.getProtein());
+        response.setAlcohol(recipe.getAlcohol());
+        response.setAlcoholPercent(recipe.getAlcoholPercent());
         response.setUserCreated(recipe.getOwner() != null);
         response.setLanguage(recipe.getLanguage());
+        response.setExternalId(recipe.getExternalId());
+        response.setSource(recipe.getExternalId() == null ? "dishly" : "spoonacular");
+        response.setSourceUrl(recipe.getSourceUrl());
+        response.setSourceName(recipe.getSourceName());
+        response.setDishTypes(recipe.getDishTypes());
+        response.setDiets(recipe.getDiets());
+        response.setVegetarian(recipe.isVegetarian());
+        response.setVegan(recipe.isVegan());
+        response.setGlutenFree(recipe.isGlutenFree());
+        response.setDairyFree(recipe.isDairyFree());
         return response;
     }
 
@@ -59,6 +71,8 @@ public class RecipeMapper {
         recipe.setPublished(request.isPublished());
         recipe.setCalories(request.getCalories());
         recipe.setProtein(request.getProtein());
+        recipe.setAlcohol(request.getAlcohol());
+        recipe.setAlcoholPercent(request.getAlcoholPercent());
         recipe.setLanguage(request.getLanguage());
     }
 
@@ -77,6 +91,8 @@ public class RecipeMapper {
         recipe.setPublished(source.isPublished());
         recipe.setCalories(source.getCalories());
         recipe.setProtein(source.getProtein());
+        recipe.setAlcohol(source.getAlcohol());
+        recipe.setAlcoholPercent(source.getAlcoholPercent());
         recipe.setLanguage(source.getLanguage());
     }
 }

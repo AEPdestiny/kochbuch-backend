@@ -19,9 +19,18 @@ public class RecipeResponse {
     private boolean published;
     private Integer calories;
     private Double protein;
+    private Double alcohol;
+    private Double alcoholPercent;
     private boolean userCreated;
     private String language;
     private String sourceUrl;
+    private String sourceName;
+    private String dishTypes;
+    private String diets;
+    private boolean vegetarian;
+    private boolean vegan;
+    private boolean glutenFree;
+    private boolean dairyFree;
 
     public Long getId() {
         return id;
@@ -159,6 +168,22 @@ public class RecipeResponse {
         this.protein = protein;
     }
 
+    public Double getAlcohol() {
+        return alcohol;
+    }
+
+    public void setAlcohol(Double alcohol) {
+        this.alcohol = alcohol;
+    }
+
+    public Double getAlcoholPercent() {
+        return alcoholPercent;
+    }
+
+    public void setAlcoholPercent(Double alcoholPercent) {
+        this.alcoholPercent = alcoholPercent;
+    }
+
     public boolean isUserCreated() {
         return userCreated;
     }
@@ -181,5 +206,61 @@ public class RecipeResponse {
 
     public void setSourceUrl(String sourceUrl) {
         this.sourceUrl = sourceUrl;
+    }
+
+    public String getSourceName() {
+        return sourceName;
+    }
+
+    public void setSourceName(String sourceName) {
+        this.sourceName = sourceName;
+    }
+
+    public String getDishTypes() {
+        return dishTypes;
+    }
+
+    public void setDishTypes(String dishTypes) {
+        this.dishTypes = dishTypes;
+    }
+
+    public String getDiets() {
+        return diets;
+    }
+
+    public void setDiets(String diets) {
+        this.diets = diets;
+    }
+
+    public boolean isVegetarian() {
+        return vegetarian;
+    }
+
+    public void setVegetarian(boolean vegetarian) {
+        this.vegetarian = vegetarian;
+    }
+
+    public boolean isVegan() {
+        return vegan;
+    }
+
+    public void setVegan(boolean vegan) {
+        this.vegan = vegan;
+    }
+
+    public boolean isGlutenFree() {
+        return glutenFree;
+    }
+
+    public void setGlutenFree(boolean glutenFree) {
+        this.glutenFree = glutenFree;
+    }
+
+    public boolean isDairyFree() {
+        return dairyFree;
+    }
+
+    public void setDairyFree(boolean dairyFree) {
+        this.dairyFree = dairyFree;
     }
 }

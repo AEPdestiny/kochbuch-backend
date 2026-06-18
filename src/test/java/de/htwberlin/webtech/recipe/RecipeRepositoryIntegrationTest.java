@@ -64,8 +64,8 @@ class RecipeRepositoryIntegrationTest {
 
     @Test
     @TestTransaction
-    void should_exclude_public_seed_recipe_without_ingredients() {
-        Recipe recipe = recipe("Invisible Empty Recipe", true);
+    void should_include_public_seed_recipe_without_ingredients() {
+        Recipe recipe = recipe("Visible Empty Recipe", true);
         recipe.setCategory("breakfast");
         recipe.setLanguage("en");
         recipe.setIngredients("");
@@ -74,28 +74,7 @@ class RecipeRepositoryIntegrationTest {
 
         var result = repository.findRandomPublishedByLanguageAndCategory("en", "breakfast", 25);
 
-        assertTrue(result.stream().noneMatch(found -> "Invisible Empty Recipe".equals(found.getTitle())));
-    }
-
-    @Test
-    @TestTransaction
-    void should_delete_invalid_seed_recipes_without_ingredients() {
-        Recipe invalidSeed = recipe("Invalid Seed", true);
-        invalidSeed.setIngredients("Keine Zutaten angegeben.");
-        Recipe validSeed = recipe("Valid Seed", true);
-        repository.persist(invalidSeed);
-        repository.persist(validSeed);
-        repository.flush();
-        Long invalidSeedId = invalidSeed.getId();
-        Long validSeedId = validSeed.getId();
-
-        long deleted = repository.deleteInvalidSeedRecipesWithoutIngredients();
-        repository.flush();
-        repository.getEntityManager().clear();
-
-        assertEquals(1, deleted);
-        assertNull(repository.findById(invalidSeedId));
-        assertNotNull(repository.findById(validSeedId));
+        assertTrue(result.stream().anyMatch(found -> "Visible Empty Recipe".equals(found.getTitle())));
     }
 
     @Test

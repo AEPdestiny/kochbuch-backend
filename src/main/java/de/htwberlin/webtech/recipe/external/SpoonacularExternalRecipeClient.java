@@ -49,7 +49,7 @@ public class SpoonacularExternalRecipeClient implements ExternalRecipeClient {
         String key = requireApiKey();
         StringBuilder uriBuilder = new StringBuilder(BASE_URL + "/complexSearch"
                 + "?query=" + encode(search)
-                + "&number=12"
+                + "&number=100"
                 + "&addRecipeInformation=true"
                 + "&fillIngredients=true"
                 + "&instructionsRequired=false"

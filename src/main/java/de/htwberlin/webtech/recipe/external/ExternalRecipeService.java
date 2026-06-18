@@ -68,7 +68,6 @@ public class ExternalRecipeService {
         try {
             List<RecipeResponse> recipes = client.searchRecipes(query, normalizeOptional(diet), normalizeOptional(intolerances), maxReadyTime, normalizeOptional(type)).stream()
                     .map(this::mapToListResponse)
-                    .filter(this::hasIngredients)
                     .toList();
             cache.put(cacheKey, new CacheEntry(recipes, now()));
             evictOldestEntriesIfNecessary();
@@ -296,10 +295,6 @@ public class ExternalRecipeService {
                 .findFirst()
                 .map(BigDecimal::doubleValue)
                 .orElse(null);
-    }
-
-    private boolean hasIngredients(RecipeResponse recipe) {
-        return recipe.getIngredients() != null && !recipe.getIngredients().isBlank();
     }
 
     private String firstString(List<String> values) {

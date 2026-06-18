@@ -29,6 +29,8 @@ public class RecipeRequest {
     private boolean published;
     private Integer calories;
     private Double protein;
+    private Double alcohol;
+    private Double alcoholPercent;
     private String language;
 
     public Long getId() {
@@ -149,6 +151,22 @@ public class RecipeRequest {
 
     public void setProtein(Double protein) {
         this.protein = protein;
+    }
+
+    public Double getAlcohol() {
+        return alcohol;
+    }
+
+    public void setAlcohol(Double alcohol) {
+        this.alcohol = alcohol;
+    }
+
+    public Double getAlcoholPercent() {
+        return alcoholPercent;
+    }
+
+    public void setAlcoholPercent(Double alcoholPercent) {
+        this.alcoholPercent = alcoholPercent;
     }
 
     public String getLanguage() {
