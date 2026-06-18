@@ -3,9 +3,12 @@ package de.htwberlin.webtech.recipe.resource;
 import de.htwberlin.webtech.recipe.dto.RecipeRequest;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
 import de.htwberlin.webtech.recipe.dto.ExternalRecipeMatchResponse;
+import de.htwberlin.webtech.recipe.dto.InstructionSearchRequest;
+import de.htwberlin.webtech.recipe.dto.InstructionSearchResponse;
 import de.htwberlin.webtech.recipe.entity.Recipe;
 import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
 import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
+import de.htwberlin.webtech.recipe.instructions.InstructionSearchService;
 import de.htwberlin.webtech.recipe.mapper.RecipeMapper;
 import de.htwberlin.webtech.recipe.service.RecipeService;
 import de.htwberlin.webtech.security.UserContext;
@@ -41,12 +44,20 @@ public class RecipeResource {
 
     private final RecipeService service;
     private final ExternalRecipeService externalService;
+    private final InstructionSearchService instructionSearchService;
     private final RecipeMapper mapper;
     private final UserContext userContext;
 
-    public RecipeResource(RecipeService service, ExternalRecipeService externalService, RecipeMapper mapper, UserContext userContext) {
+    public RecipeResource(
+            RecipeService service,
+            ExternalRecipeService externalService,
+            InstructionSearchService instructionSearchService,
+            RecipeMapper mapper,
+            UserContext userContext
+    ) {
         this.service = service;
         this.externalService = externalService;
+        this.instructionSearchService = instructionSearchService;
         this.mapper = mapper;
         this.userContext = userContext;
     }
@@ -191,5 +202,14 @@ public class RecipeResource {
                 .filter(value -> !value.isBlank())
                 .toList();
         return externalService.findRecipesByIngredients(ingredientList);
+    }
+
+    @POST
+    @Path("/instructions/search")
+    @Operation(summary = "Search recipe instructions online", description = "Returns web search results for missing recipe instructions.")
+    @APIResponse(responseCode = "200", description = "Instruction search handled")
+    @APIResponse(responseCode = "400", description = "Invalid search request")
+    public InstructionSearchResponse searchInstructions(@Valid InstructionSearchRequest request) {
+        return instructionSearchService.search(request);
     }
 }

@@ -4,7 +4,10 @@ import de.htwberlin.webtech.recipe.entity.Recipe;
 import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
 import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
 import de.htwberlin.webtech.recipe.dto.ExternalRecipeDetailResponse;
+import de.htwberlin.webtech.recipe.dto.InstructionSearchResponse;
+import de.htwberlin.webtech.recipe.dto.InstructionSearchResult;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
+import de.htwberlin.webtech.recipe.instructions.InstructionSearchService;
 import de.htwberlin.webtech.recipe.service.RecipeService;
 import de.htwberlin.webtech.security.UserContext;
 import de.htwberlin.webtech.shared.exception.ForbiddenException;
@@ -35,15 +38,18 @@ class RecipeResourceTest {
 
     private RecipeService recipeService;
     private ExternalRecipeService externalRecipeService;
+    private InstructionSearchService instructionSearchService;
     private UserContext userContext;
 
     @BeforeEach
     void setUp() {
         recipeService = mock(RecipeService.class);
         externalRecipeService = mock(ExternalRecipeService.class);
+        instructionSearchService = mock(InstructionSearchService.class);
         userContext = mock(UserContext.class);
         QuarkusMock.installMockForType(recipeService, RecipeService.class);
         QuarkusMock.installMockForType(externalRecipeService, ExternalRecipeService.class);
+        QuarkusMock.installMockForType(instructionSearchService, InstructionSearchService.class);
         QuarkusMock.installMockForType(userContext, UserContext.class);
     }
 
@@ -192,6 +198,50 @@ class RecipeResourceTest {
                 .statusCode(404)
                 .body("status", equalTo(404))
                 .body("error", equalTo("Not Found"));
+    }
+
+    @Test
+    void searchInstructions_should_return_results() {
+        InstructionSearchResponse response = new InstructionSearchResponse();
+        response.setConfigured(true);
+        response.setResults(List.of(new InstructionSearchResult(
+                "Pasta instructions",
+                "https://example.com/pasta",
+                "Cook pasta."
+        )));
+        doReturn(response).when(instructionSearchService).search(any());
+
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                          "recipeTitle": "Pasta",
+                          "sourceUrl": "https://example.com/source",
+                          "sourceName": "Example"
+                        }
+                        """)
+                .when().post("/recipes/instructions/search")
+                .then()
+                .statusCode(200)
+                .body("configured", equalTo(true))
+                .body("results", hasSize(1))
+                .body("results[0].title", equalTo("Pasta instructions"))
+                .body("results[0].url", equalTo("https://example.com/pasta"));
+    }
+
+    @Test
+    void searchInstructions_should_return_bad_request_for_blank_title() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                          "recipeTitle": ""
+                        }
+                        """)
+                .when().post("/recipes/instructions/search")
+                .then()
+                .statusCode(400)
+                .body("message", equalTo("Validation failed: recipeTitle must not be blank"));
     }
 
     @Test
