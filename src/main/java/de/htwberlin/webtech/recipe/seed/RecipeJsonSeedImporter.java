@@ -177,10 +177,6 @@ public class RecipeJsonSeedImporter {
         if (!hasMeaningfulIngredients(ingredients)) {
             return null;
         }
-        if (instructions.isBlank()) {
-            instructions = "Keine Anleitung angegeben.";
-        }
-
         Recipe recipe = new Recipe();
         recipe.setTitle(title);
         recipe.setImageUrl(firstText(node, "imageUrl", "image"));
