@@ -3,12 +3,11 @@ package de.htwberlin.webtech.recipe.seed;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.htwberlin.webtech.recipe.entity.Recipe;
-import de.htwberlin.webtech.recipe.repository.RecipeRepository;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import jakarta.transaction.Transactional;
+import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.io.InputStream;
@@ -27,21 +26,21 @@ public class RecipeJsonSeedImporter {
             new CategoryFile("snacks.json", "snack")
     );
 
-    private final RecipeRepository repository;
+    private final RecipeSeedPersistence persistence;
     private final ObjectMapper objectMapper;
 
-    public RecipeJsonSeedImporter(RecipeRepository repository, ObjectMapper objectMapper) {
-        this.repository = repository;
+    @Inject
+    public RecipeJsonSeedImporter(RecipeSeedPersistence persistence, ObjectMapper objectMapper) {
+        this.persistence = persistence;
         this.objectMapper = objectMapper;
     }
 
-    @Transactional
     void importRecipes(@Observes StartupEvent event) {
         if (LaunchMode.current() == LaunchMode.TEST) {
             return;
         }
 
-        long removed = repository.deleteInvalidSeedRecipesWithoutIngredients();
+        long removed = persistence.deleteInvalidSeedRecipesWithoutIngredients();
         if (removed > 0) {
             LOG.infof("Removed %d invalid seed recipe entries without ingredients.", removed);
         }
@@ -122,11 +121,18 @@ public class RecipeJsonSeedImporter {
                 if (recipe == null) {
                     continue;
                 }
-                if (repository.findByTitleAndCategoryAndLanguage(recipe.getTitle(), recipe.getCategory(), recipe.getLanguage()).isPresent()) {
-                    continue;
+                try {
+                    if (persistence.persistIfMissing(recipe)) {
+                        imported++;
+                    }
+                } catch (Exception exception) {
+                    LOG.warnf(
+                            "Could not import recipe '%s' from seed file '%s': %s",
+                            recipe.getTitle(),
+                            fileName,
+                            exception.getMessage()
+                    );
                 }
-                repository.persist(recipe);
-                imported++;
             }
             return imported;
         } catch (Exception exception) {

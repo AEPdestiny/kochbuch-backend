@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Column;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -19,7 +20,9 @@ public class Recipe {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @NotBlank(message = "must not be blank")
+    @Column(length = 500)
     private String title;
+    @Column(length = 1000)
     private String imageUrl;
     @Min(value = 0, message = "must be greater than or equal to 0")
     private int prepTimeMinutes;
@@ -32,7 +35,9 @@ public class Recipe {
     @Min(value = 0, message = "must be greater than or equal to 0")
     @Max(value = 5, message = "must be less than or equal to 5")
     private double rating;
+    @Column(columnDefinition = "TEXT")
     private String ingredients;
+    @Column(columnDefinition = "TEXT")
     private String instructions;
     private boolean favorite;
     private boolean published;

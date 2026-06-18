@@ -2,16 +2,14 @@ package de.htwberlin.webtech.recipe.seed;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.htwberlin.webtech.recipe.entity.Recipe;
-import de.htwberlin.webtech.recipe.repository.RecipeRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -22,7 +20,7 @@ class RecipeJsonSeedImporterTest {
 
     @Test
     void seedFiles_should_support_language_folder_structure_and_legacy_english_files() {
-        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(mock(RecipeRepository.class), new ObjectMapper());
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(mock(RecipeSeedPersistence.class), new ObjectMapper());
 
         List<RecipeJsonSeedImporter.SeedFile> files = importer.seedFiles();
 
@@ -45,10 +43,9 @@ class RecipeJsonSeedImporterTest {
 
     @Test
     void importFile_should_import_language_category_and_calories_from_language_folder() {
-        RecipeRepository repository = mock(RecipeRepository.class);
-        when(repository.findByTitleAndCategoryAndLanguage(anyString(), anyString(), anyString()))
-                .thenReturn(Optional.empty());
-        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.persistIfMissing(any(Recipe.class))).thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
 
         int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
                 List.of("recipes/en/breakfast.json"),
@@ -57,7 +54,7 @@ class RecipeJsonSeedImporterTest {
         ));
 
         ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
-        verify(repository).persist(captor.capture());
+        verify(persistence).persistIfMissing(captor.capture());
         Recipe recipe = captor.getValue();
         assertEquals(1, imported);
         assertEquals("Seed Breakfast", recipe.getTitle());
@@ -69,10 +66,9 @@ class RecipeJsonSeedImporterTest {
 
     @Test
     void importFile_should_import_non_english_language_and_category_from_folder() {
-        RecipeRepository repository = mock(RecipeRepository.class);
-        when(repository.findByTitleAndCategoryAndLanguage(anyString(), anyString(), anyString()))
-                .thenReturn(Optional.empty());
-        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.persistIfMissing(any(Recipe.class))).thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
 
         int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
                 List.of("recipes/de/lunch.json"),
@@ -81,7 +77,7 @@ class RecipeJsonSeedImporterTest {
         ));
 
         ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
-        verify(repository).persist(captor.capture());
+        verify(persistence).persistIfMissing(captor.capture());
         Recipe recipe = captor.getValue();
         assertEquals(1, imported);
         assertEquals("Seed Mittagessen", recipe.getTitle());
@@ -92,10 +88,8 @@ class RecipeJsonSeedImporterTest {
 
     @Test
     void importFile_should_skip_recipe_without_ingredients() {
-        RecipeRepository repository = mock(RecipeRepository.class);
-        when(repository.findByTitleAndCategoryAndLanguage(anyString(), anyString(), anyString()))
-                .thenReturn(Optional.empty());
-        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
 
         int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
                 List.of("recipes/en/missing-ingredients.json"),
@@ -104,15 +98,13 @@ class RecipeJsonSeedImporterTest {
         ));
 
         assertEquals(0, imported);
-        verify(repository, never()).persist(org.mockito.ArgumentMatchers.any(Recipe.class));
+        verify(persistence, never()).persistIfMissing(any(Recipe.class));
     }
 
     @Test
     void importFile_should_skip_recipe_with_empty_ingredients_list() {
-        RecipeRepository repository = mock(RecipeRepository.class);
-        when(repository.findByTitleAndCategoryAndLanguage(anyString(), anyString(), anyString()))
-                .thenReturn(Optional.empty());
-        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
 
         int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
                 List.of("recipes/en/empty-ingredients.json"),
@@ -121,15 +113,14 @@ class RecipeJsonSeedImporterTest {
         ));
 
         assertEquals(0, imported);
-        verify(repository, never()).persist(org.mockito.ArgumentMatchers.any(Recipe.class));
+        verify(persistence, never()).persistIfMissing(any(Recipe.class));
     }
 
     @Test
     void importFile_should_import_ingredients_from_nutrition_ingredients() {
-        RecipeRepository repository = mock(RecipeRepository.class);
-        when(repository.findByTitleAndCategoryAndLanguage(anyString(), anyString(), anyString()))
-                .thenReturn(Optional.empty());
-        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.persistIfMissing(any(Recipe.class))).thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
 
         int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
                 List.of("recipes/en/nutrition-ingredients.json"),
@@ -138,7 +129,7 @@ class RecipeJsonSeedImporterTest {
         ));
 
         ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
-        verify(repository).persist(captor.capture());
+        verify(persistence).persistIfMissing(captor.capture());
         Recipe recipe = captor.getValue();
         assertEquals(1, imported);
         assertEquals("rice, beans", recipe.getIngredients());
@@ -146,12 +137,53 @@ class RecipeJsonSeedImporterTest {
     }
 
     @Test
+    void importFile_should_import_long_ingredients_instructions_and_image_url() {
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.persistIfMissing(any(Recipe.class))).thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
+
+        int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
+                List.of("recipes/en/long-fields.json"),
+                "dinner",
+                "en"
+        ));
+
+        ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
+        verify(persistence).persistIfMissing(captor.capture());
+        Recipe recipe = captor.getValue();
+        assertEquals(1, imported);
+        assertTrue(recipe.getIngredients().length() > 255);
+        assertTrue(recipe.getInstructions().length() > 255);
+        assertTrue(recipe.getImageUrl().length() > 150);
+        assertEquals(34.5, recipe.getProtein());
+    }
+
+    @Test
+    void importFile_should_continue_after_one_recipe_persist_fails() {
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.persistIfMissing(any(Recipe.class)))
+                .thenThrow(new IllegalStateException("simulated persist error"))
+                .thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
+
+        int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
+                List.of("recipes/en/one-bad-one-good.json"),
+                "dinner",
+                "en"
+        ));
+
+        ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
+        verify(persistence, times(2)).persistIfMissing(captor.capture());
+        assertEquals(1, imported);
+        assertEquals("Broken Seed Recipe", captor.getAllValues().get(0).getTitle());
+        assertEquals("Recovering Seed Recipe", captor.getAllValues().get(1).getTitle());
+    }
+
+    @Test
     void importFile_should_avoid_duplicates_per_title_category_and_language() {
-        RecipeRepository repository = mock(RecipeRepository.class);
-        Recipe existingRecipe = new Recipe();
-        when(repository.findByTitleAndCategoryAndLanguage("Seed Breakfast", "breakfast", "en"))
-                .thenReturn(Optional.empty(), Optional.of(existingRecipe));
-        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.persistIfMissing(any(Recipe.class))).thenReturn(true, false);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
         RecipeJsonSeedImporter.SeedFile seedFile = new RecipeJsonSeedImporter.SeedFile(
                 List.of("recipes/en/breakfast.json"),
                 "breakfast",
@@ -161,13 +193,13 @@ class RecipeJsonSeedImporterTest {
         assertEquals(1, importer.importFile(seedFile));
         assertEquals(0, importer.importFile(seedFile));
 
-        verify(repository, times(1)).persist(org.mockito.ArgumentMatchers.any(Recipe.class));
+        verify(persistence, times(2)).persistIfMissing(any(Recipe.class));
     }
 
     @Test
     void importFile_should_skip_missing_files_without_persisting_test_data() {
-        RecipeRepository repository = mock(RecipeRepository.class);
-        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
 
         int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
                 List.of("recipes/de/missing.json"),
@@ -176,6 +208,6 @@ class RecipeJsonSeedImporterTest {
         ));
 
         assertEquals(0, imported);
-        verify(repository, never()).persist(org.mockito.ArgumentMatchers.any(Recipe.class));
+        verify(persistence, never()).persistIfMissing(any(Recipe.class));
     }
 }

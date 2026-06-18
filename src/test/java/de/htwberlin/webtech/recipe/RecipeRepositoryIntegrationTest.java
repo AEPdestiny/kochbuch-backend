@@ -153,6 +153,25 @@ class RecipeRepositoryIntegrationTest {
         assertEquals(owner.getEmail(), result.get(0).getOwner().getEmail());
     }
 
+    @Test
+    @TestTransaction
+    void should_save_long_seed_recipe_fields() {
+        Recipe recipe = recipe("Long Seed Recipe " + "x".repeat(260), true);
+        recipe.setImageUrl("https://example.com/" + "image-path-".repeat(80) + ".jpg");
+        recipe.setIngredients("ingredient ".repeat(120));
+        recipe.setInstructions("instruction ".repeat(120));
+
+        repository.persistAndFlush(recipe);
+        repository.getEntityManager().clear();
+
+        Recipe found = repository.findById(recipe.getId());
+        assertNotNull(found);
+        assertTrue(found.getTitle().length() > 255);
+        assertTrue(found.getImageUrl().length() > 255);
+        assertTrue(found.getIngredients().length() > 255);
+        assertTrue(found.getInstructions().length() > 255);
+    }
+
     private Recipe recipe(String title, boolean published) {
         return new Recipe(
                 title,

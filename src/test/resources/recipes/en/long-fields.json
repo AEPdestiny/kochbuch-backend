@@ -1,0 +1,25 @@
+[
+  {
+    "title": "Long Field Seed Recipe",
+    "imageUrl": "https://example.com/images/very-long-recipe-image-url-that-is-longer-than-the-old-default-varchar-limit-but-still-valid-for-the-new-column-length/with/many/path/segments/and/a/descriptive/file-name-for-render-production-import-tests.jpg",
+    "prepTimeMinutes": 20,
+    "cookTimeMinutes": 40,
+    "servings": 4,
+    "difficulty": "medium",
+    "rating": 4.2,
+    "ingredients": [
+      "500 g ingredient one with a long preparation note",
+      "300 g ingredient two with another long preparation note",
+      "200 g ingredient three with a detailed description",
+      "100 g ingredient four with extra seasoning information",
+      "50 g ingredient five with serving guidance",
+      "25 g ingredient six with optional garnish information"
+    ],
+    "instructions": [
+      "Prepare all ingredients carefully and keep them separated before cooking so the long instruction text can be stored without hitting varchar limits.",
+      "Cook everything slowly while stirring often, then finish the dish with herbs, seasoning and a final rest period before serving."
+    ],
+    "calories": 640,
+    "protein": 34.5
+  }
+]
