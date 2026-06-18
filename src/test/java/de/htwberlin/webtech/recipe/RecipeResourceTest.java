@@ -56,7 +56,8 @@ class RecipeResourceTest {
                 .when().get("/recipes")
                 .then()
                 .statusCode(200)
-                .body("$", hasSize(2));
+                .body("$", hasSize(2))
+                .body("[0].protein", equalTo(24.5F));
 
         verify(recipeService).findAll("en");
     }
@@ -661,9 +662,11 @@ class RecipeResourceTest {
     }
 
     private Recipe recipe(String title) {
-        return new Recipe(title, "", 10, 20, 2,
+        Recipe recipe = new Recipe(title, "", 10, 20, 2,
                 "easy", "Italian", 4.5,
                 "noodles", "cook", false, true);
+        recipe.setProtein(24.5);
+        return recipe;
     }
 
     private RecipeResponse externalRecipe(String title) {

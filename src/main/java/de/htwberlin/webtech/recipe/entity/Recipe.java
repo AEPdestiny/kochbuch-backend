@@ -32,9 +32,7 @@ public class Recipe {
     @Min(value = 0, message = "must be greater than or equal to 0")
     @Max(value = 5, message = "must be less than or equal to 5")
     private double rating;
-    @NotBlank(message = "must not be blank")
     private String ingredients;
-    @NotBlank(message = "must not be blank")
     private String instructions;
     private boolean favorite;
     private boolean published;

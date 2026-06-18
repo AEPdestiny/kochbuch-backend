@@ -17,8 +17,8 @@ import java.util.Set;
 @ApplicationScoped
 public class RecipeService {
 
-    private static final int PUBLIC_RECIPE_LIMIT = 50;
-    private static final int CATEGORY_TARGET = 13;
+    private static final int PUBLIC_RECIPE_LIMIT = 100;
+    private static final int CATEGORY_TARGET = 25;
     private static final List<String> PUBLIC_CATEGORIES = List.of("breakfast", "lunch", "dinner", "snack");
 
     private final RecipeRepository repo;

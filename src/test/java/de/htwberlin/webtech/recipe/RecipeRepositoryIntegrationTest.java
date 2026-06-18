@@ -64,6 +64,21 @@ class RecipeRepositoryIntegrationTest {
 
     @Test
     @TestTransaction
+    void should_include_public_recipe_without_ingredients_or_instructions() {
+        Recipe recipe = recipe("Visible Empty Recipe", true);
+        recipe.setCategory("breakfast");
+        recipe.setLanguage("en");
+        recipe.setIngredients("");
+        recipe.setInstructions("");
+        repository.persistAndFlush(recipe);
+
+        var result = repository.findRandomPublishedByLanguageAndCategory("en", "breakfast", 25);
+
+        assertTrue(result.stream().anyMatch(found -> "Visible Empty Recipe".equals(found.getTitle())));
+    }
+
+    @Test
+    @TestTransaction
     void should_delete_recipe() {
         Recipe recipe = recipe("Delete Me", true);
         repository.persistAndFlush(recipe);

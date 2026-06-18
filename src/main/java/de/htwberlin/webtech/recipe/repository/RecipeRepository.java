@@ -20,7 +20,6 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                 .createQuery("""
                         from Recipe r
                         where r.published = true
-                          and length(trim(coalesce(r.ingredients, ''))) > 0
                         order by function('random')
                         """, Recipe.class)
                 .setMaxResults(limit)
@@ -33,7 +32,6 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                         from Recipe r
                         where r.published = true
                           and lower(coalesce(r.language, 'en')) = :language
-                          and length(trim(coalesce(r.ingredients, ''))) > 0
                         order by function('random')
                         """, Recipe.class)
                 .setParameter("language", normalizeLanguage(language))
@@ -48,7 +46,6 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                         where r.published = true
                           and lower(coalesce(r.language, 'en')) = :language
                           and lower(coalesce(r.category, '')) = :category
-                          and length(trim(coalesce(r.ingredients, ''))) > 0
                         order by function('random')
                         """, Recipe.class)
                 .setParameter("language", normalizeLanguage(language))
