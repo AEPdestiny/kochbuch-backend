@@ -150,8 +150,23 @@ class RecipeJsonSeedImporterTest {
         verify(persistence).upsertSeedRecipe(captor.capture());
         Recipe recipe = captor.getValue();
         assertEquals(1, imported);
-        assertEquals("100 g rice, 200 g beans", recipe.getIngredients());
+        assertEquals("100 g rice\n200 g beans", recipe.getIngredients());
         assertEquals(22.7, recipe.getProtein());
+    }
+
+    @Test
+    void importFile_should_skip_recipe_when_language_does_not_match_seed_file() {
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
+
+        int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
+                List.of("recipes/de/lunch.json"),
+                "lunch",
+                "en"
+        ));
+
+        assertEquals(0, imported);
+        verify(persistence, never()).upsertSeedRecipe(any(Recipe.class));
     }
 
     @Test

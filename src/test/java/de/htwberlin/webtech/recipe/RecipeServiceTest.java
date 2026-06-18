@@ -87,6 +87,21 @@ class RecipeServiceTest {
     }
 
     @Test
+    @DisplayName("findAllPublished should use local language search when search is present")
+    void findAllPublished_should_use_search_query() {
+        var published = recipe("Sushi Reis");
+        published.setLanguage("de");
+        doReturn(List.of(published)).when(repo).searchRandomPublishedByLanguage("de", "sushi", 100);
+
+        var result = underTest.findAllPublished("de", "sushi");
+
+        verify(repo).searchRandomPublishedByLanguage("de", "sushi", 100);
+        verifyNoMoreInteractions(repo);
+        assertEquals(1, result.size());
+        assertEquals("Sushi Reis", result.get(0).getTitle());
+    }
+
+    @Test
     @DisplayName("findAllPublished should return at most 100 recipes with 25 per category target")
     void findAllPublished_should_return_at_most_100_recipes() {
         List<Recipe> breakfast = numberedRecipes("Breakfast", 1, 25);

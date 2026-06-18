@@ -41,6 +41,32 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                 .getResultList();
     }
 
+    public List<Recipe> searchRandomPublishedByLanguage(String language, String query, int limit) {
+        String normalizedQuery = query == null ? "" : query.trim().toLowerCase();
+        if (normalizedQuery.isBlank()) {
+            return findRandomPublishedByLanguage(language, limit);
+        }
+        return getEntityManager()
+                .createQuery("""
+                        from Recipe r
+                        where r.published = true
+                          and r.owner is null
+                          and lower(coalesce(r.language, 'en')) = :language
+                          and (
+                            lower(coalesce(r.title, '')) like :query
+                            or lower(coalesce(r.ingredients, '')) like :query
+                            or lower(coalesce(r.category, '')) like :query
+                            or lower(coalesce(r.dishTypes, '')) like :query
+                            or lower(coalesce(r.diets, '')) like :query
+                          )
+                        order by function('random')
+                        """, Recipe.class)
+                .setParameter("language", normalizeLanguage(language))
+                .setParameter("query", "%" + normalizedQuery + "%")
+                .setMaxResults(limit)
+                .getResultList();
+    }
+
     public List<Recipe> findRandomPublishedByLanguageAndCategory(String language, String category, int limit) {
         return getEntityManager()
                 .createQuery("""

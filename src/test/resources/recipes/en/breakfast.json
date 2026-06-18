@@ -1,6 +1,7 @@
 [
   {
     "id": 12345,
+    "language": "en",
     "title": "Seed Breakfast",
     "image": "https://example.com/breakfast.jpg",
     "readyInMinutes": 25,

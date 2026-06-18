@@ -22,7 +22,7 @@ public class Recipe {
     @NotBlank(message = "must not be blank")
     @Column(length = 500)
     private String title;
-    @Column(length = 1000)
+    @Column(length = 2048)
     private String imageUrl;
     @Min(value = 0, message = "must be greater than or equal to 0")
     private int prepTimeMinutes;
@@ -48,7 +48,7 @@ public class Recipe {
     private Double alcoholPercent;
     @Column(name = "external_id")
     private String externalId;
-    @Column(name = "source_url", length = 1000)
+    @Column(name = "source_url", length = 2048)
     private String sourceUrl;
     @Column(name = "source_name")
     private String sourceName;

@@ -58,7 +58,16 @@ public class RecipeService {
     }
 
     public List<Recipe> findAllPublished(String language) {
+        return findAllPublished(language, null);
+    }
+
+    public List<Recipe> findAllPublished(String language, String search) {
         String normalizedLanguage = normalizeLanguage(language);
+        String normalizedSearch = search == null ? "" : search.trim();
+        if (!normalizedSearch.isBlank()) {
+            return repo.searchRandomPublishedByLanguage(normalizedLanguage, normalizedSearch, PUBLIC_RECIPE_LIMIT);
+        }
+
         List<Recipe> balanced = new ArrayList<>();
         Set<Long> seenIds = new LinkedHashSet<>();
 

@@ -82,16 +82,16 @@ public class RecipeResource {
             description = "Recipes returned",
             content = @Content(schema = @Schema(implementation = RecipeResponse.class, type = SchemaType.ARRAY))
     )
-    public List<RecipeResponse> getAll(@QueryParam("language") String language) {
-        return publicResponses(service.findAll(language));
+    public List<RecipeResponse> getAll(@QueryParam("language") String language, @QueryParam("search") String search) {
+        return publicResponses(service.findAllPublished(language, search));
     }
 
     @GET
     @Path("/published")
     @Operation(summary = "List published recipes", description = "Returns recipes marked as published.")
     @APIResponse(responseCode = "200", description = "Published recipes returned")
-    public List<RecipeResponse> getPublished(@QueryParam("language") String language) {
-        return publicResponses(service.findAllPublished(language));
+    public List<RecipeResponse> getPublished(@QueryParam("language") String language, @QueryParam("search") String search) {
+        return publicResponses(service.findAllPublished(language, search));
     }
 
     @GET

@@ -1,5 +1,6 @@
 [
   {
+    "language": "en",
     "title": "Long Field Seed Recipe",
     "imageUrl": "https://example.com/images/very-long-recipe-image-url-that-is-longer-than-the-old-default-varchar-limit-but-still-valid-for-the-new-column-length/with/many/path/segments/and/a/descriptive/file-name-for-render-production-import-tests.jpg",
     "prepTimeMinutes": 20,

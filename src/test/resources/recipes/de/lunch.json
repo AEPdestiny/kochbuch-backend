@@ -1,6 +1,7 @@
 {
   "recipes": [
     {
+      "language": "de",
       "title": "Seed Mittagessen",
       "image": "https://example.com/lunch.jpg",
       "readyInMinutes": 25,

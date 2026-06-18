@@ -1,5 +1,6 @@
 [
   {
+    "language": "en",
     "title": "Broken Seed Recipe",
     "imageUrl": "https://example.com/broken.jpg",
     "ingredients": ["broken ingredient"],
@@ -8,6 +9,7 @@
     "protein": 10
   },
   {
+    "language": "en",
     "title": "Recovering Seed Recipe",
     "imageUrl": "https://example.com/recovering.jpg",
     "ingredients": ["recovering ingredient"],

@@ -55,7 +55,7 @@ class RecipeResourceTest {
 
     @Test
     void getAll_should_return_only_published_recipes() {
-        doReturn(List.of(recipe("Pasta"), recipe("Soup"))).when(recipeService).findAll("en");
+        doReturn(List.of(recipe("Pasta"), recipe("Soup"))).when(recipeService).findAllPublished("en", null);
 
         given()
                 .queryParam("language", "en")
@@ -65,12 +65,12 @@ class RecipeResourceTest {
                 .body("$", hasSize(2))
                 .body("[0].protein", equalTo(24.5F));
 
-        verify(recipeService).findAll("en");
+        verify(recipeService).findAllPublished("en", null);
     }
 
     @Test
     void getPublished_should_return_only_published_recipes() {
-        doReturn(List.of(recipe("Cake"))).when(recipeService).findAllPublished("de");
+        doReturn(List.of(recipe("Cake"))).when(recipeService).findAllPublished("de", null);
 
         given()
                 .queryParam("language", "de")
@@ -79,7 +79,22 @@ class RecipeResourceTest {
                 .statusCode(200)
                 .body("$", hasSize(1));
 
-        verify(recipeService).findAllPublished("de");
+        verify(recipeService).findAllPublished("de", null);
+    }
+
+    @Test
+    void getPublished_should_pass_search_query() {
+        doReturn(List.of(recipe("Sushi"))).when(recipeService).findAllPublished("de", "sushi");
+
+        given()
+                .queryParam("language", "de")
+                .queryParam("search", "sushi")
+                .when().get("/recipes/published")
+                .then()
+                .statusCode(200)
+                .body("$", hasSize(1));
+
+        verify(recipeService).findAllPublished("de", "sushi");
     }
 
     @Test
