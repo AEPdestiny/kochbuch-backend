@@ -41,6 +41,11 @@ public class RecipeJsonSeedImporter {
             return;
         }
 
+        long removed = repository.deleteInvalidSeedRecipesWithoutIngredients();
+        if (removed > 0) {
+            LOG.infof("Removed %d invalid seed recipe entries without ingredients.", removed);
+        }
+
         int imported = seedFiles().stream()
                 .mapToInt(file -> importFile(file.fileNames(), file.category(), file.language()))
                 .sum();
@@ -161,10 +166,10 @@ public class RecipeJsonSeedImporter {
             return null;
         }
 
-        String ingredients = joinValues(firstNode(node, "ingredients", "extendedIngredients"));
+        String ingredients = ingredientsText(node);
         String instructions = joinValues(firstNode(node, "instructions", "steps", "analyzedInstructions"));
-        if (ingredients.isBlank()) {
-            ingredients = "Keine Zutaten angegeben.";
+        if (!hasMeaningfulIngredients(ingredients)) {
+            return null;
         }
         if (instructions.isBlank()) {
             instructions = "Keine Anleitung angegeben.";
@@ -196,6 +201,23 @@ public class RecipeJsonSeedImporter {
             }
         }
         return null;
+    }
+
+    private String ingredientsText(JsonNode node) {
+        String ingredients = joinValues(firstNode(node, "ingredients", "extendedIngredients"));
+        if (hasMeaningfulIngredients(ingredients)) {
+            return ingredients;
+        }
+        return joinValues(node.path("nutrition").path("ingredients"));
+    }
+
+    private boolean hasMeaningfulIngredients(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        String normalized = value.trim();
+        return !normalized.equals("[]")
+                && !"Keine Zutaten angegeben.".equalsIgnoreCase(normalized);
     }
 
     private String firstText(JsonNode node, String... names) {

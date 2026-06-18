@@ -1,0 +1,12 @@
+[
+  {
+    "title": "Empty Ingredients Recipe",
+    "ingredients": [
+      {
+        "name": ""
+      }
+    ],
+    "instructions": ["Cook something"],
+    "calories": 300
+  }
+]

@@ -91,6 +91,61 @@ class RecipeJsonSeedImporterTest {
     }
 
     @Test
+    void importFile_should_skip_recipe_without_ingredients() {
+        RecipeRepository repository = mock(RecipeRepository.class);
+        when(repository.findByTitleAndCategoryAndLanguage(anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+
+        int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
+                List.of("recipes/en/missing-ingredients.json"),
+                "breakfast",
+                "en"
+        ));
+
+        assertEquals(0, imported);
+        verify(repository, never()).persist(org.mockito.ArgumentMatchers.any(Recipe.class));
+    }
+
+    @Test
+    void importFile_should_skip_recipe_with_empty_ingredients_list() {
+        RecipeRepository repository = mock(RecipeRepository.class);
+        when(repository.findByTitleAndCategoryAndLanguage(anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+
+        int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
+                List.of("recipes/en/empty-ingredients.json"),
+                "breakfast",
+                "en"
+        ));
+
+        assertEquals(0, imported);
+        verify(repository, never()).persist(org.mockito.ArgumentMatchers.any(Recipe.class));
+    }
+
+    @Test
+    void importFile_should_import_ingredients_from_nutrition_ingredients() {
+        RecipeRepository repository = mock(RecipeRepository.class);
+        when(repository.findByTitleAndCategoryAndLanguage(anyString(), anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(repository, new ObjectMapper());
+
+        int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
+                List.of("recipes/en/nutrition-ingredients.json"),
+                "breakfast",
+                "en"
+        ));
+
+        ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
+        verify(repository).persist(captor.capture());
+        Recipe recipe = captor.getValue();
+        assertEquals(1, imported);
+        assertEquals("rice, beans", recipe.getIngredients());
+        assertEquals(22.7, recipe.getProtein());
+    }
+
+    @Test
     void importFile_should_avoid_duplicates_per_title_category_and_language() {
         RecipeRepository repository = mock(RecipeRepository.class);
         Recipe existingRecipe = new Recipe();

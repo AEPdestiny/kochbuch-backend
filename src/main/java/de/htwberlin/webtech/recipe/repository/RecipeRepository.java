@@ -20,6 +20,9 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                 .createQuery("""
                         from Recipe r
                         where r.published = true
+                          and length(trim(coalesce(r.ingredients, ''))) > 0
+                          and trim(coalesce(r.ingredients, '')) <> '[]'
+                          and lower(trim(coalesce(r.ingredients, ''))) <> 'keine zutaten angegeben.'
                         order by function('random')
                         """, Recipe.class)
                 .setMaxResults(limit)
@@ -32,6 +35,9 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                         from Recipe r
                         where r.published = true
                           and lower(coalesce(r.language, 'en')) = :language
+                          and length(trim(coalesce(r.ingredients, ''))) > 0
+                          and trim(coalesce(r.ingredients, '')) <> '[]'
+                          and lower(trim(coalesce(r.ingredients, ''))) <> 'keine zutaten angegeben.'
                         order by function('random')
                         """, Recipe.class)
                 .setParameter("language", normalizeLanguage(language))
@@ -46,12 +52,27 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                         where r.published = true
                           and lower(coalesce(r.language, 'en')) = :language
                           and lower(coalesce(r.category, '')) = :category
+                          and length(trim(coalesce(r.ingredients, ''))) > 0
+                          and trim(coalesce(r.ingredients, '')) <> '[]'
+                          and lower(trim(coalesce(r.ingredients, ''))) <> 'keine zutaten angegeben.'
                         order by function('random')
                         """, Recipe.class)
                 .setParameter("language", normalizeLanguage(language))
                 .setParameter("category", category == null ? "" : category.trim().toLowerCase())
                 .setMaxResults(limit)
                 .getResultList();
+    }
+
+    public long deleteInvalidSeedRecipesWithoutIngredients() {
+        return delete("""
+                owner is null
+                and (
+                    ingredients is null
+                    or length(trim(ingredients)) = 0
+                    or trim(ingredients) = '[]'
+                    or lower(trim(ingredients)) = 'keine zutaten angegeben.'
+                )
+                """);
     }
 
     public List<Recipe> findByOwner(AppUser owner) {

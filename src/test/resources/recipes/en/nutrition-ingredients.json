@@ -1,0 +1,22 @@
+[
+  {
+    "title": "Nutrition Ingredients Recipe",
+    "instructions": ["Cook something"],
+    "nutrition": {
+      "nutrients": [
+        {
+          "name": "Protein",
+          "amount": 22.7
+        }
+      ],
+      "ingredients": [
+        {
+          "name": "rice"
+        },
+        {
+          "name": "beans"
+        }
+      ]
+    }
+  }
+]
