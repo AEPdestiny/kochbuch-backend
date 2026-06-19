@@ -105,7 +105,15 @@ public class RecipeJsonSeedImporter {
                 LOG.debugf("Recipe seed file '%s' not found. Skipping.", fileName);
                 return 0;
             }
+            return importStream(stream, fileName, category, language);
+        } catch (Exception exception) {
+            LOG.warnf("Could not import recipe seed file '%s': %s", fileName, exception.getMessage());
+            return 0;
+        }
+    }
 
+    int importStream(InputStream stream, String fileName, String category, String language) {
+        try {
             JsonNode root = objectMapper.readTree(stream);
             JsonNode recipes = recipesNode(root);
             if (!recipes.isArray()) {

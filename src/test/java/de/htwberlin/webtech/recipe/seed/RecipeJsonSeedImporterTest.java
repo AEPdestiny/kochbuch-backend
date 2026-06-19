@@ -5,9 +5,14 @@ import de.htwberlin.webtech.recipe.entity.Recipe;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -17,6 +22,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RecipeJsonSeedImporterTest {
+
+    private static final Path GERMAN_LUNCH_FILE = Path.of(
+            "src", "main", "resources", "recipes", "de", "lunch.json"
+    );
 
     @Test
     void seedFiles_should_support_language_folder_structure_and_legacy_english_files() {
@@ -94,6 +103,45 @@ class RecipeJsonSeedImporterTest {
         assertEquals("lunch", recipe.getCategory());
         assertEquals("de", recipe.getLanguage());
         assertEquals(510, recipe.getCalories());
+    }
+
+    @Test
+    void productionGermanLunch_should_import_complete_searchable_recipes() throws Exception {
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.upsertSeedRecipe(any(Recipe.class))).thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
+
+        int imported;
+        try (InputStream stream = Files.newInputStream(GERMAN_LUNCH_FILE)) {
+            imported = importer.importStream(stream, "recipes/de/lunch.json", "lunch", "de");
+        }
+
+        ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
+        verify(persistence, times(120)).upsertSeedRecipe(captor.capture());
+        List<Recipe> recipes = captor.getAllValues();
+
+        assertEquals(120, imported);
+        assertEquals(120, recipes.stream().map(Recipe::getExternalId).distinct().count());
+        assertTrue(recipes.stream().allMatch(recipe -> "de".equals(recipe.getLanguage())));
+        assertTrue(recipes.stream().allMatch(recipe -> "lunch".equals(recipe.getCategory())));
+        assertTrue(recipes.stream().allMatch(recipe -> !recipe.getTitle().isBlank()));
+        assertTrue(recipes.stream().allMatch(recipe -> !recipe.getImageUrl().isBlank()));
+        assertTrue(recipes.stream().allMatch(recipe -> recipe.getCookTimeMinutes() >= 0));
+        assertTrue(recipes.stream().allMatch(recipe -> recipe.getServings() > 0));
+        assertTrue(recipes.stream().allMatch(recipe -> !recipe.getSourceUrl().isBlank()));
+        assertTrue(recipes.stream().allMatch(recipe -> recipe.getCalories() != null));
+        assertTrue(recipes.stream().allMatch(recipe -> recipe.getProtein() != null));
+        assertTrue(recipes.stream().allMatch(recipe -> !recipe.getIngredients().isBlank()));
+        assertTrue(recipes.stream().allMatch(recipe -> !recipe.getInstructions().isBlank()));
+
+        Recipe sushi = recipes.stream()
+                .filter(recipe -> searchableText(recipe).contains("sushi"))
+                .findFirst()
+                .orElseThrow();
+        assertNotNull(sushi.getCalories());
+        assertNotNull(sushi.getProtein());
+        assertFalse(sushi.getIngredients().isBlank());
+        assertFalse(sushi.getInstructions().isBlank());
     }
 
     @Test
@@ -263,5 +311,15 @@ class RecipeJsonSeedImporterTest {
 
         assertEquals(0, imported);
         verify(persistence, never()).upsertSeedRecipe(any(Recipe.class));
+    }
+
+    private String searchableText(Recipe recipe) {
+        return String.join(" ",
+                recipe.getTitle(),
+                recipe.getIngredients(),
+                recipe.getInstructions(),
+                recipe.getDishTypes(),
+                recipe.getDiets()
+        ).toLowerCase();
     }
 }
