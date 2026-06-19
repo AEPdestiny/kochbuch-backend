@@ -55,6 +55,7 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                           and (
                             lower(coalesce(r.title, '')) like :query
                             or lower(coalesce(r.ingredients, '')) like :query
+                            or lower(coalesce(r.instructions, '')) like :query
                             or lower(coalesce(r.category, '')) like :query
                             or lower(coalesce(r.dishTypes, '')) like :query
                             or lower(coalesce(r.diets, '')) like :query

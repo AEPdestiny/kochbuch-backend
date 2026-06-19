@@ -155,6 +155,27 @@ class RecipeJsonSeedImporterTest {
     }
 
     @Test
+    void importFile_should_prefer_metric_measures_over_ugly_us_units() {
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.upsertSeedRecipe(any(Recipe.class))).thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
+
+        int imported = importer.importFile(new RecipeJsonSeedImporter.SeedFile(
+                List.of("recipes/de/metric-ingredients.json"),
+                "dinner",
+                "de"
+        ));
+
+        ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
+        verify(persistence).upsertSeedRecipe(captor.capture());
+        Recipe recipe = captor.getValue();
+        assertEquals(1, imported);
+        assertEquals("66 g Brokkoliröschen\n1 Prise Salz", recipe.getIngredients());
+        assertEquals(230, recipe.getCalories());
+        assertEquals(13.5, recipe.getProtein());
+    }
+
+    @Test
     void importFile_should_skip_recipe_when_language_does_not_match_seed_file() {
         RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
         RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());

@@ -1,0 +1,46 @@
+[
+  {
+    "language": "de",
+    "id": 99001,
+    "title": "Metrisches Testrezept",
+    "instructions": "Kochen.",
+    "extendedIngredients": [
+      {
+        "name": "Brokkoliröschen",
+        "original": "2.33 ounces broccoli florets",
+        "amount": 2.33,
+        "unit": "ounces",
+        "measures": {
+          "metric": {
+            "amount": 66,
+            "unitShort": "g"
+          }
+        }
+      },
+      {
+        "name": "Salz",
+        "original": "0.04 teaspoon salt",
+        "amount": 0.04,
+        "unit": "teaspoon",
+        "measures": {
+          "metric": {
+            "amount": 0.04,
+            "unitShort": "teaspoon"
+          }
+        }
+      }
+    ],
+    "nutrition": {
+      "nutrients": [
+        {
+          "name": "Calories",
+          "amount": 230
+        },
+        {
+          "name": "Protein",
+          "amount": 13.5
+        }
+      ]
+    }
+  }
+]

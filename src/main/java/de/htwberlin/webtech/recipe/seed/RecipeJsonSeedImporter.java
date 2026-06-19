@@ -452,18 +452,102 @@ public class RecipeJsonSeedImporter {
 
     private String ingredientText(JsonNode value) {
         String original = firstText(value, "original", "originalString");
-        if (!original.isBlank()) {
+        String metric = metricIngredientText(value);
+        if (!original.isBlank() && !shouldPreferMetric(original, metric)) {
             return stripHtml(original);
+        }
+        if (!metric.isBlank()) {
+            return metric;
         }
         String name = firstText(value, "name");
         if (name.isBlank()) {
             return "";
         }
-        String amount = numericText(value.get("amount"));
         String unit = firstText(value, "unit", "unitShort", "unitLong");
+        String amount = formattedAmount(value.get("amount"), unit);
+        unit = normalizedUnit(unit);
+        if (isTinyTeaspoon(value.get("amount"), unit)) {
+            return "1 Prise " + name;
+        }
         return List.of(amount, unit, name).stream()
                 .filter(part -> part != null && !part.isBlank())
                 .collect(Collectors.joining(" "));
+    }
+
+    private String metricIngredientText(JsonNode value) {
+        JsonNode metric = value.path("measures").path("metric");
+        if (metric.isMissingNode() || metric.isNull()) {
+            return "";
+        }
+        String name = firstText(value, "name");
+        if (name.isBlank()) {
+            return "";
+        }
+        String unit = firstText(metric, "unitShort", "unitLong", "unit");
+        JsonNode amountNode = metric.get("amount");
+        if (isTinyTeaspoon(amountNode, unit)) {
+            return "1 Prise " + name;
+        }
+        String amount = formattedAmount(amountNode, unit);
+        unit = normalizedUnit(unit);
+        return List.of(amount, unit, name).stream()
+                .filter(part -> part != null && !part.isBlank())
+                .collect(Collectors.joining(" "));
+    }
+
+    private boolean shouldPreferMetric(String original, String metric) {
+        if (metric == null || metric.isBlank()) {
+            return false;
+        }
+        String normalized = original.toLowerCase();
+        return normalized.matches(".*\\b(ounce|ounces|oz|pound|pounds|lb|lbs|teaspoon|teaspoons|tablespoon|tablespoons|tbsp|tsp|cup|cups)\\b.*")
+                || normalized.matches(".*\\b0\\.0[0-9]+\\b.*")
+                || normalized.matches(".*\\b[0-9]+\\.[0-9]{2,}\\b.*");
+    }
+
+    private boolean isTinyTeaspoon(JsonNode amountNode, String unit) {
+        String normalizedUnit = normalizedUnit(unit);
+        return amountNode != null
+                && amountNode.isNumber()
+                && amountNode.asDouble() > 0
+                && amountNode.asDouble() < 0.15
+                && "TL".equals(normalizedUnit);
+    }
+
+    private String normalizedUnit(String unit) {
+        if (unit == null || unit.isBlank()) {
+            return "";
+        }
+        return switch (unit.trim().toLowerCase()) {
+            case "teaspoon", "teaspoons", "tsp" -> "TL";
+            case "tablespoon", "tablespoons", "tbsp" -> "EL";
+            case "ounce", "ounces", "oz" -> "g";
+            case "pound", "pounds", "lb", "lbs" -> "g";
+            case "cup", "cups" -> "ml";
+            default -> unit.trim();
+        };
+    }
+
+    private String formattedAmount(JsonNode value, String unit) {
+        if (value == null || value.isNull()) {
+            return "";
+        }
+        if (!value.isNumber()) {
+            return value.asText("").trim();
+        }
+        double number = value.asDouble();
+        String normalizedUnit = normalizedUnit(unit);
+        if ("g".equals(normalizedUnit) || "ml".equals(normalizedUnit)) {
+            return String.valueOf(Math.round(number));
+        }
+        if (number == Math.rint(number)) {
+            return String.valueOf((long) number);
+        }
+        return BigDecimal.valueOf(number)
+                .setScale(number < 1 ? 2 : 1, java.math.RoundingMode.HALF_UP)
+                .stripTrailingZeros()
+                .toPlainString()
+                .replace(".", ",");
     }
 
     private String numericText(JsonNode value) {
