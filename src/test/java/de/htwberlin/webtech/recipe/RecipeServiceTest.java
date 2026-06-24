@@ -165,6 +165,29 @@ class RecipeServiceTest {
     }
 
     @Test
+    @DisplayName("create with owner should preserve private or published state")
+    void create_with_owner_should_preserve_publication_state() {
+        var owner = user(1L, "owner@example.com");
+        var privateRecipe = recipe("Private");
+        privateRecipe.setPublished(false);
+        privateRecipe.setLanguage("de");
+        var publishedRecipe = recipe("Published");
+        publishedRecipe.setPublished(true);
+        publishedRecipe.setLanguage("en");
+
+        var privateResult = underTest.create(privateRecipe, owner);
+        var publishedResult = underTest.create(publishedRecipe, owner);
+
+        assertTrue(!privateResult.isPublished());
+        assertTrue(publishedResult.isPublished());
+        assertEquals("de", privateResult.getLanguage());
+        assertEquals("en", publishedResult.getLanguage());
+        verify(repo).persist(privateRecipe);
+        verify(repo).persist(publishedRecipe);
+        verifyNoMoreInteractions(repo);
+    }
+
+    @Test
     @DisplayName("findById should throw when recipe not found")
     void findById_should_throw_when_not_found() {
         Long id = 42L;

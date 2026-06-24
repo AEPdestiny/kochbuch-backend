@@ -12,7 +12,7 @@ import java.util.Optional;
 public class RecipeRepository implements PanacheRepository<Recipe> {
 
     public List<Recipe> findPublished() {
-        return list("published = true and owner is null");
+        return list("published = true");
     }
 
     public List<Recipe> findRandomPublished(int limit) {
@@ -20,7 +20,6 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                 .createQuery("""
                         from Recipe r
                         where r.published = true
-                          and r.owner is null
                         order by function('random')
                         """, Recipe.class)
                 .setMaxResults(limit)
@@ -32,7 +31,6 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                 .createQuery("""
                         from Recipe r
                         where r.published = true
-                          and r.owner is null
                           and lower(coalesce(r.language, 'en')) = :language
                         order by function('random')
                         """, Recipe.class)
@@ -50,7 +48,6 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                 .createQuery("""
                         from Recipe r
                         where r.published = true
-                          and r.owner is null
                           and lower(coalesce(r.language, 'en')) = :language
                           and (
                             lower(coalesce(r.title, '')) like :query
@@ -73,7 +70,6 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
                 .createQuery("""
                         from Recipe r
                         where r.published = true
-                          and r.owner is null
                           and lower(coalesce(r.language, 'en')) = :language
                           and lower(coalesce(r.category, '')) = :category
                         order by function('random')

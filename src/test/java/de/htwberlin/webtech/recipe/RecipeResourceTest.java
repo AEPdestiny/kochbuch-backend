@@ -98,6 +98,26 @@ class RecipeResourceTest {
     }
 
     @Test
+    void getPublished_should_include_owned_published_recipe_without_exposing_owner_actions() {
+        Recipe publishedOwned = recipe("Community Pasta");
+        publishedOwned.setOwner(user());
+        publishedOwned.setLanguage("de");
+        doReturn(List.of(publishedOwned)).when(recipeService).findAllPublished("de", "community");
+
+        given()
+                .queryParam("language", "de")
+                .queryParam("search", "community")
+                .when().get("/recipes/published")
+                .then()
+                .statusCode(200)
+                .body("$", hasSize(1))
+                .body("[0].title", equalTo("Community Pasta"))
+                .body("[0].published", equalTo(true))
+                .body("[0].userCreated", equalTo(true))
+                .body("[0].ownedByCurrentUser", equalTo(false));
+    }
+
+    @Test
     void getMine_should_return_unauthorized_without_token() {
         doThrow(new UnauthorizedException("Missing or invalid Bearer token."))
                 .when(userContext).requireUser(null);
@@ -126,7 +146,8 @@ class RecipeResourceTest {
                 .then()
                 .statusCode(200)
                 .body("$", hasSize(1))
-                .body("[0].title", equalTo("Mine"));
+                .body("[0].title", equalTo("Mine"))
+                .body("[0].ownedByCurrentUser", equalTo(true));
 
         verify(recipeService).findMine(currentUser);
     }
@@ -300,7 +321,8 @@ class RecipeResourceTest {
                 .then()
                 .statusCode(200)
                 .body("title", equalTo("Private"))
-                .body("published", equalTo(false));
+                .body("published", equalTo(false))
+                .body("ownedByCurrentUser", equalTo(true));
     }
 
     @Test
@@ -324,8 +346,11 @@ class RecipeResourceTest {
 
     @Test
     void create_should_return_ok() {
-        doReturn(user()).when(userContext).requireUser("Bearer valid-token");
-        doReturn(recipe("Pasta")).when(recipeService).create(any(), any());
+        AppUser currentUser = user();
+        Recipe created = recipe("Pasta");
+        created.setOwner(currentUser);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(created).when(recipeService).create(any(), any());
 
         given()
                 .contentType(ContentType.JSON)
@@ -349,7 +374,9 @@ class RecipeResourceTest {
                 .when().post("/recipes")
                 .then()
                 .statusCode(201)
-                .body("title", equalTo("Pasta"));
+                .body("title", equalTo("Pasta"))
+                .body("published", equalTo(true))
+                .body("ownedByCurrentUser", equalTo(true));
     }
 
     @Test
@@ -386,8 +413,11 @@ class RecipeResourceTest {
 
     @Test
     void update_should_return_ok() {
-        doReturn(user()).when(userContext).requireUser("Bearer valid-token");
-        doReturn(recipe("Updated")).when(recipeService).update(eq(1L), any(), any());
+        AppUser currentUser = user();
+        Recipe updated = recipe("Updated");
+        updated.setOwner(currentUser);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(updated).when(recipeService).update(eq(1L), any(), any());
 
         given()
                 .contentType(ContentType.JSON)
@@ -411,7 +441,8 @@ class RecipeResourceTest {
                 .when().put("/recipes/1")
                 .then()
                 .statusCode(200)
-                .body("title", equalTo("Updated"));
+                .body("title", equalTo("Updated"))
+                .body("ownedByCurrentUser", equalTo(true));
     }
 
     @Test

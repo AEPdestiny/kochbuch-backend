@@ -68,10 +68,11 @@ public class RecipeResource {
     @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
     @APIResponse(responseCode = "400", description = "Invalid recipe data")
     public Response create(@HeaderParam("Authorization") String authorizationHeader, @Valid RecipeRequest request) {
-        RecipeResponse created = mapper.toResponse(service.create(
+        AppUser currentUser = userContext.requireUser(authorizationHeader);
+        RecipeResponse created = ownerResponse(service.create(
                 mapper.toEntity(request),
-                userContext.requireUser(authorizationHeader)
-        ));
+                currentUser
+        ), currentUser);
         return Response.status(Response.Status.CREATED).entity(created).build();
     }
 
@@ -100,7 +101,10 @@ public class RecipeResource {
     @APIResponse(responseCode = "200", description = "Own recipes returned")
     @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
     public List<RecipeResponse> getMine(@HeaderParam("Authorization") String authorizationHeader) {
-        return mapper.toResponseList(service.findMine(userContext.requireUser(authorizationHeader)));
+        AppUser currentUser = userContext.requireUser(authorizationHeader);
+        return service.findMine(currentUser).stream()
+                .map(recipe -> ownerResponse(recipe, currentUser))
+                .toList();
     }
 
     @GET
@@ -112,6 +116,7 @@ public class RecipeResource {
         AppUser currentUser = userContext.currentUserOrNull(authorizationHeader);
         Recipe recipe = service.findVisibleById(id, currentUser);
         RecipeResponse response = mapper.toResponse(recipe);
+        response.setOwnedByCurrentUser(isOwner(recipe, currentUser));
         if (!isOwner(recipe, currentUser)) {
             response.setFavorite(false);
         }
@@ -127,11 +132,12 @@ public class RecipeResource {
     @APIResponse(responseCode = "403", description = "Only the owner may update the recipe")
     @APIResponse(responseCode = "404", description = "Recipe not found")
     public RecipeResponse update(@PathParam("id") Long id, @HeaderParam("Authorization") String authorizationHeader, @Valid RecipeRequest request) {
-        return mapper.toResponse(service.update(
+        AppUser currentUser = userContext.requireUser(authorizationHeader);
+        return ownerResponse(service.update(
                 id,
                 mapper.toEntity(request),
-                userContext.requireUser(authorizationHeader)
-        ));
+                currentUser
+        ), currentUser);
     }
 
     @DELETE
@@ -170,8 +176,17 @@ public class RecipeResource {
 
     private List<RecipeResponse> publicResponses(List<Recipe> recipes) {
         return mapper.toResponseList(recipes).stream()
-                .peek(response -> response.setFavorite(false))
+                .peek(response -> {
+                    response.setFavorite(false);
+                    response.setOwnedByCurrentUser(false);
+                })
                 .toList();
+    }
+
+    private RecipeResponse ownerResponse(Recipe recipe, AppUser currentUser) {
+        RecipeResponse response = mapper.toResponse(recipe);
+        response.setOwnedByCurrentUser(isOwner(recipe, currentUser));
+        return response;
     }
 
     private boolean isOwner(Recipe recipe, AppUser currentUser) {

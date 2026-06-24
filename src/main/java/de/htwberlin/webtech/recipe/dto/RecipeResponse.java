@@ -22,6 +22,7 @@ public class RecipeResponse {
     private Double alcohol;
     private Double alcoholPercent;
     private boolean userCreated;
+    private boolean ownedByCurrentUser;
     private String language;
     private String sourceUrl;
     private String sourceName;
@@ -190,6 +191,14 @@ public class RecipeResponse {
 
     public void setUserCreated(boolean userCreated) {
         this.userCreated = userCreated;
+    }
+
+    public boolean isOwnedByCurrentUser() {
+        return ownedByCurrentUser;
+    }
+
+    public void setOwnedByCurrentUser(boolean ownedByCurrentUser) {
+        this.ownedByCurrentUser = ownedByCurrentUser;
     }
 
     public String getLanguage() {

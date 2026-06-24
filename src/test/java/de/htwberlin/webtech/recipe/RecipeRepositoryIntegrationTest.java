@@ -64,19 +64,52 @@ class RecipeRepositoryIntegrationTest {
 
     @Test
     @TestTransaction
-    void should_not_return_owned_recipes_in_public_published_query() {
+    void should_return_published_owned_recipes_but_not_private_owned_recipes() {
         AppUser owner = user("public-owner", "public-owner@example.com");
         userRepository.persistAndFlush(owner);
-        Recipe owned = recipe("Owned Published", true);
-        owned.setOwner(owner);
+        Recipe publishedOwned = recipe("Owned Published", true);
+        publishedOwned.setOwner(owner);
+        Recipe privateOwned = recipe("Owned Private", false);
+        privateOwned.setOwner(owner);
         repository.persist(recipe("Seed Published", true));
-        repository.persist(owned);
+        repository.persist(publishedOwned);
+        repository.persist(privateOwned);
         repository.flush();
 
         var published = repository.findPublished();
 
         assertTrue(published.stream().anyMatch(recipe -> "Seed Published".equals(recipe.getTitle())));
-        assertTrue(published.stream().noneMatch(recipe -> "Owned Published".equals(recipe.getTitle())));
+        assertTrue(published.stream().anyMatch(recipe -> "Owned Published".equals(recipe.getTitle())));
+        assertTrue(published.stream().noneMatch(recipe -> "Owned Private".equals(recipe.getTitle())));
+    }
+
+    @Test
+    @TestTransaction
+    void should_find_published_owned_recipe_by_language_and_search() {
+        AppUser owner = user("search-owner", "search-owner@example.com");
+        userRepository.persistAndFlush(owner);
+        Recipe germanPublished = recipe("Veröffentlichte Eigentümer-Suppe", true);
+        germanPublished.setOwner(owner);
+        germanPublished.setLanguage("de");
+        germanPublished.setCategory("lunch");
+        Recipe germanPrivate = recipe("Private Eigentümer-Suppe", false);
+        germanPrivate.setOwner(owner);
+        germanPrivate.setLanguage("de");
+        Recipe englishPublished = recipe("Published Owner Soup", true);
+        englishPublished.setOwner(owner);
+        englishPublished.setLanguage("en");
+        repository.persist(germanPublished);
+        repository.persist(germanPrivate);
+        repository.persist(englishPublished);
+        repository.flush();
+
+        var result = repository.searchRandomPublishedByLanguage("de", "Eigentümer", 100);
+        var publicLunch = repository.findRandomPublishedByLanguageAndCategory("de", "lunch", 25);
+
+        assertTrue(result.stream().anyMatch(recipe -> "Veröffentlichte Eigentümer-Suppe".equals(recipe.getTitle())));
+        assertTrue(result.stream().noneMatch(recipe -> "Private Eigentümer-Suppe".equals(recipe.getTitle())));
+        assertTrue(result.stream().noneMatch(recipe -> "Published Owner Soup".equals(recipe.getTitle())));
+        assertTrue(publicLunch.stream().anyMatch(recipe -> "Veröffentlichte Eigentümer-Suppe".equals(recipe.getTitle())));
     }
 
     @Test
