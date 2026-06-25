@@ -110,7 +110,8 @@ class RecipeResourceTest {
                 .then()
                 .statusCode(200)
                 .body("$", hasSize(1))
-                .body("[0].ingredients", equalTo("onion\n5 EL garlic\nbutter"));
+                .body("[0].ingredients", equalTo("onion\n5 EL garlic\nbutter"))
+                .body("[0].ingredientsList", equalTo(List.of("onion", "5 EL garlic", "butter")));
     }
 
     @Test

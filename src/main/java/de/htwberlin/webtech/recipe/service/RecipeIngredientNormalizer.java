@@ -15,10 +15,14 @@ public final class RecipeIngredientNormalizer {
     private static final Pattern LEADING_ZERO_UNIT = Pattern.compile("^(?:0(?:[,.]0+)?\\s*)?(?:ml|g|kg|l|el|tl|tbsp|tsp|cup|cups|serving|servings)\\s+", Pattern.CASE_INSENSITIVE);
     private static final Pattern LEADING_SERVINGS = Pattern.compile("^\\d+(?:[,.]\\d+)?\\s+servings?\\s+", Pattern.CASE_INSENSITIVE);
     private static final Pattern COMMA_INGREDIENT_BOUNDARY = Pattern.compile(",\\s*(?=(?:\\d|\\d/|[\\u00BC\\u00BD\\u00BE]|\\p{Lu}))");
+    private static final String AMOUNT_PATTERN = "(?:\\d+(?:[,.]\\d+)?|\\d+/\\d+|[\\u00BC\\u00BD\\u00BE])";
+    private static final String DIRECT_UNIT_PATTERN =
+            "ml|g|kg|l|el|tl|tbsp|tsp|cups?|servings?|strips?|cloves?|sticks?|prise|prisen|zehe|zehen|stück|stueck|scheiben?|dose|dosen|bund|handvoll";
+    private static final String TRAILING_UNIT_PATTERN =
+            "cloves?|zehen?|sticks?|strips?|scheiben?";
     private static final Pattern EMBEDDED_AMOUNT_BOUNDARY = Pattern.compile(
-            "(?<=\\p{L})\\s+(?=(?:\\d+(?:[,.]\\d+)?|\\d+/\\d+|[\\u00BC\\u00BD\\u00BE])\\s+"
-                    + "(?:ml|g|kg|l|el|tl|tbsp|tsp|cups?|servings?|strips?|cloves?|sticks?|prise)\\b)",
-            Pattern.CASE_INSENSITIVE
+            "(?<=\\p{L})\\s+(?=" + AMOUNT_PATTERN + "\\s+"
+                    + "(?:(?i:" + DIRECT_UNIT_PATTERN + ")\\b|\\p{Lu}|\\p{L}+\\s+(?i:" + TRAILING_UNIT_PATTERN + ")\\b))"
     );
 
     private RecipeIngredientNormalizer() {

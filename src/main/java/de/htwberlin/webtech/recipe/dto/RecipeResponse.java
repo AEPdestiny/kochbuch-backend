@@ -1,5 +1,7 @@
 package de.htwberlin.webtech.recipe.dto;
 
+import java.util.List;
+
 public class RecipeResponse {
 
     private Long id;
@@ -14,6 +16,7 @@ public class RecipeResponse {
     private String category;
     private double rating;
     private String ingredients;
+    private List<String> ingredientsList;
     private String instructions;
     private boolean favorite;
     private boolean published;
@@ -127,6 +130,14 @@ public class RecipeResponse {
 
     public void setIngredients(String ingredients) {
         this.ingredients = ingredients;
+    }
+
+    public List<String> getIngredientsList() {
+        return ingredientsList;
+    }
+
+    public void setIngredientsList(List<String> ingredientsList) {
+        this.ingredientsList = ingredientsList;
     }
 
     public String getInstructions() {

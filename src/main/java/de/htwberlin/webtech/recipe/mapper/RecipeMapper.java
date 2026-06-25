@@ -28,7 +28,9 @@ public class RecipeMapper {
         response.setDifficulty(recipe.getDifficulty());
         response.setCategory(recipe.getCategory());
         response.setRating(recipe.getRating());
-        response.setIngredients(RecipeIngredientNormalizer.normalizeToText(recipe.getIngredients()));
+        List<String> ingredientsList = RecipeIngredientNormalizer.normalizeToList(recipe.getIngredients());
+        response.setIngredients(String.join("\n", ingredientsList));
+        response.setIngredientsList(ingredientsList);
         response.setInstructions(recipe.getInstructions());
         response.setFavorite(recipe.isFavorite());
         response.setPublished(recipe.isPublished());

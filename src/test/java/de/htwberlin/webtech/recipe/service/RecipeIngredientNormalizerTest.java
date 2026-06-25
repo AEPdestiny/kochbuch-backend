@@ -85,6 +85,38 @@ class RecipeIngredientNormalizerTest {
     }
 
     @Test
+    void normalizeToList_should_split_live_recipe_1155_ingredient_block() {
+        assertEquals(
+                List.of(
+                        "61 g geröstetes Kürbispüree",
+                        "4 g Teffmehl",
+                        "4 g Tapiokamehl",
+                        "8 g Reismehl"
+                ),
+                RecipeIngredientNormalizer.normalizeToList(
+                        "61 g geröstetes Kürbispüree 4 g Teffmehl 4 g Tapiokamehl 8 g Reismehl 0"
+                )
+        );
+    }
+
+    @Test
+    void normalizeToList_should_split_long_pumpkin_ingredient_block() {
+        assertEquals(
+                List.of(
+                        "02 TL gemahlene Nelken",
+                        "1/4 EL Dattelzucker",
+                        "1/6 EL Sonnenblumenöl",
+                        "1/6 EL Leinsamenmehl",
+                        "1/6 EL Wasser",
+                        "19 ml Kokosmilch"
+                ),
+                RecipeIngredientNormalizer.normalizeToList(
+                        "02 TL gemahlene Nelken 1/4 EL Dattelzucker 1/6 EL Sonnenblumenöl 1/6 EL Leinsamenmehl 1/6 EL Wasser 19 ml Kokosmilch 0"
+                )
+        );
+    }
+
+    @Test
     void normalizeToList_should_keep_valid_amounts_and_units() {
         assertEquals(
                 List.of("120 ml Milch", "40 g Reis", "1/2 TL Salz", "3 strips bacon"),
