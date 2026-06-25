@@ -18,6 +18,7 @@ class RecipeMapperTest {
         recipe.setId(1155L);
         recipe.setTitle("Kürbisrezept");
         recipe.setIngredients("61 g geröstetes Kürbispüree 4 g Teffmehl 4 g Tapiokamehl 8 g Reismehl 0");
+        recipe.setInstructions("1. Zutaten vorbereiten.\n2. Alles verrühren.\n3. Servieren.");
 
         RecipeResponse response = underTest.toResponse(recipe);
 
@@ -33,6 +34,10 @@ class RecipeMapperTest {
         assertEquals(
                 "61 g geröstetes Kürbispüree\n4 g Teffmehl\n4 g Tapiokamehl\n8 g Reismehl",
                 response.getIngredients()
+        );
+        assertEquals(
+                List.of("Zutaten vorbereiten.", "Alles verrühren.", "Servieren."),
+                response.getInstructionsList()
         );
     }
 }

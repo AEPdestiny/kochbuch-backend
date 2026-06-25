@@ -4,6 +4,7 @@ import de.htwberlin.webtech.recipe.dto.RecipeRequest;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
 import de.htwberlin.webtech.recipe.entity.Recipe;
 import de.htwberlin.webtech.recipe.service.RecipeIngredientNormalizer;
+import de.htwberlin.webtech.recipe.service.RecipeInstructionNormalizer;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
@@ -32,6 +33,14 @@ public class RecipeMapper {
         response.setIngredients(String.join("\n", ingredientsList));
         response.setIngredientsList(ingredientsList);
         response.setInstructions(recipe.getInstructions());
+        response.setInstructionsList(RecipeInstructionNormalizer.normalizeToList(
+                recipe.getInstructions(),
+                recipe.getTitle(),
+                recipe.getCategory(),
+                recipe.getDishTypes(),
+                ingredientsList,
+                recipe.getLanguage()
+        ));
         response.setFavorite(recipe.isFavorite());
         response.setPublished(recipe.isPublished());
         response.setCalories(recipe.getCalories());

@@ -101,6 +101,7 @@ class RecipeResourceTest {
     void getPublished_should_return_normalized_ingredient_text() {
         Recipe recipe = recipe("Shrimp");
         recipe.setIngredients("0 ml onion 0 5 EL garlic 0 ml butter 0 1");
+        recipe.setInstructions("1. Zutaten vorbereiten.\n2. Alles verrühren.\n3. Servieren.");
         doReturn(List.of(recipe)).when(recipeService).findAllPublished("en", "shrimp");
 
         given()
@@ -111,7 +112,8 @@ class RecipeResourceTest {
                 .statusCode(200)
                 .body("$", hasSize(1))
                 .body("[0].ingredients", equalTo("onion\n5 EL garlic\nbutter"))
-                .body("[0].ingredientsList", equalTo(List.of("onion", "5 EL garlic", "butter")));
+                .body("[0].ingredientsList", equalTo(List.of("onion", "5 EL garlic", "butter")))
+                .body("[0].instructionsList", equalTo(List.of("Zutaten vorbereiten.", "Alles verrühren.", "Servieren.")));
     }
 
     @Test

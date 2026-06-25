@@ -18,6 +18,7 @@ public class RecipeResponse {
     private String ingredients;
     private List<String> ingredientsList;
     private String instructions;
+    private List<String> instructionsList;
     private boolean favorite;
     private boolean published;
     private Integer calories;
@@ -146,6 +147,14 @@ public class RecipeResponse {
 
     public void setInstructions(String instructions) {
         this.instructions = instructions;
+    }
+
+    public List<String> getInstructionsList() {
+        return instructionsList;
+    }
+
+    public void setInstructionsList(List<String> instructionsList) {
+        this.instructionsList = instructionsList;
     }
 
     public boolean isFavorite() {
