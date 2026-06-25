@@ -31,19 +31,19 @@ class RecipeServiceTest {
     void findAll_should_return_only_published_recipes() {
         var r1 = recipe("Pasta");
         var r2 = recipe("Soup");
-        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 25);
-        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 25);
-        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 25);
-        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 25);
-        doReturn(List.of(r1, r2)).when(repo).findRandomPublishedByLanguage("en", 100);
+        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 75);
+        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 75);
+        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 75);
+        doReturn(List.of()).when(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 75);
+        doReturn(List.of(r1, r2)).when(repo).findRandomPublishedByLanguage("en", 200);
 
         var result = underTest.findAll();
 
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 25);
-        verify(repo).findRandomPublishedByLanguage("en", 100);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 75);
+        verify(repo).findRandomPublishedByLanguage("en", 200);
         verifyNoMoreInteractions(repo);
         assertEquals(2, result.size());
     }
@@ -53,15 +53,15 @@ class RecipeServiceTest {
     void findAllPublished_should_call_findRandomPublished() {
         var published = recipe("Cake");
         published.setPublished(true);
-        doReturn(List.of(published)).when(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 25);
+        doReturn(List.of(published)).when(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 75);
 
         var result = underTest.findAllPublished();
 
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 25);
-        verify(repo).findRandomPublishedByLanguage("en", 100);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 75);
+        verify(repo).findRandomPublishedByLanguage("en", 200);
         verifyNoMoreInteractions(repo);
         assertEquals(1, result.size());
         assertTrue(result.get(0).isPublished());
@@ -72,15 +72,15 @@ class RecipeServiceTest {
     void findAllPublished_should_filter_by_language() {
         var published = recipe("Deutsches Rezept");
         published.setLanguage("de");
-        doReturn(List.of(published)).when(repo).findRandomPublishedByLanguageAndCategory("de", "lunch", 25);
+        doReturn(List.of(published)).when(repo).findRandomPublishedByLanguageAndCategory("de", "lunch", 75);
 
         var result = underTest.findAllPublished("de");
 
-        verify(repo).findRandomPublishedByLanguageAndCategory("de", "breakfast", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("de", "lunch", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("de", "dinner", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("de", "snack", 25);
-        verify(repo).findRandomPublishedByLanguage("de", 100);
+        verify(repo).findRandomPublishedByLanguageAndCategory("de", "breakfast", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("de", "lunch", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("de", "dinner", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("de", "snack", 75);
+        verify(repo).findRandomPublishedByLanguage("de", 200);
         verifyNoMoreInteractions(repo);
         assertEquals(1, result.size());
         assertEquals("de", result.get(0).getLanguage());
@@ -91,14 +91,63 @@ class RecipeServiceTest {
     void findAllPublished_should_use_search_query() {
         var published = recipe("Sushi Reis");
         published.setLanguage("de");
-        doReturn(List.of(published)).when(repo).searchRandomPublishedByLanguage("de", "sushi", 100);
+        doReturn(List.of(published)).when(repo).searchRandomPublishedByLanguage("de", "sushi", 200);
 
         var result = underTest.findAllPublished("de", "sushi");
 
-        verify(repo).searchRandomPublishedByLanguage("de", "sushi", 100);
+        verify(repo).searchRandomPublishedByLanguage("de", "sushi", 200);
         verifyNoMoreInteractions(repo);
         assertEquals(1, result.size());
         assertEquals("Sushi Reis", result.get(0).getTitle());
+    }
+
+    @Test
+    @DisplayName("findAllPublished should remove visible system duplicates from search results")
+    void findAllPublished_should_remove_system_duplicates_from_search_results() {
+        var incomplete = recipe("Rindereintopf aus dem Slow Cooker");
+        incomplete.setId(10L);
+        incomplete.setLanguage("de");
+        incomplete.setExternalId("beef-stew-1");
+        incomplete.setImageUrl("");
+        incomplete.setIngredients("0");
+        incomplete.setInstructions("");
+
+        var complete = recipe("Rindereintopf aus dem Schongarer");
+        complete.setId(11L);
+        complete.setLanguage("de");
+        complete.setExternalId("beef-stew-1");
+        complete.setImageUrl("https://example.com/beef.jpg");
+        complete.setIngredients("500 g Rindfleisch\n300 g Kartoffeln");
+        complete.setInstructions("Alles langsam schmoren.");
+
+        doReturn(List.of(incomplete, complete)).when(repo).searchRandomPublishedByLanguage("de", "rind", 200);
+
+        var result = underTest.findAllPublished("de", "rind");
+
+        assertEquals(1, result.size());
+        assertEquals("Rindereintopf aus dem Schongarer", result.get(0).getTitle());
+    }
+
+    @Test
+    @DisplayName("findAllPublished should keep user-created recipes even when similar to seed recipes")
+    void findAllPublished_should_keep_user_created_recipes_when_similar_to_seed_recipes() {
+        var seed = recipe("Sushi Bowl");
+        seed.setId(20L);
+        seed.setLanguage("de");
+        seed.setExternalId("sushi-1");
+
+        var userRecipe = recipe("Sushi Bowl");
+        userRecipe.setId(21L);
+        userRecipe.setLanguage("de");
+        userRecipe.setOwner(user(1L, "owner@example.com"));
+
+        doReturn(List.of(seed, userRecipe)).when(repo).searchRandomPublishedByLanguage("de", "sushi", 200);
+
+        var result = underTest.findAllPublished("de", "sushi");
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().anyMatch(recipe -> recipe.getOwner() != null));
+        assertTrue(result.stream().anyMatch(recipe -> recipe.getOwner() == null));
     }
 
     @Test
@@ -108,17 +157,17 @@ class RecipeServiceTest {
         List<Recipe> lunch = numberedRecipes("Lunch", 26, 25);
         List<Recipe> dinner = numberedRecipes("Dinner", 51, 25);
         List<Recipe> snack = numberedRecipes("Snack", 76, 25);
-        doReturn(breakfast).when(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 25);
-        doReturn(lunch).when(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 25);
-        doReturn(dinner).when(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 25);
-        doReturn(snack).when(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 25);
+        doReturn(breakfast).when(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 75);
+        doReturn(lunch).when(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 75);
+        doReturn(dinner).when(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 75);
+        doReturn(snack).when(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 75);
 
         var result = underTest.findAllPublished("en");
 
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 25);
-        verify(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 25);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "breakfast", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "lunch", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "dinner", 75);
+        verify(repo).findRandomPublishedByLanguageAndCategory("en", "snack", 75);
         verifyNoMoreInteractions(repo);
         assertEquals(100, result.size());
     }

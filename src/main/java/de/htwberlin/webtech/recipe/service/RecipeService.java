@@ -10,15 +10,18 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Locale;
+import java.util.Map;
 
 @ApplicationScoped
 public class RecipeService {
 
     private static final int PUBLIC_RECIPE_LIMIT = 100;
     private static final int CATEGORY_TARGET = 25;
+    private static final int CATEGORY_QUERY_LIMIT = 75;
+    private static final int PUBLIC_QUERY_LIMIT = 200;
     private static final List<String> PUBLIC_CATEGORIES = List.of("breakfast", "lunch", "dinner", "snack");
 
     private final RecipeRepository repo;
@@ -65,18 +68,35 @@ public class RecipeService {
         String normalizedLanguage = normalizeLanguage(language);
         String normalizedSearch = search == null ? "" : search.trim();
         if (!normalizedSearch.isBlank()) {
-            return repo.searchRandomPublishedByLanguage(normalizedLanguage, normalizedSearch, PUBLIC_RECIPE_LIMIT);
+            return deduplicatePublicRecipes(
+                    repo.searchRandomPublishedByLanguage(normalizedLanguage, normalizedSearch, PUBLIC_QUERY_LIMIT),
+                    null
+            ).stream()
+                    .limit(PUBLIC_RECIPE_LIMIT)
+                    .toList();
         }
 
         List<Recipe> balanced = new ArrayList<>();
-        Set<Long> seenIds = new LinkedHashSet<>();
+        Map<String, Integer> seenKeys = new HashMap<>();
 
         for (String category : PUBLIC_CATEGORIES) {
-            addUnique(balanced, seenIds, repo.findRandomPublishedByLanguageAndCategory(normalizedLanguage, category, CATEGORY_TARGET));
+            addBestUnique(
+                    balanced,
+                    seenKeys,
+                    repo.findRandomPublishedByLanguageAndCategory(normalizedLanguage, category, CATEGORY_QUERY_LIMIT),
+                    category,
+                    CATEGORY_TARGET
+            );
         }
 
         if (balanced.size() < PUBLIC_RECIPE_LIMIT) {
-            addUnique(balanced, seenIds, repo.findRandomPublishedByLanguage(normalizedLanguage, PUBLIC_RECIPE_LIMIT));
+            addBestUnique(
+                    balanced,
+                    seenKeys,
+                    repo.findRandomPublishedByLanguage(normalizedLanguage, PUBLIC_QUERY_LIMIT),
+                    null,
+                    PUBLIC_RECIPE_LIMIT - balanced.size()
+            );
         }
 
         return balanced.stream()
@@ -170,13 +190,91 @@ public class RecipeService {
         return language == null || language.isBlank() ? "en" : language.trim().toLowerCase();
     }
 
-    private void addUnique(List<Recipe> target, Set<Long> seenIds, List<Recipe> candidates) {
+    private List<Recipe> deduplicatePublicRecipes(List<Recipe> candidates, String preferredCategory) {
+        List<Recipe> result = new ArrayList<>();
+        Map<String, Integer> seenKeys = new HashMap<>();
+        addBestUnique(result, seenKeys, candidates, preferredCategory, PUBLIC_RECIPE_LIMIT);
+        return result;
+    }
+
+    private void addBestUnique(
+            List<Recipe> target,
+            Map<String, Integer> seenKeys,
+            List<Recipe> candidates,
+            String preferredCategory,
+            int maxNewEntries
+    ) {
+        int added = 0;
         for (Recipe candidate : candidates) {
-            Long id = candidate.getId();
-            if (id != null && !seenIds.add(id)) {
+            String key = duplicateKey(candidate);
+            Integer existingIndex = seenKeys.get(key);
+            if (existingIndex != null) {
+                Recipe existing = target.get(existingIndex);
+                if (isBetterPublicCandidate(candidate, existing, preferredCategory)) {
+                    target.set(existingIndex, candidate);
+                }
+                continue;
+            }
+            if (added >= maxNewEntries) {
                 continue;
             }
             target.add(candidate);
+            seenKeys.put(key, target.size() - 1);
+            added++;
         }
+    }
+
+    private String duplicateKey(Recipe recipe) {
+        if (recipe.getOwner() != null) {
+            return "user:" + (recipe.getId() == null ? System.identityHashCode(recipe) : recipe.getId());
+        }
+        String language = normalizeLanguage(recipe.getLanguage());
+        if (hasText(recipe.getExternalId())) {
+            return language + "|external:" + recipe.getExternalId().trim().toLowerCase(Locale.ROOT);
+        }
+        if (hasText(recipe.getSourceUrl())) {
+            return language + "|url:" + recipe.getSourceUrl().trim().toLowerCase(Locale.ROOT);
+        }
+        return language
+                + "|title-image:"
+                + normalizeDuplicateText(recipe.getTitle())
+                + "|"
+                + normalizeDuplicateText(recipe.getImageUrl());
+    }
+
+    private boolean isBetterPublicCandidate(Recipe candidate, Recipe existing, String preferredCategory) {
+        int candidateScore = qualityScore(candidate, preferredCategory);
+        int existingScore = qualityScore(existing, preferredCategory);
+        if (candidateScore != existingScore) {
+            return candidateScore > existingScore;
+        }
+        if (candidate.getId() == null) {
+            return false;
+        }
+        return existing.getId() == null || candidate.getId() < existing.getId();
+    }
+
+    private int qualityScore(Recipe recipe, String preferredCategory) {
+        int score = 0;
+        if (recipe.isPublished()) {
+            score += 100;
+        }
+        if (hasText(recipe.getImageUrl())) {
+            score += 20;
+        }
+        if (hasText(preferredCategory) && preferredCategory.equalsIgnoreCase(recipe.getCategory())) {
+            score += 15;
+        }
+        score += Math.min(30, RecipeIngredientNormalizer.countIngredients(recipe.getIngredients()) * 3);
+        score += Math.min(30, recipe.getInstructions() == null ? 0 : recipe.getInstructions().trim().length() / 80);
+        return score;
+    }
+
+    private String normalizeDuplicateText(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

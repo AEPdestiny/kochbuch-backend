@@ -3,6 +3,7 @@ package de.htwberlin.webtech.recipe.mapper;
 import de.htwberlin.webtech.recipe.dto.RecipeRequest;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
 import de.htwberlin.webtech.recipe.entity.Recipe;
+import de.htwberlin.webtech.recipe.service.RecipeIngredientNormalizer;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.List;
@@ -27,7 +28,7 @@ public class RecipeMapper {
         response.setDifficulty(recipe.getDifficulty());
         response.setCategory(recipe.getCategory());
         response.setRating(recipe.getRating());
-        response.setIngredients(recipe.getIngredients());
+        response.setIngredients(RecipeIngredientNormalizer.normalizeToText(recipe.getIngredients()));
         response.setInstructions(recipe.getInstructions());
         response.setFavorite(recipe.isFavorite());
         response.setPublished(recipe.isPublished());

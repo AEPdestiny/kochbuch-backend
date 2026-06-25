@@ -5,7 +5,9 @@ import de.htwberlin.webtech.recipe.entity.Recipe;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -221,6 +223,38 @@ class RecipeJsonSeedImporterTest {
         assertEquals("66 g Brokkoliröschen\n1 Prise Salz", recipe.getIngredients());
         assertEquals(230, recipe.getCalories());
         assertEquals(13.5, recipe.getProtein());
+    }
+
+    @Test
+    void importStream_should_normalize_safe_german_title_terms() {
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.upsertSeedRecipe(any(Recipe.class))).thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
+        String json = """
+                [
+                  {
+                    "id": 9123,
+                    "language": "de",
+                    "title": "Instant Pot Slow Cooker Eintopf",
+                    "ingredients": ["Kartoffeln", "Rindfleisch"],
+                    "instructions": ["Kochen"],
+                    "calories": 420,
+                    "protein": 31.5
+                  }
+                ]
+                """;
+
+        int imported = importer.importStream(
+                new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)),
+                "inline.json",
+                "dinner",
+                "de"
+        );
+
+        ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
+        verify(persistence).upsertSeedRecipe(captor.capture());
+        assertEquals(1, imported);
+        assertEquals("Schnellkochtopf Schongarer Eintopf", captor.getValue().getTitle());
     }
 
     @Test

@@ -3,6 +3,7 @@ package de.htwberlin.webtech.recipe.seed;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.htwberlin.webtech.recipe.entity.Recipe;
+import de.htwberlin.webtech.recipe.service.RecipeIngredientNormalizer;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -194,7 +195,7 @@ public class RecipeJsonSeedImporter {
         String instructions = instructionsText(node);
         Recipe recipe = new Recipe();
         recipe.setExternalId(firstText(node, "id"));
-        recipe.setTitle(truncate(title, MAX_TITLE_LENGTH));
+        recipe.setTitle(truncate(normalizeTitle(title, language), MAX_TITLE_LENGTH));
         recipe.setImageUrl(firstImageUrl(node));
         recipe.setPrepTimeMinutes(firstInt(node, 0, "prepTimeMinutes", "prepTime", "preparationMinutes"));
         recipe.setCookTimeMinutes(firstInt(node, firstInt(node, 0, "readyInMinutes"), "cookTimeMinutes", "cookTime", "cookingMinutes"));
@@ -203,7 +204,7 @@ public class RecipeJsonSeedImporter {
         recipe.setCategory(category);
         recipe.setLanguage(recipeLanguage.trim().toLowerCase());
         recipe.setRating(firstDouble(node, 0.0, "rating"));
-        recipe.setIngredients(ingredients);
+        recipe.setIngredients(RecipeIngredientNormalizer.normalizeToText(ingredients));
         recipe.setInstructions(instructions);
         recipe.setCalories(firstNonNull(firstNullableInt(node, "calories", "kcal"), caloriesFromNutrition(node)));
         recipe.setProtein(firstNonNull(firstNullableDouble(node, "protein", "proteinGrams"), proteinFromNutrition(node)));
@@ -396,6 +397,17 @@ public class RecipeJsonSeedImporter {
             return value;
         }
         return value.substring(0, maxLength).trim();
+    }
+
+    private String normalizeTitle(String title, String language) {
+        if (title == null || title.isBlank() || !"de".equalsIgnoreCase(language)) {
+            return title;
+        }
+        return title
+                .replace("Slow Cooker", "Schongarer")
+                .replace("slow cooker", "Schongarer")
+                .replace("Instant Pot", "Schnellkochtopf")
+                .replace("instant pot", "Schnellkochtopf");
     }
 
     private double firstDouble(JsonNode node, double defaultValue, String... names) {
