@@ -2,9 +2,11 @@ package de.htwberlin.webtech.mealplan.resource;
 
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryRequest;
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryResponse;
+import de.htwberlin.webtech.mealplan.dto.MealPlanShoppingListResponse;
 import de.htwberlin.webtech.mealplan.dto.MealPlanWeekResponse;
 import de.htwberlin.webtech.mealplan.entity.MealSlot;
 import de.htwberlin.webtech.mealplan.mapper.MealPlanMapper;
+import de.htwberlin.webtech.mealplan.service.MealPlanShoppingListService;
 import de.htwberlin.webtech.mealplan.service.MealPlanService;
 import de.htwberlin.webtech.security.UserContext;
 import de.htwberlin.webtech.user.entity.AppUser;
@@ -13,6 +15,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -34,11 +37,16 @@ import java.time.format.DateTimeParseException;
 public class MealPlanResource {
 
     private final MealPlanService service;
+    private final MealPlanShoppingListService shoppingListService;
     private final MealPlanMapper mapper;
     private final UserContext userContext;
 
-    public MealPlanResource(MealPlanService service, MealPlanMapper mapper, UserContext userContext) {
+    public MealPlanResource(MealPlanService service,
+                            MealPlanShoppingListService shoppingListService,
+                            MealPlanMapper mapper,
+                            UserContext userContext) {
         this.service = service;
+        this.shoppingListService = shoppingListService;
         this.mapper = mapper;
         this.userContext = userContext;
     }
@@ -117,6 +125,18 @@ public class MealPlanResource {
                                @HeaderParam("Authorization") String authorizationHeader) {
         service.deleteForSlot(userContext.requireUser(authorizationHeader), parseDate(date), MealSlot.fromPath(slot));
         return Response.noContent().build();
+    }
+
+    @POST
+    @Path("/shopping-list")
+    @Operation(summary = "Create shopping list from meal plan", description = "Creates missing shopping list items from the authenticated user's week and respects pantry items where safe.")
+    @APIResponse(responseCode = "200", description = "Shopping list result returned")
+    @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
+    public MealPlanShoppingListResponse createShoppingListFromWeek(@HeaderParam("Authorization") String authorizationHeader,
+                                                                   @QueryParam("startDate") String startDate) {
+        AppUser currentUser = userContext.requireUser(authorizationHeader);
+        LocalDate weekStart = service.normalizeWeekStart(parseOptionalDate(startDate));
+        return shoppingListService.createShoppingList(currentUser, weekStart);
     }
 
     private LocalDate parseOptionalDate(String value) {

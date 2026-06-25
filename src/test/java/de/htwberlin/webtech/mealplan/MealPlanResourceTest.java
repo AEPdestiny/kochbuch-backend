@@ -1,9 +1,12 @@
 package de.htwberlin.webtech.mealplan;
 
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryRequest;
+import de.htwberlin.webtech.mealplan.dto.MealPlanShoppingListItemResponse;
+import de.htwberlin.webtech.mealplan.dto.MealPlanShoppingListResponse;
 import de.htwberlin.webtech.mealplan.entity.MealPlan;
 import de.htwberlin.webtech.mealplan.entity.MealSlot;
 import de.htwberlin.webtech.mealplan.exception.MealPlanEntryNotFoundException;
+import de.htwberlin.webtech.mealplan.service.MealPlanShoppingListService;
 import de.htwberlin.webtech.mealplan.service.MealPlanService;
 import de.htwberlin.webtech.recipe.entity.Recipe;
 import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
@@ -18,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 
 import static io.restassured.RestAssured.given;
@@ -35,13 +39,16 @@ import static org.mockito.Mockito.verify;
 class MealPlanResourceTest {
 
     private MealPlanService mealPlanService;
+    private MealPlanShoppingListService shoppingListService;
     private UserContext userContext;
 
     @BeforeEach
     void setUp() {
         mealPlanService = mock(MealPlanService.class);
+        shoppingListService = mock(MealPlanShoppingListService.class);
         userContext = mock(UserContext.class);
         QuarkusMock.installMockForType(mealPlanService, MealPlanService.class);
+        QuarkusMock.installMockForType(shoppingListService, MealPlanShoppingListService.class);
         QuarkusMock.installMockForType(userContext, UserContext.class);
     }
 
@@ -347,6 +354,63 @@ class MealPlanResourceTest {
                 .statusCode(204);
 
         verify(mealPlanService).deleteForSlot(currentUser, date, MealSlot.SNACK);
+    }
+
+    @Test
+    void createShoppingListFromWeek_should_return_unauthorized_without_token() {
+        doThrow(new UnauthorizedException("Missing or invalid Bearer token."))
+                .when(userContext).requireUser(null);
+
+        given()
+                .contentType(ContentType.JSON)
+                .when().post("/meal-plan/shopping-list")
+                .then()
+                .statusCode(401)
+                .body("status", equalTo(401))
+                .body("message", equalTo("Missing or invalid Bearer token."))
+                .body("path", equalTo("/meal-plan/shopping-list"));
+
+        verify(shoppingListService, never()).createShoppingList(any(), any());
+    }
+
+    @Test
+    void createShoppingListFromWeek_should_return_transparent_result() {
+        AppUser currentUser = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        MealPlanShoppingListResponse response = new MealPlanShoppingListResponse();
+        response.getAdded().add(new MealPlanShoppingListItemResponse(
+                "Tomaten",
+                BigDecimal.valueOf(200),
+                "g",
+                "Pasta",
+                "500 g Tomaten",
+                "Zur Einkaufsliste hinzugefügt."
+        ));
+        response.getSkippedBecauseInPantry().add(new MealPlanShoppingListItemResponse(
+                "Eier",
+                BigDecimal.valueOf(2),
+                "Stück",
+                "Omelette",
+                "2 Eier",
+                "Bereits ausreichend im Vorrat."
+        ));
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(monday).when(mealPlanService).normalizeWeekStart(LocalDate.of(2026, 6, 3));
+        doReturn(response).when(shoppingListService).createShoppingList(currentUser, monday);
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .queryParam("startDate", "2026-06-03")
+                .when().post("/meal-plan/shopping-list")
+                .then()
+                .statusCode(200)
+                .body("added", hasSize(1))
+                .body("added[0].name", equalTo("Tomaten"))
+                .body("added[0].quantity", equalTo(200))
+                .body("added[0].unit", equalTo("g"))
+                .body("skippedBecauseInPantry", hasSize(1))
+                .body("skippedBecauseInPantry[0].name", equalTo("Eier"));
     }
 
     private MealPlan mealPlan(AppUser owner, Recipe recipe, LocalDate plannedDate) {
