@@ -39,12 +39,15 @@ public final class RecipeInstructionNormalizer {
             List<String> ingredients,
             String language
     ) {
-        String cleaned = clean(instructions);
-        List<String> realSteps = realInstructionSteps(cleaned);
-        if (!realSteps.isEmpty()) {
-            return realSteps;
-        }
-        return fallbackSteps(title, category, dishTypes, ingredients, language);
+        return realInstructionSteps(clean(instructions));
+    }
+
+    public static boolean hasRealInstructions(String instructions) {
+        return !realInstructionSteps(clean(instructions)).isEmpty();
+    }
+
+    public static List<String> extractRealStepsFromSnippet(String snippet) {
+        return realInstructionSteps(clean(snippet));
     }
 
     private static List<String> realInstructionSteps(String value) {
@@ -144,129 +147,6 @@ public final class RecipeInstructionNormalizer {
                 || normalized.equals("no instructions available.");
     }
 
-    private static List<String> fallbackSteps(
-            String title,
-            String category,
-            String dishTypes,
-            List<String> ingredients,
-            String language
-    ) {
-        String context = normalize(String.join(" ",
-                nullToBlank(title),
-                nullToBlank(category),
-                nullToBlank(dishTypes),
-                String.join(" ", ingredients == null ? List.of() : ingredients)
-        ));
-        boolean german = isGerman(language);
-
-        if (containsAny(context, "smoothie", "getränk", "getraenk", "drink", "beverage")) {
-            return german
-                    ? List.of(
-                    "Obst und weitere Zutaten vorbereiten.",
-                    "Alle Zutaten in einen Mixer geben.",
-                    "Fein und cremig mixen.",
-                    "Bei Bedarf mit etwas Flüssigkeit anpassen und sofort servieren."
-            )
-                    : List.of(
-                    "Prepare the fruit and remaining ingredients.",
-                    "Add all ingredients to a blender.",
-                    "Blend until smooth and creamy.",
-                    "Adjust with a little liquid if needed and serve immediately."
-            );
-        }
-
-        if (containsAny(context, "salat", "salad")) {
-            return german
-                    ? List.of(
-                    "Zutaten waschen und vorbereiten.",
-                    "Zutaten in mundgerechte Stücke schneiden.",
-                    "Alles in einer Schüssel vermengen.",
-                    "Abschmecken und servieren."
-            )
-                    : List.of(
-                    "Wash and prepare the ingredients.",
-                    "Cut the ingredients into bite-sized pieces.",
-                    "Combine everything in a bowl.",
-                    "Season to taste and serve."
-            );
-        }
-
-        if (containsAny(context, "suppe", "soup")) {
-            return german
-                    ? List.of(
-                    "Gemüse und weitere Zutaten vorbereiten.",
-                    "Zutaten in einem Topf erhitzen.",
-                    "Köcheln lassen, bis alles gar ist.",
-                    "Nach Geschmack würzen und servieren."
-            )
-                    : List.of(
-                    "Prepare the vegetables and remaining ingredients.",
-                    "Heat the ingredients in a pot.",
-                    "Simmer until everything is cooked.",
-                    "Season to taste and serve."
-            );
-        }
-
-        if (containsAny(context, "pasta", "nudel", "spaghetti", "macaroni")) {
-            return german
-                    ? List.of(
-                    "Pasta nach Packungsanleitung kochen.",
-                    "Weitere Zutaten vorbereiten.",
-                    "Zutaten in einer Pfanne oder einem Topf erhitzen.",
-                    "Pasta mit der Sauce vermengen und servieren."
-            )
-                    : List.of(
-                    "Cook the pasta according to the package instructions.",
-                    "Prepare the remaining ingredients.",
-                    "Heat the ingredients in a pan or pot.",
-                    "Combine the pasta with the sauce and serve."
-            );
-        }
-
-        if (containsAny(context, "pfannkuchen", "pancake", "muffin", "brot", "bread", "cake", "gebacken", "baked")) {
-            return german
-                    ? List.of(
-                    "Zutaten vorbereiten und Backofen oder Pfanne vorheizen.",
-                    "Trockene und feuchte Zutaten getrennt vorbereiten.",
-                    "Alles zu einem Teig verrühren.",
-                    "Backen oder ausbacken, bis das Gericht gar ist."
-            )
-                    : List.of(
-                    "Prepare the ingredients and preheat the oven or pan.",
-                    "Prepare dry and wet ingredients separately.",
-                    "Mix everything into a batter or dough.",
-                    "Bake or cook until done."
-            );
-        }
-
-        return german
-                ? List.of(
-                "Zutaten vorbereiten.",
-                "Zutaten nach Rezeptart garen oder vermengen.",
-                "Nach Geschmack würzen.",
-                "Anrichten und servieren."
-        )
-                : List.of(
-                "Prepare the ingredients.",
-                "Cook or combine the ingredients according to the recipe type.",
-                "Season to taste.",
-                "Plate and serve."
-        );
-    }
-
-    private static boolean containsAny(String value, String... needles) {
-        for (String needle : needles) {
-            if (value.contains(needle)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean isGerman(String language) {
-        return language != null && language.toLowerCase(Locale.ROOT).startsWith("de");
-    }
-
     private static String clean(String value) {
         if (value == null || value.isBlank()) {
             return "";
@@ -290,9 +170,5 @@ public final class RecipeInstructionNormalizer {
 
     private static String normalize(String value) {
         return clean(value).toLowerCase(Locale.ROOT);
-    }
-
-    private static String nullToBlank(String value) {
-        return value == null ? "" : value;
     }
 }

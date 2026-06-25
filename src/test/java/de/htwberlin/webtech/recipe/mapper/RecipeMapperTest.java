@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RecipeMapperTest {
 
@@ -39,5 +40,6 @@ class RecipeMapperTest {
                 List.of("Zutaten vorbereiten.", "Alles verrühren.", "Servieren."),
                 response.getInstructionsList()
         );
+        assertTrue(response.isHasRealInstructions());
     }
 }

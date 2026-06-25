@@ -5,10 +5,12 @@ import de.htwberlin.webtech.recipe.dto.RecipeResponse;
 import de.htwberlin.webtech.recipe.dto.ExternalRecipeMatchResponse;
 import de.htwberlin.webtech.recipe.dto.InstructionSearchRequest;
 import de.htwberlin.webtech.recipe.dto.InstructionSearchResponse;
+import de.htwberlin.webtech.recipe.dto.RecipeInstructionSuggestionResponse;
 import de.htwberlin.webtech.recipe.entity.Recipe;
 import de.htwberlin.webtech.recipe.exception.RecipeNotFoundException;
 import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
 import de.htwberlin.webtech.recipe.instructions.InstructionSearchService;
+import de.htwberlin.webtech.recipe.instructions.RecipeInstructionSuggestionService;
 import de.htwberlin.webtech.recipe.mapper.RecipeMapper;
 import de.htwberlin.webtech.recipe.service.RecipeService;
 import de.htwberlin.webtech.security.UserContext;
@@ -45,6 +47,7 @@ public class RecipeResource {
     private final RecipeService service;
     private final ExternalRecipeService externalService;
     private final InstructionSearchService instructionSearchService;
+    private final RecipeInstructionSuggestionService instructionSuggestionService;
     private final RecipeMapper mapper;
     private final UserContext userContext;
 
@@ -52,12 +55,14 @@ public class RecipeResource {
             RecipeService service,
             ExternalRecipeService externalService,
             InstructionSearchService instructionSearchService,
+            RecipeInstructionSuggestionService instructionSuggestionService,
             RecipeMapper mapper,
             UserContext userContext
     ) {
         this.service = service;
         this.externalService = externalService;
         this.instructionSearchService = instructionSearchService;
+        this.instructionSuggestionService = instructionSuggestionService;
         this.mapper = mapper;
         this.userContext = userContext;
     }
@@ -226,5 +231,20 @@ public class RecipeResource {
     @APIResponse(responseCode = "400", description = "Invalid search request")
     public InstructionSearchResponse searchInstructions(@Valid InstructionSearchRequest request) {
         return instructionSearchService.search(request);
+    }
+
+    @POST
+    @Path("/{id}/instruction-suggestions")
+    @Operation(summary = "Suggest missing recipe instructions", description = "Returns transparent web-based instruction suggestions without modifying the recipe.")
+    @APIResponse(responseCode = "200", description = "Instruction suggestions handled")
+    @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
+    @APIResponse(responseCode = "404", description = "Recipe not found")
+    public RecipeInstructionSuggestionResponse suggestInstructions(
+            @PathParam("id") Long id,
+            @HeaderParam("Authorization") String authorizationHeader
+    ) {
+        AppUser currentUser = userContext.requireUser(authorizationHeader);
+        Recipe recipe = service.findVisibleById(id, currentUser);
+        return instructionSuggestionService.suggestFor(recipe);
     }
 }

@@ -19,6 +19,7 @@ public class RecipeResponse {
     private List<String> ingredientsList;
     private String instructions;
     private List<String> instructionsList;
+    private boolean hasRealInstructions;
     private boolean favorite;
     private boolean published;
     private Integer calories;
@@ -155,6 +156,14 @@ public class RecipeResponse {
 
     public void setInstructionsList(List<String> instructionsList) {
         this.instructionsList = instructionsList;
+    }
+
+    public boolean isHasRealInstructions() {
+        return hasRealInstructions;
+    }
+
+    public void setHasRealInstructions(boolean hasRealInstructions) {
+        this.hasRealInstructions = hasRealInstructions;
     }
 
     public boolean isFavorite() {

@@ -33,14 +33,16 @@ public class RecipeMapper {
         response.setIngredients(String.join("\n", ingredientsList));
         response.setIngredientsList(ingredientsList);
         response.setInstructions(recipe.getInstructions());
-        response.setInstructionsList(RecipeInstructionNormalizer.normalizeToList(
+        List<String> instructionsList = RecipeInstructionNormalizer.normalizeToList(
                 recipe.getInstructions(),
                 recipe.getTitle(),
                 recipe.getCategory(),
                 recipe.getDishTypes(),
                 ingredientsList,
                 recipe.getLanguage()
-        ));
+        );
+        response.setInstructionsList(instructionsList);
+        response.setHasRealInstructions(!instructionsList.isEmpty());
         response.setFavorite(recipe.isFavorite());
         response.setPublished(recipe.isPublished());
         response.setCalories(recipe.getCalories());

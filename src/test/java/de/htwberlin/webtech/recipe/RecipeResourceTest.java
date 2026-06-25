@@ -6,8 +6,11 @@ import de.htwberlin.webtech.recipe.external.ExternalRecipeService;
 import de.htwberlin.webtech.recipe.dto.ExternalRecipeDetailResponse;
 import de.htwberlin.webtech.recipe.dto.InstructionSearchResponse;
 import de.htwberlin.webtech.recipe.dto.InstructionSearchResult;
+import de.htwberlin.webtech.recipe.dto.RecipeInstructionSuggestion;
+import de.htwberlin.webtech.recipe.dto.RecipeInstructionSuggestionResponse;
 import de.htwberlin.webtech.recipe.dto.RecipeResponse;
 import de.htwberlin.webtech.recipe.instructions.InstructionSearchService;
+import de.htwberlin.webtech.recipe.instructions.RecipeInstructionSuggestionService;
 import de.htwberlin.webtech.recipe.service.RecipeService;
 import de.htwberlin.webtech.security.UserContext;
 import de.htwberlin.webtech.shared.exception.ForbiddenException;
@@ -39,6 +42,7 @@ class RecipeResourceTest {
     private RecipeService recipeService;
     private ExternalRecipeService externalRecipeService;
     private InstructionSearchService instructionSearchService;
+    private RecipeInstructionSuggestionService instructionSuggestionService;
     private UserContext userContext;
 
     @BeforeEach
@@ -46,10 +50,12 @@ class RecipeResourceTest {
         recipeService = mock(RecipeService.class);
         externalRecipeService = mock(ExternalRecipeService.class);
         instructionSearchService = mock(InstructionSearchService.class);
+        instructionSuggestionService = mock(RecipeInstructionSuggestionService.class);
         userContext = mock(UserContext.class);
         QuarkusMock.installMockForType(recipeService, RecipeService.class);
         QuarkusMock.installMockForType(externalRecipeService, ExternalRecipeService.class);
         QuarkusMock.installMockForType(instructionSearchService, InstructionSearchService.class);
+        QuarkusMock.installMockForType(instructionSuggestionService, RecipeInstructionSuggestionService.class);
         QuarkusMock.installMockForType(userContext, UserContext.class);
     }
 
@@ -297,6 +303,56 @@ class RecipeResourceTest {
                 .then()
                 .statusCode(400)
                 .body("message", equalTo("Validation failed: recipeTitle must not be blank"));
+    }
+
+    @Test
+    void suggestInstructions_should_require_token() {
+        doThrow(new UnauthorizedException("Missing or invalid Bearer token."))
+                .when(userContext).requireUser(null);
+
+        given()
+                .contentType(ContentType.JSON)
+                .when().post("/recipes/1/instruction-suggestions")
+                .then()
+                .statusCode(401)
+                .body("status", equalTo(401))
+                .body("error", equalTo("Unauthorized"));
+    }
+
+    @Test
+    void suggestInstructions_should_return_recipe_specific_suggestions() {
+        AppUser currentUser = user();
+        Recipe recipe = recipe("Pasta");
+        recipe.setId(1L);
+        RecipeInstructionSuggestionResponse response = new RecipeInstructionSuggestionResponse();
+        response.setRecipeId(1L);
+        response.setConfigured(true);
+        response.setHasRealInstructions(false);
+        response.setSuggestions(List.of(new RecipeInstructionSuggestion(
+                "Pasta instructions",
+                "https://example.com/pasta",
+                List.of("Prepare pasta.", "Cook sauce.", "Serve warm."),
+                0.7,
+                "Aus Websuche abgeleitete Vorschlagsquelle. Bitte vor dem Kochen prüfen."
+        )));
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(recipe).when(recipeService).findVisibleById(1L, currentUser);
+        doReturn(response).when(instructionSuggestionService).suggestFor(recipe);
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .contentType(ContentType.JSON)
+                .when().post("/recipes/1/instruction-suggestions")
+                .then()
+                .statusCode(200)
+                .body("configured", equalTo(true))
+                .body("hasRealInstructions", equalTo(false))
+                .body("suggestions", hasSize(1))
+                .body("suggestions[0].sourceTitle", equalTo("Pasta instructions"))
+                .body("suggestions[0].steps", equalTo(List.of("Prepare pasta.", "Cook sauce.", "Serve warm.")));
+
+        verify(recipeService).findVisibleById(1L, currentUser);
+        verify(instructionSuggestionService).suggestFor(recipe);
     }
 
     @Test
