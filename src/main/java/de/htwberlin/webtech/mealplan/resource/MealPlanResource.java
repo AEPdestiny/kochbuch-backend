@@ -2,6 +2,7 @@ package de.htwberlin.webtech.mealplan.resource;
 
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryRequest;
 import de.htwberlin.webtech.mealplan.dto.MealPlanEntryResponse;
+import de.htwberlin.webtech.mealplan.dto.MealPlanMoveRequest;
 import de.htwberlin.webtech.mealplan.dto.MealPlanShoppingListResponse;
 import de.htwberlin.webtech.mealplan.dto.MealPlanWeekResponse;
 import de.htwberlin.webtech.mealplan.entity.MealSlot;
@@ -15,6 +16,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
@@ -125,6 +127,32 @@ public class MealPlanResource {
                                @HeaderParam("Authorization") String authorizationHeader) {
         service.deleteForSlot(userContext.requireUser(authorizationHeader), parseDate(date), MealSlot.fromPath(slot));
         return Response.noContent().build();
+    }
+
+    @PATCH
+    @Path("/entries/{id}/move")
+    @Operation(summary = "Move or swap meal plan entry", description = "Moves an owned meal plan entry to another slot. If the target is occupied, entries are swapped when requested.")
+    @APIResponse(responseCode = "200", description = "Updated meal plan week returned")
+    @APIResponse(responseCode = "400", description = "Invalid target date, slot or request body")
+    @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
+    @APIResponse(responseCode = "403", description = "Only own meal plan entries can be moved")
+    @APIResponse(responseCode = "404", description = "Meal plan entry not found")
+    public MealPlanWeekResponse moveEntry(@PathParam("id") Long id,
+                                          @HeaderParam("Authorization") String authorizationHeader,
+                                          @Valid MealPlanMoveRequest request) {
+        if (request == null || request.getTargetDate() == null || request.getTargetSlot() == null || request.getTargetSlot().isBlank()) {
+            throw new IllegalArgumentException("targetDate and targetSlot must be provided.");
+        }
+        AppUser currentUser = userContext.requireUser(authorizationHeader);
+        LocalDate weekStart = service.normalizeWeekStart(request.getTargetDate());
+        LocalDate weekEnd = weekStart.plusDays(6);
+        return mapper.toWeekResponse(weekStart, weekEnd, service.moveEntry(
+                currentUser,
+                id,
+                request.getTargetDate(),
+                MealSlot.fromPath(request.getTargetSlot()),
+                request.isSwapIfOccupied()
+        ));
     }
 
     @POST

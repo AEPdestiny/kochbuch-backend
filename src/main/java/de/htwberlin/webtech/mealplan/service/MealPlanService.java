@@ -92,15 +92,65 @@ public class MealPlanService {
         mealPlanRepository.delete(mealPlan);
     }
 
+    @Transactional
+    public List<MealPlan> moveEntry(AppUser currentUser,
+                                    Long entryId,
+                                    LocalDate targetDate,
+                                    MealSlot targetSlot,
+                                    boolean swapIfOccupied) {
+        if (entryId == null || targetDate == null || targetSlot == null) {
+            throw new IllegalArgumentException("targetDate and targetSlot must be provided.");
+        }
+
+        MealPlan source = mealPlanRepository.findByIdOptional(entryId)
+                .orElseThrow(() -> new MealPlanEntryNotFoundException(entryId));
+        ensureMealPlanOwner(source, currentUser);
+
+        LocalDate sourceDate = source.getPlannedDate();
+        MealSlot sourceSlot = source.getMealSlot();
+        if (sourceDate.equals(targetDate) && sourceSlot == targetSlot) {
+            return getWeek(currentUser, targetDate);
+        }
+
+        MealPlan target = findEntry(currentUser, targetDate, targetSlot)
+                .filter(entry -> !entry.getId().equals(source.getId()))
+                .orElse(null);
+
+        if (target == null) {
+            source.setPlannedDate(targetDate);
+            source.setMealSlot(targetSlot);
+        } else {
+            if (!swapIfOccupied) {
+                throw new IllegalArgumentException("Target meal plan slot is already occupied.");
+            }
+            MealPlanContent sourceContent = MealPlanContent.from(source);
+            MealPlanContent targetContent = MealPlanContent.from(target);
+            sourceContent.applyTo(target);
+            targetContent.applyTo(source);
+        }
+
+        return getWeek(currentUser, targetDate);
+    }
+
     public LocalDate normalizeWeekStart(LocalDate date) {
         LocalDate baseDate = date == null ? LocalDate.now() : date;
         return baseDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 
     private void ensureRecipeOwner(Recipe recipe, AppUser currentUser) {
-        if (recipe.getOwner() == null || currentUser == null || currentUser.getId() == null
+        if (recipe.getOwner() == null) {
+            return;
+        }
+        if (currentUser == null || currentUser.getId() == null
                 || !currentUser.getId().equals(recipe.getOwner().getId())) {
             throw new ForbiddenException("Only own recipes can be planned.");
+        }
+    }
+
+    private void ensureMealPlanOwner(MealPlan mealPlan, AppUser currentUser) {
+        if (mealPlan.getOwner() == null || currentUser == null || currentUser.getId() == null
+                || !currentUser.getId().equals(mealPlan.getOwner().getId())) {
+            throw new ForbiddenException("Only own meal plan entries can be moved.");
         }
     }
 
@@ -156,5 +206,35 @@ public class MealPlanService {
             return mealPlanRepository.findByOwnerAndPlannedDate(currentUser, plannedDate);
         }
         return mealPlanRepository.findByOwnerAndPlannedDateAndMealSlot(currentUser, plannedDate, mealSlot);
+    }
+
+    private record MealPlanContent(Recipe recipe,
+                                   String customTitle,
+                                   Integer caloriesSnapshot,
+                                   Double proteinSnapshot,
+                                   String imageUrlSnapshot,
+                                   String externalRecipeId,
+                                   String externalSource) {
+        static MealPlanContent from(MealPlan mealPlan) {
+            return new MealPlanContent(
+                    mealPlan.getRecipe(),
+                    mealPlan.getCustomTitle(),
+                    mealPlan.getCaloriesSnapshot(),
+                    mealPlan.getProteinSnapshot(),
+                    mealPlan.getImageUrlSnapshot(),
+                    mealPlan.getExternalRecipeId(),
+                    mealPlan.getExternalSource()
+            );
+        }
+
+        void applyTo(MealPlan mealPlan) {
+            mealPlan.setRecipe(recipe);
+            mealPlan.setCustomTitle(customTitle);
+            mealPlan.setCaloriesSnapshot(caloriesSnapshot);
+            mealPlan.setProteinSnapshot(proteinSnapshot);
+            mealPlan.setImageUrlSnapshot(imageUrlSnapshot);
+            mealPlan.setExternalRecipeId(externalRecipeId);
+            mealPlan.setExternalSource(externalSource);
+        }
     }
 }

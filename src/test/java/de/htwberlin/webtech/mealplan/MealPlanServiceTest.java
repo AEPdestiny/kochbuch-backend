@@ -222,6 +222,91 @@ class MealPlanServiceTest {
     }
 
     @Test
+    @DisplayName("setRecipeForSlot should allow public seed recipe without owner")
+    void setRecipeForSlot_should_allow_public_seed_recipe_without_owner() {
+        AppUser owner = user(1L);
+        Recipe publicRecipe = recipe(10L, null);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        doReturn(publicRecipe).when(recipeRepository).findById(10L);
+        doReturn(Optional.empty()).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.LUNCH);
+
+        MealPlan result = underTest.setRecipeForSlot(owner, date, MealSlot.LUNCH, request(10L));
+
+        verify(recipeRepository).findById(10L);
+        verify(mealPlanRepository).findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.LUNCH);
+        verify(mealPlanRepository).persist(result);
+        assertSame(publicRecipe, result.getRecipe());
+        assertEquals(null, result.getCustomTitle());
+    }
+
+    @Test
+    @DisplayName("moveEntry should move entry into empty slot and preserve recipe")
+    void moveEntry_should_move_entry_into_empty_slot_and_preserve_recipe() {
+        AppUser owner = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        LocalDate tuesday = LocalDate.of(2026, 6, 2);
+        Recipe recipe = recipe(10L, owner);
+        MealPlan source = mealPlan(owner, recipe, monday);
+        source.setMealSlot(MealSlot.DINNER);
+        doReturn(Optional.of(source)).when(mealPlanRepository).findByIdOptional(1L);
+        doReturn(Optional.empty()).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, tuesday, MealSlot.BREAKFAST);
+        doReturn(List.of(source)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateBetween(owner, monday, monday.plusDays(6));
+
+        List<MealPlan> result = underTest.moveEntry(owner, 1L, tuesday, MealSlot.BREAKFAST, true);
+
+        assertEquals(tuesday, source.getPlannedDate());
+        assertEquals(MealSlot.BREAKFAST, source.getMealSlot());
+        assertSame(recipe, source.getRecipe());
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    @DisplayName("moveEntry should swap occupied target slot and preserve both recipes")
+    void moveEntry_should_swap_occupied_target_slot_and_preserve_both_recipes() {
+        AppUser owner = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        LocalDate tuesday = LocalDate.of(2026, 6, 2);
+        Recipe sourceRecipe = recipe(10L, owner);
+        Recipe targetRecipe = recipe(11L, owner);
+        MealPlan source = mealPlan(owner, sourceRecipe, monday);
+        source.setMealSlot(MealSlot.DINNER);
+        MealPlan target = mealPlan(owner, targetRecipe, tuesday);
+        target.setId(2L);
+        target.setMealSlot(MealSlot.BREAKFAST);
+        target.setCaloriesSnapshot(480);
+        doReturn(Optional.of(source)).when(mealPlanRepository).findByIdOptional(1L);
+        doReturn(Optional.of(target)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, tuesday, MealSlot.BREAKFAST);
+        doReturn(List.of(source, target)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateBetween(owner, monday, monday.plusDays(6));
+
+        List<MealPlan> result = underTest.moveEntry(owner, 1L, tuesday, MealSlot.BREAKFAST, true);
+
+        assertEquals(monday, source.getPlannedDate());
+        assertEquals(MealSlot.DINNER, source.getMealSlot());
+        assertSame(targetRecipe, source.getRecipe());
+        assertEquals(tuesday, target.getPlannedDate());
+        assertEquals(MealSlot.BREAKFAST, target.getMealSlot());
+        assertSame(sourceRecipe, target.getRecipe());
+        assertEquals(null, target.getCaloriesSnapshot());
+        assertEquals(2, result.size());
+    }
+
+    @Test
+    @DisplayName("moveEntry should reject foreign entry")
+    void moveEntry_should_reject_foreign_entry() {
+        AppUser owner = user(1L);
+        MealPlan source = mealPlan(user(2L), recipe(10L, user(2L)), LocalDate.of(2026, 6, 1));
+        doReturn(Optional.of(source)).when(mealPlanRepository).findByIdOptional(1L);
+
+        assertThrows(ForbiddenException.class,
+                () -> underTest.moveEntry(owner, 1L, LocalDate.of(2026, 6, 2), MealSlot.LUNCH, true));
+    }
+
+    @Test
     @DisplayName("setRecipeForDay should reject unknown recipe")
     void setRecipeForDay_should_reject_unknown_recipe() {
         doReturn(null).when(recipeRepository).findById(99L);

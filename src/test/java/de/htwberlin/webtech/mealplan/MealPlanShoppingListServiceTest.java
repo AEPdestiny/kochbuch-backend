@@ -57,6 +57,29 @@ class MealPlanShoppingListServiceTest {
     }
 
     @Test
+    @DisplayName("createShoppingList should use real planned recipe ingredients instead of needs review")
+    void createShoppingList_should_use_real_planned_recipe_ingredients_instead_of_needs_review() {
+        AppUser owner = user(1L);
+        LocalDate weekStart = LocalDate.of(2026, 6, 1);
+        doReturn(List.of(
+                mealPlan(owner, recipe("Tomato Pasta", "200 g Tomaten\n1 Zehe Knoblauch")),
+                mealPlan(owner, recipe("Rice Bowl", "150 g Reis"))
+        )).when(mealPlanRepository).findByOwnerAndPlannedDateBetween(owner, weekStart, weekStart.plusDays(6));
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(owner);
+        doReturn(List.of()).when(shoppingListItemRepository).findByOwner(owner);
+
+        MealPlanShoppingListResponse result = underTest.createShoppingList(owner, weekStart);
+
+        ArgumentCaptor<ShoppingListItem> captor = ArgumentCaptor.forClass(ShoppingListItem.class);
+        verify(shoppingListItemRepository, org.mockito.Mockito.times(3)).persist(captor.capture());
+        assertEquals(3, result.getAdded().size());
+        assertEquals(0, result.getNeedsReview().size());
+        assertEquals(List.of("Tomaten", "Knoblauch", "Reis"), captor.getAllValues().stream()
+                .map(ShoppingListItem::getName)
+                .toList());
+    }
+
+    @Test
     @DisplayName("createShoppingList should skip ingredient fully covered by pantry")
     void createShoppingList_should_skip_covered_ingredient() {
         AppUser owner = user(1L);

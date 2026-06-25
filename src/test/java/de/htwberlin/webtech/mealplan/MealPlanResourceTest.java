@@ -357,6 +357,58 @@ class MealPlanResourceTest {
     }
 
     @Test
+    void moveEntry_should_return_updated_week_for_own_entry() {
+        AppUser currentUser = user(1L);
+        LocalDate tuesday = LocalDate.of(2026, 6, 2);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        MealPlan moved = mealPlan(currentUser, recipe(10L, currentUser), tuesday);
+        moved.setMealSlot(MealSlot.BREAKFAST);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(monday).when(mealPlanService).normalizeWeekStart(tuesday);
+        doReturn(List.of(moved)).when(mealPlanService)
+                .moveEntry(currentUser, 1L, tuesday, MealSlot.BREAKFAST, true);
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "targetDate": "2026-06-02",
+                          "targetSlot": "breakfast",
+                          "swapIfOccupied": true
+                        }
+                        """)
+                .when().patch("/meal-plan/entries/1/move")
+                .then()
+                .statusCode(200)
+                .body("weekStart", equalTo("2026-06-01"))
+                .body("weekEnd", equalTo("2026-06-07"))
+                .body("entries", hasSize(1))
+                .body("entries[0].plannedDate", equalTo("2026-06-02"))
+                .body("entries[0].mealSlot", equalTo("breakfast"))
+                .body("entries[0].recipe.id", equalTo(10));
+    }
+
+    @Test
+    void moveEntry_should_return_bad_request_for_missing_target() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "targetSlot": "breakfast"
+                        }
+                        """)
+                .when().patch("/meal-plan/entries/1/move")
+                .then()
+                .statusCode(400)
+                .body("message", equalTo("targetDate and targetSlot must be provided."));
+    }
+
+    @Test
     void createShoppingListFromWeek_should_return_unauthorized_without_token() {
         doThrow(new UnauthorizedException("Missing or invalid Bearer token."))
                 .when(userContext).requireUser(null);
