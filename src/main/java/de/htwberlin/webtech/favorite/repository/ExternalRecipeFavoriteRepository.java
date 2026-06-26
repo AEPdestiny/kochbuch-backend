@@ -16,7 +16,7 @@ public class ExternalRecipeFavoriteRepository implements PanacheRepository<Exter
     }
 
     public Optional<ExternalRecipeFavorite> findByOwnerAndSourceAndExternalRecipeId(AppUser owner, String source, String externalRecipeId) {
-        return find("owner = ?1 and externalSource = ?2 and externalRecipeId = ?3", owner, source, externalRecipeId)
+        return find("owner = ?1 and upper(externalSource) = ?2 and externalRecipeId = ?3", owner, source.toUpperCase(), externalRecipeId)
                 .firstResultOptional();
     }
 }
