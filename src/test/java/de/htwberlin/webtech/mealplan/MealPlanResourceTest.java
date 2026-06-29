@@ -26,7 +26,10 @@ import java.util.List;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -290,6 +293,156 @@ class MealPlanResourceTest {
                 .body("mealSlot", equalTo("snack"))
                 .body("customTitle", equalTo("Sushi frei"))
                 .body("calories", equalTo(480));
+    }
+
+    @Test
+    void putSlot_should_return_ok_for_custom_title_without_calories() {
+        AppUser currentUser = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        MealPlan mealPlan = mealPlan(currentUser, null, date);
+        mealPlan.setMealSlot(MealSlot.SNACK);
+        mealPlan.setCustomTitle("Lasagne");
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(mealPlan)
+                .when(mealPlanService).setRecipeForSlot(eq(currentUser), eq(date), eq(MealSlot.SNACK), any(MealPlanEntryRequest.class));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "customTitle": "Lasagne"
+                        }
+                        """)
+                .when().put("/meal-plan/days/2026-06-01/slots/snack")
+                .then()
+                .statusCode(200)
+                .body("customTitle", equalTo("Lasagne"))
+                .body("calories", nullValue());
+    }
+
+    @Test
+    void putSlot_should_return_bad_request_for_negative_caloriesSnapshot() {
+        AppUser currentUser = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doThrow(new IllegalArgumentException("caloriesSnapshot must be greater than or equal to 0."))
+                .when(mealPlanService).setRecipeForSlot(eq(currentUser), eq(date), eq(MealSlot.SNACK), any(MealPlanEntryRequest.class));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "customTitle": "Sushi",
+                          "caloriesSnapshot": -1
+                        }
+                        """)
+                .when().put("/meal-plan/days/2026-06-01/slots/snack")
+                .then()
+                .statusCode(400)
+                .body("status", equalTo(400))
+                .body("error", equalTo("Bad Request"))
+                .body("message", equalTo("caloriesSnapshot must be greater than or equal to 0."))
+                .body("path", equalTo("/meal-plan/days/2026-06-01/slots/snack"));
+    }
+
+    @Test
+    void putSlot_should_return_ok_when_updating_calories_to_new_value() {
+        AppUser currentUser = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        MealPlan mealPlan = mealPlan(currentUser, null, date);
+        mealPlan.setMealSlot(MealSlot.LUNCH);
+        mealPlan.setCustomTitle("Pasta");
+        mealPlan.setCaloriesSnapshot(750);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(mealPlan)
+                .when(mealPlanService).setRecipeForSlot(eq(currentUser), eq(date), eq(MealSlot.LUNCH), any(MealPlanEntryRequest.class));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "customTitle": "Pasta",
+                          "caloriesSnapshot": 750
+                        }
+                        """)
+                .when().put("/meal-plan/days/2026-06-01/slots/lunch")
+                .then()
+                .statusCode(200)
+                .body("calories", equalTo(750));
+    }
+
+    @Test
+    void putSlot_should_return_ok_when_clearing_calories() {
+        AppUser currentUser = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        MealPlan mealPlan = mealPlan(currentUser, null, date);
+        mealPlan.setMealSlot(MealSlot.LUNCH);
+        mealPlan.setCustomTitle("Pasta");
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(mealPlan)
+                .when(mealPlanService).setRecipeForSlot(eq(currentUser), eq(date), eq(MealSlot.LUNCH), any(MealPlanEntryRequest.class));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "customTitle": "Pasta"
+                        }
+                        """)
+                .when().put("/meal-plan/days/2026-06-01/slots/lunch")
+                .then()
+                .statusCode(200)
+                .body("calories", nullValue());
+    }
+
+    @Test
+    void getWeek_should_include_day_and_week_calorie_totals() {
+        AppUser currentUser = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        MealPlan freeText = mealPlan(currentUser, null, monday);
+        freeText.setMealSlot(MealSlot.SNACK);
+        freeText.setCustomTitle("Sushi frei");
+        freeText.setCaloriesSnapshot(480);
+        Recipe recipeWithCalories = recipe(10L, currentUser);
+        recipeWithCalories.setCalories(520);
+        MealPlan recipeEntry = mealPlan(currentUser, recipeWithCalories, monday);
+        recipeEntry.setId(2L);
+        recipeEntry.setMealSlot(MealSlot.DINNER);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(monday).when(mealPlanService).normalizeWeekStart(null);
+        doReturn(List.of(freeText, recipeEntry)).when(mealPlanService).getWeek(currentUser, monday);
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .when().get("/meal-plan/week")
+                .then()
+                .statusCode(200)
+                .body("caloriesByDate.'" + monday + "'", equalTo(1000))
+                .body("totalCalories", equalTo(1000));
+    }
+
+    @Test
+    void getWeek_should_not_count_entries_without_calories_in_totals() {
+        AppUser currentUser = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        MealPlan noCalories = mealPlan(currentUser, null, monday);
+        noCalories.setMealSlot(MealSlot.SNACK);
+        noCalories.setCustomTitle("Unbekannt");
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(monday).when(mealPlanService).normalizeWeekStart(null);
+        doReturn(List.of(noCalories)).when(mealPlanService).getWeek(currentUser, monday);
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .when().get("/meal-plan/week")
+                .then()
+                .statusCode(200)
+                .body("caloriesByDate", not(hasKey(monday.toString())))
+                .body("totalCalories", equalTo(0));
     }
 
     @Test

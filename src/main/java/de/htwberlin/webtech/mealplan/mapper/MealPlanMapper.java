@@ -8,6 +8,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class MealPlanMapper {
@@ -37,12 +39,24 @@ public class MealPlanMapper {
     }
 
     public MealPlanWeekResponse toWeekResponse(LocalDate weekStart, LocalDate weekEnd, List<MealPlan> entries) {
+        List<MealPlanEntryResponse> entryResponses = entries.stream()
+                .map(this::toResponse)
+                .toList();
+
+        Map<String, Integer> caloriesByDate = entryResponses.stream()
+                .filter(e -> e.getCalories() != null)
+                .collect(Collectors.groupingBy(
+                        e -> e.getPlannedDate().toString(),
+                        Collectors.summingInt(MealPlanEntryResponse::getCalories)
+                ));
+        int totalCalories = caloriesByDate.values().stream().mapToInt(Integer::intValue).sum();
+
         MealPlanWeekResponse response = new MealPlanWeekResponse();
         response.setWeekStart(weekStart);
         response.setWeekEnd(weekEnd);
-        response.setEntries(entries.stream()
-                .map(this::toResponse)
-                .toList());
+        response.setEntries(entryResponses);
+        response.setCaloriesByDate(caloriesByDate);
+        response.setTotalCalories(totalCalories);
         return response;
     }
 

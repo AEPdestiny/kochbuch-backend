@@ -318,6 +318,72 @@ class MealPlanServiceTest {
     }
 
     @Test
+    @DisplayName("setRecipeForSlot should reject negative caloriesSnapshot")
+    void setRecipeForSlot_should_reject_negative_caloriesSnapshot() {
+        AppUser owner = user(1L);
+        MealPlanEntryRequest request = customRequest("Sushi Abend");
+        request.setCaloriesSnapshot(-1);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> underTest.setRecipeForSlot(owner, LocalDate.of(2026, 6, 1), MealSlot.LUNCH, request));
+
+        verifyNoMoreInteractions(mealPlanRepository, recipeRepository);
+    }
+
+    @Test
+    @DisplayName("setRecipeForSlot should allow zero caloriesSnapshot")
+    void setRecipeForSlot_should_allow_zero_caloriesSnapshot() {
+        AppUser owner = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        doReturn(Optional.empty()).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.LUNCH);
+        MealPlanEntryRequest request = customRequest("Wasser-Diät");
+        request.setCaloriesSnapshot(0);
+
+        MealPlan result = underTest.setRecipeForSlot(owner, date, MealSlot.LUNCH, request);
+
+        assertEquals(0, result.getCaloriesSnapshot());
+    }
+
+    @Test
+    @DisplayName("setRecipeForSlot should update caloriesSnapshot to new value")
+    void setRecipeForSlot_should_update_caloriesSnapshot_to_new_value() {
+        AppUser owner = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        MealPlan existing = mealPlan(owner, null, date);
+        existing.setMealSlot(MealSlot.LUNCH);
+        existing.setCustomTitle("Alt");
+        existing.setCaloriesSnapshot(300);
+        doReturn(Optional.of(existing)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.LUNCH);
+        MealPlanEntryRequest request = customRequest("Neu");
+        request.setCaloriesSnapshot(750);
+
+        MealPlan result = underTest.setRecipeForSlot(owner, date, MealSlot.LUNCH, request);
+
+        assertSame(existing, result);
+        assertEquals(750, result.getCaloriesSnapshot());
+    }
+
+    @Test
+    @DisplayName("setRecipeForSlot should clear caloriesSnapshot when omitted on update")
+    void setRecipeForSlot_should_clear_caloriesSnapshot_when_omitted_on_update() {
+        AppUser owner = user(1L);
+        LocalDate date = LocalDate.of(2026, 6, 1);
+        MealPlan existing = mealPlan(owner, null, date);
+        existing.setMealSlot(MealSlot.LUNCH);
+        existing.setCustomTitle("Alt");
+        existing.setCaloriesSnapshot(300);
+        doReturn(Optional.of(existing)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, date, MealSlot.LUNCH);
+
+        MealPlan result = underTest.setRecipeForSlot(owner, date, MealSlot.LUNCH, customRequest("Neu"));
+
+        assertSame(existing, result);
+        assertEquals(null, result.getCaloriesSnapshot());
+    }
+
+    @Test
     @DisplayName("setRecipeForDay should reject missing recipe id")
     void setRecipeForDay_should_reject_missing_recipe_id() {
         assertThrows(IllegalArgumentException.class,
