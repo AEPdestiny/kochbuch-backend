@@ -27,6 +27,7 @@ public class RecipeRequest {
     private String instructions;
     private boolean favorite;
     private boolean published;
+    @Min(value = 0, message = "must be greater than or equal to 0")
     private Integer calories;
     private Double protein;
     private Double alcohol;

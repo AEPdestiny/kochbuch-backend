@@ -28,6 +28,7 @@ import java.util.Optional;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -455,6 +456,106 @@ class RecipeResourceTest {
     }
 
     @Test
+    void create_should_return_ok_without_calories() {
+        AppUser currentUser = user();
+        Recipe created = recipe("Pasta");
+        created.setOwner(currentUser);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(created).when(recipeService).create(any(), any());
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "title": "Pasta",
+                          "imageUrl": "",
+                          "prepTimeMinutes": 10,
+                          "cookTimeMinutes": 20,
+                          "servings": 2,
+                          "difficulty": "easy",
+                          "category": "Italian",
+                          "rating": 4.5,
+                          "ingredients": "noodles",
+                          "instructions": "cook",
+                          "favorite": false,
+                          "published": true
+                        }
+                """)
+                .when().post("/recipes")
+                .then()
+                .statusCode(201)
+                .body("title", equalTo("Pasta"))
+                .body("calories", nullValue());
+    }
+
+    @Test
+    void create_should_save_and_return_calories_when_provided() {
+        AppUser currentUser = user();
+        Recipe created = recipe("Pasta");
+        created.setOwner(currentUser);
+        created.setCalories(480);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(created).when(recipeService).create(any(), any());
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "title": "Pasta",
+                          "imageUrl": "",
+                          "prepTimeMinutes": 10,
+                          "cookTimeMinutes": 20,
+                          "servings": 2,
+                          "difficulty": "easy",
+                          "category": "Italian",
+                          "rating": 4.5,
+                          "ingredients": "noodles",
+                          "instructions": "cook",
+                          "favorite": false,
+                          "published": true,
+                          "calories": 480
+                        }
+                """)
+                .when().post("/recipes")
+                .then()
+                .statusCode(201)
+                .body("title", equalTo("Pasta"))
+                .body("calories", equalTo(480));
+    }
+
+    @Test
+    void create_should_return_bad_request_when_calories_is_negative() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                          "title": "Pasta",
+                          "imageUrl": "",
+                          "prepTimeMinutes": 10,
+                          "cookTimeMinutes": 20,
+                          "servings": 2,
+                          "difficulty": "easy",
+                          "category": "Italian",
+                          "rating": 4.5,
+                          "ingredients": "noodles",
+                          "instructions": "cook",
+                          "favorite": false,
+                          "published": true,
+                          "calories": -5
+                        }
+                        """)
+                .when().post("/recipes")
+                .then()
+                .statusCode(400)
+                .body("status", equalTo(400))
+                .body("error", equalTo("Bad Request"))
+                .body("message", equalTo("Validation failed: calories must be greater than or equal to 0"))
+                .body("path", equalTo("/recipes"));
+    }
+
+    @Test
     void create_should_return_unauthorized_without_token() {
         doThrow(new UnauthorizedException("Missing or invalid Bearer token."))
                 .when(userContext).requireUser(null);
@@ -518,6 +619,107 @@ class RecipeResourceTest {
                 .statusCode(200)
                 .body("title", equalTo("Updated"))
                 .body("ownedByCurrentUser", equalTo(true));
+    }
+
+    @Test
+    void update_should_save_and_return_calories_when_provided() {
+        AppUser currentUser = user();
+        Recipe updated = recipe("Updated");
+        updated.setOwner(currentUser);
+        updated.setCalories(610);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(updated).when(recipeService).update(eq(1L), any(), any());
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "title": "Updated",
+                          "imageUrl": "",
+                          "prepTimeMinutes": 10,
+                          "cookTimeMinutes": 20,
+                          "servings": 2,
+                          "difficulty": "easy",
+                          "category": "Italian",
+                          "rating": 4.5,
+                          "ingredients": "noodles",
+                          "instructions": "cook",
+                          "favorite": false,
+                          "published": true,
+                          "calories": 610
+                        }
+                        """)
+                .when().put("/recipes/1")
+                .then()
+                .statusCode(200)
+                .body("title", equalTo("Updated"))
+                .body("calories", equalTo(610));
+    }
+
+    @Test
+    void update_should_clear_calories_when_omitted() {
+        AppUser currentUser = user();
+        Recipe updated = recipe("Updated");
+        updated.setOwner(currentUser);
+        updated.setCalories(null);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(updated).when(recipeService).update(eq(1L), any(), any());
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "title": "Updated",
+                          "imageUrl": "",
+                          "prepTimeMinutes": 10,
+                          "cookTimeMinutes": 20,
+                          "servings": 2,
+                          "difficulty": "easy",
+                          "category": "Italian",
+                          "rating": 4.5,
+                          "ingredients": "noodles",
+                          "instructions": "cook",
+                          "favorite": false,
+                          "published": true
+                        }
+                        """)
+                .when().put("/recipes/1")
+                .then()
+                .statusCode(200)
+                .body("title", equalTo("Updated"))
+                .body("calories", nullValue());
+    }
+
+    @Test
+    void update_should_return_bad_request_when_calories_is_negative() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                          "title": "Updated",
+                          "imageUrl": "",
+                          "prepTimeMinutes": 10,
+                          "cookTimeMinutes": 20,
+                          "servings": 2,
+                          "difficulty": "easy",
+                          "category": "Italian",
+                          "rating": 4.5,
+                          "ingredients": "noodles",
+                          "instructions": "cook",
+                          "favorite": false,
+                          "published": true,
+                          "calories": -1
+                        }
+                        """)
+                .when().put("/recipes/1")
+                .then()
+                .statusCode(400)
+                .body("status", equalTo(400))
+                .body("error", equalTo("Bad Request"))
+                .body("message", equalTo("Validation failed: calories must be greater than or equal to 0"))
+                .body("path", equalTo("/recipes/1"));
     }
 
     @Test

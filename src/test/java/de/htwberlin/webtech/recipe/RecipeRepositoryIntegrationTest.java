@@ -184,6 +184,33 @@ class RecipeRepositoryIntegrationTest {
 
     @Test
     @TestTransaction
+    void should_save_and_read_recipe_with_calories() {
+        Recipe recipe = recipe("Calorie Pasta", true);
+        recipe.setCalories(540);
+
+        repository.persistAndFlush(recipe);
+        repository.getEntityManager().clear();
+        Recipe found = repository.findById(recipe.getId());
+
+        assertNotNull(found);
+        assertEquals(540, found.getCalories());
+    }
+
+    @Test
+    @TestTransaction
+    void should_save_and_read_recipe_without_calories() {
+        Recipe recipe = recipe("No Calorie Info Pasta", true);
+
+        repository.persistAndFlush(recipe);
+        repository.getEntityManager().clear();
+        Recipe found = repository.findById(recipe.getId());
+
+        assertNotNull(found);
+        assertNull(found.getCalories());
+    }
+
+    @Test
+    @TestTransaction
     void should_save_long_seed_recipe_fields() {
         Recipe recipe = recipe("Long Seed Recipe " + "x".repeat(260), true);
         recipe.setImageUrl("https://example.com/" + "image-path-".repeat(80) + ".jpg");
