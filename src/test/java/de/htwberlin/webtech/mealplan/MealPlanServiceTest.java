@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -293,6 +294,79 @@ class MealPlanServiceTest {
         assertSame(sourceRecipe, target.getRecipe());
         assertEquals(null, target.getCaloriesSnapshot());
         assertEquals(2, result.size());
+    }
+
+    @Test
+    @DisplayName("moveEntry should preserve customTitle and caloriesSnapshot when moving to empty slot")
+    void moveEntry_should_preserve_customTitle_and_caloriesSnapshot() {
+        AppUser owner = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        LocalDate tuesday = LocalDate.of(2026, 6, 2);
+        MealPlan source = mealPlan(owner, null, monday);
+        source.setCustomTitle("Sushi Abend");
+        source.setCaloriesSnapshot(480);
+        source.setMealSlot(MealSlot.DINNER);
+        doReturn(Optional.of(source)).when(mealPlanRepository).findByIdOptional(1L);
+        doReturn(Optional.empty()).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, tuesday, MealSlot.BREAKFAST);
+        doReturn(List.of(source)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateBetween(owner, monday, monday.plusDays(6));
+
+        underTest.moveEntry(owner, 1L, tuesday, MealSlot.BREAKFAST, true);
+
+        assertEquals(tuesday, source.getPlannedDate());
+        assertEquals(MealSlot.BREAKFAST, source.getMealSlot());
+        assertEquals("Sushi Abend", source.getCustomTitle());
+        assertEquals(480, source.getCaloriesSnapshot());
+        assertNull(source.getRecipe());
+    }
+
+    @Test
+    @DisplayName("moveEntry should preserve caloriesSnapshot on both sides during swap")
+    void moveEntry_should_preserve_caloriesSnapshot_during_swap() {
+        AppUser owner = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        LocalDate tuesday = LocalDate.of(2026, 6, 2);
+        MealPlan source = mealPlan(owner, null, monday);
+        source.setCustomTitle("Quelle");
+        source.setCaloriesSnapshot(300);
+        source.setMealSlot(MealSlot.DINNER);
+        MealPlan target = mealPlan(owner, null, tuesday);
+        target.setId(2L);
+        target.setCustomTitle("Ziel");
+        target.setCaloriesSnapshot(600);
+        target.setMealSlot(MealSlot.LUNCH);
+        doReturn(Optional.of(source)).when(mealPlanRepository).findByIdOptional(1L);
+        doReturn(Optional.of(target)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, tuesday, MealSlot.LUNCH);
+        doReturn(List.of(source, target)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateBetween(owner, monday, monday.plusDays(6));
+
+        underTest.moveEntry(owner, 1L, tuesday, MealSlot.LUNCH, true);
+
+        assertEquals("Ziel", source.getCustomTitle());
+        assertEquals(600, source.getCaloriesSnapshot());
+        assertEquals("Quelle", target.getCustomTitle());
+        assertEquals(300, target.getCaloriesSnapshot());
+    }
+
+    @Test
+    @DisplayName("moveEntry should move entry to a different slot on same day")
+    void moveEntry_should_move_to_different_slot_on_same_day() {
+        AppUser owner = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        MealPlan source = mealPlan(owner, recipe(10L, owner), monday);
+        source.setMealSlot(MealSlot.DINNER);
+        doReturn(Optional.of(source)).when(mealPlanRepository).findByIdOptional(1L);
+        doReturn(Optional.empty()).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateAndMealSlot(owner, monday, MealSlot.LUNCH);
+        doReturn(List.of(source)).when(mealPlanRepository)
+                .findByOwnerAndPlannedDateBetween(owner, monday, monday.plusDays(6));
+
+        underTest.moveEntry(owner, 1L, monday, MealSlot.LUNCH, true);
+
+        assertEquals(monday, source.getPlannedDate());
+        assertEquals(MealSlot.LUNCH, source.getMealSlot());
     }
 
     @Test

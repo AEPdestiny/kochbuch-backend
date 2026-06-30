@@ -543,6 +543,122 @@ class MealPlanResourceTest {
     }
 
     @Test
+    void moveEntry_should_preserve_free_text_entry_with_caloriesSnapshot() {
+        AppUser currentUser = user(1L);
+        LocalDate tuesday = LocalDate.of(2026, 6, 2);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        MealPlan moved = mealPlan(currentUser, null, tuesday);
+        moved.setMealSlot(MealSlot.BREAKFAST);
+        moved.setCustomTitle("Sushi frei");
+        moved.setCaloriesSnapshot(480);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(monday).when(mealPlanService).normalizeWeekStart(tuesday);
+        doReturn(List.of(moved)).when(mealPlanService)
+                .moveEntry(currentUser, 1L, tuesday, MealSlot.BREAKFAST, true);
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "targetDate": "2026-06-02",
+                          "targetSlot": "breakfast",
+                          "swapIfOccupied": true
+                        }
+                        """)
+                .when().patch("/meal-plan/entries/1/move")
+                .then()
+                .statusCode(200)
+                .body("entries[0].customTitle", equalTo("Sushi frei"))
+                .body("entries[0].calories", equalTo(480))
+                .body("entries[0].mealSlot", equalTo("breakfast"))
+                .body("entries[0].plannedDate", equalTo("2026-06-02"));
+    }
+
+    @Test
+    void moveEntry_should_return_updated_week_for_recipe_on_different_day() {
+        AppUser currentUser = user(1L);
+        LocalDate thursday = LocalDate.of(2026, 6, 4);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        MealPlan moved = mealPlan(currentUser, recipe(10L, currentUser), thursday);
+        moved.setMealSlot(MealSlot.DINNER);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(monday).when(mealPlanService).normalizeWeekStart(thursday);
+        doReturn(List.of(moved)).when(mealPlanService)
+                .moveEntry(currentUser, 1L, thursday, MealSlot.DINNER, false);
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "targetDate": "2026-06-04",
+                          "targetSlot": "dinner",
+                          "swapIfOccupied": false
+                        }
+                        """)
+                .when().patch("/meal-plan/entries/1/move")
+                .then()
+                .statusCode(200)
+                .body("weekStart", equalTo("2026-06-01"))
+                .body("entries[0].plannedDate", equalTo("2026-06-04"))
+                .body("entries[0].recipe.id", equalTo(10));
+    }
+
+    @Test
+    void moveEntry_should_return_not_found_for_unknown_entry() {
+        AppUser currentUser = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(monday).when(mealPlanService).normalizeWeekStart(LocalDate.of(2026, 6, 2));
+        doThrow(new MealPlanEntryNotFoundException(99L))
+                .when(mealPlanService).moveEntry(eq(currentUser), eq(99L), any(), any(), eq(true));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "targetDate": "2026-06-02",
+                          "targetSlot": "dinner",
+                          "swapIfOccupied": true
+                        }
+                        """)
+                .when().patch("/meal-plan/entries/99/move")
+                .then()
+                .statusCode(404)
+                .body("status", equalTo(404))
+                .body("error", equalTo("Not Found"))
+                .body("path", equalTo("/meal-plan/entries/99/move"));
+    }
+
+    @Test
+    void moveEntry_should_return_forbidden_for_foreign_entry() {
+        AppUser currentUser = user(1L);
+        LocalDate monday = LocalDate.of(2026, 6, 1);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(monday).when(mealPlanService).normalizeWeekStart(LocalDate.of(2026, 6, 2));
+        doThrow(new ForbiddenException("Only own meal plan entries can be moved."))
+                .when(mealPlanService).moveEntry(eq(currentUser), eq(1L), any(), any(), eq(true));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "targetDate": "2026-06-02",
+                          "targetSlot": "dinner",
+                          "swapIfOccupied": true
+                        }
+                        """)
+                .when().patch("/meal-plan/entries/1/move")
+                .then()
+                .statusCode(403)
+                .body("status", equalTo(403))
+                .body("message", equalTo("Only own meal plan entries can be moved."));
+    }
+
+    @Test
     void moveEntry_should_return_bad_request_for_missing_target() {
         AppUser currentUser = user(1L);
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
