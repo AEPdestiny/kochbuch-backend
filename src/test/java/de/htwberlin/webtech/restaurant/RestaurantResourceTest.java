@@ -189,7 +189,7 @@ class RestaurantResourceTest {
                 .body("status", equalTo("no_results"))
                 .body("results", hasSize(0));
 
-        verify(tavilyRestaurantSearchService, never()).search(any(), any());
+        verify(tavilyRestaurantSearchService, never()).search(any(), any(), any(), any());
     }
 
     @Test
@@ -198,7 +198,7 @@ class RestaurantResourceTest {
         RestaurantResponse restaurant = tavilyRestaurant();
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
         doReturn(new TavilyRestaurantSearchResponse("ok", List.of(restaurant)))
-                .when(tavilyRestaurantSearchService).search(any(), any());
+                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any());
 
         given()
                 .header("Authorization", "Bearer valid-token")
@@ -217,7 +217,7 @@ class RestaurantResourceTest {
         AppUser currentUser = user(1L);
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
         doReturn(new TavilyRestaurantSearchResponse("unavailable", List.of()))
-                .when(tavilyRestaurantSearchService).search(any(), any());
+                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any());
 
         given()
                 .header("Authorization", "Bearer valid-token")

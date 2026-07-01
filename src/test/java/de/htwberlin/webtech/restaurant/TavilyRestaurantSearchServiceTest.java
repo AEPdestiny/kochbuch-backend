@@ -1,7 +1,13 @@
 package de.htwberlin.webtech.restaurant;
 
+import de.htwberlin.webtech.restaurant.client.GeoapifyClient;
+import de.htwberlin.webtech.restaurant.client.GeoapifyClientException;
 import de.htwberlin.webtech.restaurant.client.TavilyRestaurantSearchClient;
 import de.htwberlin.webtech.restaurant.client.TavilyRestaurantSearchClient.TavilyRestaurantResult;
+import de.htwberlin.webtech.restaurant.client.dto.GeoapifyFeature;
+import de.htwberlin.webtech.restaurant.client.dto.GeoapifyGeometry;
+import de.htwberlin.webtech.restaurant.client.dto.GeoapifyProperties;
+import de.htwberlin.webtech.restaurant.client.dto.GeoapifyResponse;
 import de.htwberlin.webtech.restaurant.dto.RestaurantResponse;
 import de.htwberlin.webtech.restaurant.dto.TavilyRestaurantSearchResponse;
 import de.htwberlin.webtech.restaurant.service.TavilyRestaurantSearchService;
@@ -12,15 +18,22 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
 class TavilyRestaurantSearchServiceTest {
 
     private final TavilyRestaurantSearchClient client = mock(TavilyRestaurantSearchClient.class);
-    private final TavilyRestaurantSearchService underTest = new TavilyRestaurantSearchService(client);
+    private final GeoapifyClient geoapifyClient = mock(GeoapifyClient.class);
+    private final TavilyRestaurantSearchService underTest = new TavilyRestaurantSearchService(client, geoapifyClient);
 
     @BeforeEach
     void setUp() {
@@ -34,7 +47,7 @@ class TavilyRestaurantSearchServiceTest {
     void search_returns_unavailable_when_not_configured() {
         doReturn(false).when(client).isConfigured();
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals("unavailable", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -47,7 +60,7 @@ class TavilyRestaurantSearchServiceTest {
                 new TavilyRestaurantResult("Hotel Mitte Berlin", "https://hotel.de", "Luxury hotel with spa.")
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -64,7 +77,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals("ok", result.getStatus());
         assertEquals(1, result.getResults().size());
@@ -83,7 +96,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals(1, result.getResults().size());
         assertEquals("Il Ristorante", result.getResults().getFirst().getName());
@@ -100,7 +113,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals(1, result.getResults().size());
     }
@@ -116,7 +129,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Kimbap – koreanisches Sushi", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Kimbap – koreanisches Sushi", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Kimbap – koreanisches Sushi", "Berlin", null, null);
 
         assertEquals(1, result.getResults().size());
     }
@@ -134,7 +147,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Sushi Bowl", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Sushi Bowl", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi Bowl", "Berlin", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -151,7 +164,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -168,7 +181,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Kimbap – koreanisches Sushi", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Kimbap – koreanisches Sushi", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Kimbap – koreanisches Sushi", "Berlin", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -185,7 +198,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -204,7 +217,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         RestaurantResponse restaurant = result.getResults().getFirst();
         assertNull(restaurant.getDistanceMeters());
@@ -223,7 +236,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         String url = result.getResults().getFirst().getGoogleMapsUrl();
         assertTrue(url.startsWith("https://www.google.com/maps/search/?api=1&query="));
@@ -241,7 +254,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Döner Kebab", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Döner Kebab", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Döner Kebab", "Berlin", null, null);
 
         assertEquals("Kebab King", result.getResults().getFirst().getName());
     }
@@ -259,7 +272,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Miesmuscheln in Beurre Blanc", "München");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München");
+        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -276,7 +289,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Miesmuscheln in Beurre Blanc", "München");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München");
+        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -293,7 +306,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -310,7 +323,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -327,7 +340,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals(1, result.getResults().size());
         assertEquals("ARME RITTER BERLIN", result.getResults().getFirst().getName());
@@ -344,7 +357,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals(1, result.getResults().size());
         assertEquals("Trattoria Mario", result.getResults().getFirst().getName());
@@ -361,7 +374,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals(1, result.getResults().size());
         assertEquals("Trattoria Mario", result.getResults().getFirst().getName());
@@ -378,7 +391,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -397,7 +410,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Miesmuscheln in Beurre Blanc", "München");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München");
+        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München", null, null);
 
         assertEquals(1, result.getResults().size());
         assertEquals("Restaurant Fischer Ammersee", result.getResults().getFirst().getName());
@@ -414,7 +427,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals(1, result.getResults().size());
         assertEquals("Trattoria Mario", result.getResults().getFirst().getName());
@@ -431,7 +444,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Miesmuscheln in Beurre Blanc", "München");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München");
+        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München", null, null);
 
         assertEquals(1, result.getResults().size());
         assertEquals("Café Am See", result.getResults().getFirst().getName());
@@ -448,7 +461,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Wiener Schnitzel", "Wien");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Wiener Schnitzel", "Wien");
+        TavilyRestaurantSearchResponse result = underTest.search("Wiener Schnitzel", "Wien", null, null);
 
         assertEquals(1, result.getResults().size());
         assertEquals("Gasthaus Zur Post", result.getResults().getFirst().getName());
@@ -465,7 +478,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Miesmuscheln in Beurre Blanc", "München");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München");
+        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -482,7 +495,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Miesmuscheln in Beurre Blanc", "München");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München");
+        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -499,7 +512,7 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Pasta Carbonara", "Berlin");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin");
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
@@ -516,9 +529,130 @@ class TavilyRestaurantSearchServiceTest {
                 )
         )).when(client).search("Miesmuscheln in Beurre Blanc", "München");
 
-        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München");
+        TavilyRestaurantSearchResponse result = underTest.search("Miesmuscheln in Beurre Blanc", "München", null, null);
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
+    }
+
+    // === Geoapify enrichment ===
+
+    @Test
+    @DisplayName("enriches result with address and distance when user coordinates are provided and Geoapify returns a match")
+    void enriches_result_with_geoapify_when_user_coords_present() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Pasta Palace Berlin",
+                        "https://pasta-palace.de",
+                        "Best Carbonara in Berlin. Restaurant menu."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+        doReturn(geoapifyResponse(52.5201, 13.4052, "Pasta Palace, Musterstraße 1, Berlin"))
+                .when(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        RestaurantResponse restaurant = result.getResults().getFirst();
+        assertEquals("Pasta Palace Berlin", restaurant.getName());
+        assertEquals("Pasta Palace, Musterstraße 1, Berlin", restaurant.getAddress());
+        assertNotNull(restaurant.getDistanceMeters());
+        assertTrue(restaurant.getDistanceMeters() > 0);
+        assertNotNull(restaurant.getLatitude());
+        assertNotNull(restaurant.getLongitude());
+    }
+
+    @Test
+    @DisplayName("returns result without Geoapify data when user coordinates are absent")
+    void returns_result_without_geoapify_when_no_user_coords() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Pasta Palace Berlin",
+                        "https://pasta-palace.de",
+                        "Pasta Carbonara on our menu. Restaurant in Berlin."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
+
+        RestaurantResponse restaurant = result.getResults().getFirst();
+        assertNull(restaurant.getDistanceMeters());
+        assertNull(restaurant.getLatitude());
+        assertNull(restaurant.getLongitude());
+    }
+
+    @Test
+    @DisplayName("keeps result when Geoapify throws GeoapifyClientException (API key not configured)")
+    void keeps_result_when_geoapify_not_configured() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Pasta Palace Berlin",
+                        "https://pasta-palace.de",
+                        "Best Carbonara in Berlin. Restaurant menu."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+        doThrow(new GeoapifyClientException("Geoapify API key not configured"))
+                .when(geoapifyClient).searchRestaurants(any(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        assertEquals("ok", result.getStatus());
+        assertEquals(1, result.getResults().size());
+        assertNull(result.getResults().getFirst().getDistanceMeters());
+    }
+
+    @Test
+    @DisplayName("generates route Maps URL when user coords and restaurant coords are both available")
+    void generates_route_maps_url_when_all_coords_available() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Pasta Palace Berlin",
+                        "https://pasta-palace.de",
+                        "Best Carbonara in Berlin. Restaurant menu."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+        doReturn(geoapifyResponse(52.5201, 13.4052, "Pasta Palace, Berlin"))
+                .when(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        String url = result.getResults().getFirst().getGoogleMapsUrl();
+        assertTrue(url.startsWith("https://www.google.com/maps/dir/?api=1&origin="));
+        assertTrue(url.contains("destination="));
+    }
+
+    @Test
+    @DisplayName("generates search Maps URL when no coordinates are available")
+    void generates_search_maps_url_when_no_coords() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Pasta Palace Berlin",
+                        "https://pasta-palace.de",
+                        "Best Carbonara in Berlin. Restaurant menu."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
+
+        String url = result.getResults().getFirst().getGoogleMapsUrl();
+        assertTrue(url.startsWith("https://www.google.com/maps/search/?api=1&query="));
+        assertTrue(url.contains("Berlin"));
+    }
+
+    // === Helper ===
+
+    private GeoapifyResponse geoapifyResponse(double lat, double lon, String formatted) {
+        GeoapifyGeometry geometry = new GeoapifyGeometry();
+        geometry.setCoordinates(List.of(lon, lat));
+
+        GeoapifyProperties properties = new GeoapifyProperties();
+        properties.setFormatted(formatted);
+
+        GeoapifyFeature feature = new GeoapifyFeature();
+        feature.setGeometry(geometry);
+        feature.setProperties(properties);
+
+        GeoapifyResponse response = new GeoapifyResponse();
+        response.setFeatures(List.of(feature));
+        return response;
     }
 }

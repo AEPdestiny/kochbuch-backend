@@ -58,11 +58,13 @@ public class RestaurantResource {
     @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
     public TavilyRestaurantSearchResponse tavilySearch(@HeaderParam("Authorization") String authorizationHeader,
                                                         @QueryParam("recipeTitle") String recipeTitle,
-                                                        @QueryParam("location") String location) {
+                                                        @QueryParam("location") String location,
+                                                        @QueryParam("latitude") Double latitude,
+                                                        @QueryParam("longitude") Double longitude) {
         userContext.requireUser(authorizationHeader);
         if (recipeTitle == null || recipeTitle.isBlank() || location == null || location.isBlank()) {
             return new TavilyRestaurantSearchResponse("no_results", List.of());
         }
-        return tavilyRestaurantSearchService.search(recipeTitle, location);
+        return tavilyRestaurantSearchService.search(recipeTitle, location, latitude, longitude);
     }
 }

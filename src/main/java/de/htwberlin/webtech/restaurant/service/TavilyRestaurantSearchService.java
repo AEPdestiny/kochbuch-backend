@@ -1,10 +1,15 @@
 package de.htwberlin.webtech.restaurant.service;
 
+import de.htwberlin.webtech.restaurant.client.GeoapifyClient;
+import de.htwberlin.webtech.restaurant.client.GeoapifyClientException;
 import de.htwberlin.webtech.restaurant.client.TavilyRestaurantSearchClient;
 import de.htwberlin.webtech.restaurant.client.TavilyRestaurantSearchClient.TavilyRestaurantResult;
+import de.htwberlin.webtech.restaurant.client.dto.GeoapifyFeature;
+import de.htwberlin.webtech.restaurant.client.dto.GeoapifyResponse;
 import de.htwberlin.webtech.restaurant.dto.RestaurantResponse;
 import de.htwberlin.webtech.restaurant.dto.TavilyRestaurantSearchResponse;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.jboss.logging.Logger;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -100,14 +105,19 @@ public class TavilyRestaurantSearchService {
     private static final int MAX_RESTAURANT_NAME_LENGTH = 60;
     private static final int MIN_DISTINCTIVE_LENGTH = 4;
     private static final int MAX_CONTENT_NAME_WORDS = 4;
+    private static final int GEO_ENRICH_RADIUS_METERS = 20000;
+
+    private static final Logger LOG = Logger.getLogger(TavilyRestaurantSearchService.class);
 
     private final TavilyRestaurantSearchClient client;
+    private final GeoapifyClient geoapifyClient;
 
-    public TavilyRestaurantSearchService(TavilyRestaurantSearchClient client) {
+    public TavilyRestaurantSearchService(TavilyRestaurantSearchClient client, GeoapifyClient geoapifyClient) {
         this.client = client;
+        this.geoapifyClient = geoapifyClient;
     }
 
-    public TavilyRestaurantSearchResponse search(String recipeTitle, String location) {
+    public TavilyRestaurantSearchResponse search(String recipeTitle, String location, Double userLat, Double userLon) {
         if (!client.isConfigured()) {
             return new TavilyRestaurantSearchResponse("unavailable", List.of());
         }
@@ -115,7 +125,7 @@ public class TavilyRestaurantSearchService {
         String normalizedTitle = normalizeTitle(recipeTitle);
         List<RestaurantResponse> matched = raw.stream()
                 .filter(result -> isPlausible(result, normalizedTitle))
-                .map(result -> toResponse(result, location, recipeTitle))
+                .map(result -> toResponse(result, location, recipeTitle, userLat, userLon))
                 .filter(Objects::nonNull)
                 .toList();
         String status = matched.isEmpty() ? "no_results" : "ok";
@@ -151,7 +161,7 @@ public class TavilyRestaurantSearchService {
         return false;
     }
 
-    private RestaurantResponse toResponse(TavilyRestaurantResult result, String location, String recipeTitle) {
+    private RestaurantResponse toResponse(TavilyRestaurantResult result, String location, String recipeTitle, Double userLat, Double userLon) {
         String name = extractRestaurantName(result, recipeTitle);
         if (name == null) return null;
 
@@ -161,8 +171,45 @@ public class TavilyRestaurantSearchService {
         response.setDistanceMeters(null);
         response.setLatitude(null);
         response.setLongitude(null);
-        response.setGoogleMapsUrl(mapsUrl(name, location));
+        enrichWithGeoapify(response, location, userLat, userLon);
+        response.setGoogleMapsUrl(mapsUrl(name, location, response.getLatitude(), response.getLongitude(), userLat, userLon));
         return response;
+    }
+
+    private void enrichWithGeoapify(RestaurantResponse response, String location, Double userLat, Double userLon) {
+        if (userLat == null || userLon == null) return;
+        try {
+            String query = (location != null && !location.isBlank())
+                    ? response.getName() + " " + location
+                    : response.getName();
+            GeoapifyResponse geoResponse = geoapifyClient.searchRestaurants(query, userLat, userLon, GEO_ENRICH_RADIUS_METERS, 1);
+            if (geoResponse == null || geoResponse.getFeatures() == null || geoResponse.getFeatures().isEmpty()) return;
+            GeoapifyFeature feature = geoResponse.getFeatures().get(0);
+            if (feature.getGeometry() == null || feature.getProperties() == null) return;
+            List<Double> coords = feature.getGeometry().getCoordinates();
+            if (coords == null || coords.size() < 2 || coords.get(0) == null || coords.get(1) == null) return;
+            double restLon = coords.get(0);
+            double restLat = coords.get(1);
+            response.setLatitude(restLat);
+            response.setLongitude(restLon);
+            String address = feature.getProperties().getFormatted();
+            if (address != null && !address.isBlank()) response.setAddress(address);
+            response.setDistanceMeters(haversineMeters(userLat, userLon, restLat, restLon));
+        } catch (GeoapifyClientException e) {
+            LOG.debugf("Geoapify enrichment skipped for '%s': %s", response.getName(), e.getMessage());
+        } catch (Exception e) {
+            LOG.debugf("Geoapify enrichment error for '%s': %s", response.getName(), e.getMessage());
+        }
+    }
+
+    private static int haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+        final double R = 6371000.0;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return (int) Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
     }
 
     // Visible for tests
@@ -332,7 +379,15 @@ public class TavilyRestaurantSearchService {
                 .trim();
     }
 
-    private String mapsUrl(String restaurantName, String location) {
+    private String mapsUrl(String restaurantName, String location, Double restLat, Double restLon, Double userLat, Double userLon) {
+        if (restLat != null && restLon != null && userLat != null && userLon != null) {
+            String origin = URLEncoder.encode(userLat + "," + userLon, StandardCharsets.UTF_8);
+            String dest = URLEncoder.encode(restLat + "," + restLon, StandardCharsets.UTF_8);
+            return "https://www.google.com/maps/dir/?api=1&origin=" + origin + "&destination=" + dest;
+        }
+        if (restLat != null && restLon != null) {
+            return "https://www.google.com/maps/search/?api=1&query=" + restLat + "," + restLon;
+        }
         String query = URLEncoder.encode(restaurantName + " " + location, StandardCharsets.UTF_8);
         return "https://www.google.com/maps/search/?api=1&query=" + query;
     }
