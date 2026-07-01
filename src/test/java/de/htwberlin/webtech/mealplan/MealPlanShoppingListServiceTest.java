@@ -199,6 +199,60 @@ class MealPlanShoppingListServiceTest {
         return item;
     }
 
+    @Test
+    @DisplayName("createShoppingList should parse 'Tasse' as a recognized unit")
+    void createShoppingList_should_parse_tasse_unit() {
+        AppUser owner = user(1L);
+        LocalDate weekStart = LocalDate.of(2026, 6, 1);
+        doReturn(List.of(mealPlan(owner, recipe("Pancakes", "0.75 Tasse Mehl"))))
+                .when(mealPlanRepository).findByOwnerAndPlannedDateBetween(owner, weekStart, weekStart.plusDays(6));
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(owner);
+        doReturn(List.of()).when(shoppingListItemRepository).findByOwner(owner);
+
+        MealPlanShoppingListResponse result = underTest.createShoppingList(owner, weekStart);
+
+        ArgumentCaptor<ShoppingListItem> captor = ArgumentCaptor.forClass(ShoppingListItem.class);
+        verify(shoppingListItemRepository).persist(captor.capture());
+        assertEquals("Mehl", captor.getValue().getName());
+        assertEquals("tasse", captor.getValue().getUnit());
+    }
+
+    @Test
+    @DisplayName("createShoppingList should parse 'cup' as a recognized unit (canonical: tasse)")
+    void createShoppingList_should_parse_cup_unit() {
+        AppUser owner = user(1L);
+        LocalDate weekStart = LocalDate.of(2026, 6, 1);
+        doReturn(List.of(mealPlan(owner, recipe("Pancakes", "1 cup Milch"))))
+                .when(mealPlanRepository).findByOwnerAndPlannedDateBetween(owner, weekStart, weekStart.plusDays(6));
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(owner);
+        doReturn(List.of()).when(shoppingListItemRepository).findByOwner(owner);
+
+        MealPlanShoppingListResponse result = underTest.createShoppingList(owner, weekStart);
+
+        ArgumentCaptor<ShoppingListItem> captor = ArgumentCaptor.forClass(ShoppingListItem.class);
+        verify(shoppingListItemRepository).persist(captor.capture());
+        assertEquals("Milch", captor.getValue().getName());
+        assertEquals("tasse", captor.getValue().getUnit());
+    }
+
+    @Test
+    @DisplayName("createShoppingList should parse 'piece' as a recognized unit (canonical: stueck)")
+    void createShoppingList_should_parse_piece_unit() {
+        AppUser owner = user(1L);
+        LocalDate weekStart = LocalDate.of(2026, 6, 1);
+        doReturn(List.of(mealPlan(owner, recipe("Salad", "2 piece Tomate"))))
+                .when(mealPlanRepository).findByOwnerAndPlannedDateBetween(owner, weekStart, weekStart.plusDays(6));
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(owner);
+        doReturn(List.of()).when(shoppingListItemRepository).findByOwner(owner);
+
+        MealPlanShoppingListResponse result = underTest.createShoppingList(owner, weekStart);
+
+        ArgumentCaptor<ShoppingListItem> captor = ArgumentCaptor.forClass(ShoppingListItem.class);
+        verify(shoppingListItemRepository).persist(captor.capture());
+        assertEquals("Tomate", captor.getValue().getName());
+        assertEquals("stueck", captor.getValue().getUnit());
+    }
+
     private AppUser user(Long id) {
         AppUser user = new AppUser();
         user.setId(id);

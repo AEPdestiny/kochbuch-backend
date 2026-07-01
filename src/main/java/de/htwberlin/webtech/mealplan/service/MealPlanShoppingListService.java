@@ -37,7 +37,7 @@ public class MealPlanShoppingListService {
             "stück", "stueck", "stuck", "stk", "ei", "eier", "zehe", "zehen", "scheibe", "scheiben",
             "packung", "packungen", "dose", "dosen"
     );
-    private static final Set<String> UNSAFE_COUNT_UNITS = Set.of("tl", "el", "prise", "prisen");
+    private static final Set<String> UNSAFE_COUNT_UNITS = Set.of("tl", "el", "prise", "prisen", "tasse", "cup");
     private static final Set<String> ALL_UNITS = union(GRAM_UNITS, MILLILITER_UNITS, COUNT_UNITS, UNSAFE_COUNT_UNITS);
 
     private final MealPlanRepository mealPlanRepository;
@@ -305,6 +305,9 @@ public class MealPlanShoppingListService {
             case "slices" -> "scheiben";
             case "can" -> "dose";
             case "cans" -> "dosen";
+            case "cup" -> "tasse";
+            case "piece", "pieces" -> "stueck";
+            case "pack", "packs" -> "packung";
             default -> normalized;
         };
     }
