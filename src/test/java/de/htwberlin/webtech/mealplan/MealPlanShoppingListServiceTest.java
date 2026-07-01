@@ -128,6 +128,23 @@ class MealPlanShoppingListServiceTest {
     }
 
     @Test
+    @DisplayName("createShoppingList should avoid duplicate when existing item has no unit but need has a unit")
+    void createShoppingList_should_avoid_duplicate_when_units_differ() {
+        AppUser owner = user(1L);
+        LocalDate weekStart = LocalDate.of(2026, 6, 1);
+        doReturn(List.of(mealPlan(owner, recipe("Rice Bowl", "200 g Reis"))))
+                .when(mealPlanRepository).findByOwnerAndPlannedDateBetween(owner, weekStart, weekStart.plusDays(6));
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(owner);
+        // Existing item has no unit (manually added), need has "g" — must not create duplicate
+        doReturn(List.of(shopping("Reis", null, null, owner))).when(shoppingListItemRepository).findByOwner(owner);
+
+        MealPlanShoppingListResponse result = underTest.createShoppingList(owner, weekStart);
+
+        assertEquals(1, result.getAlreadyOnShoppingList().size());
+        verify(shoppingListItemRepository, never()).persist(org.mockito.ArgumentMatchers.any(ShoppingListItem.class));
+    }
+
+    @Test
     @DisplayName("createShoppingList should report custom title entries for review")
     void createShoppingList_should_report_custom_title_entries_for_review() {
         AppUser owner = user(1L);

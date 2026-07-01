@@ -113,9 +113,10 @@ public class MealPlanShoppingListService {
                             MealPlanShoppingListResponse response) {
         IngredientNeed remainingNeed = need;
         IngredientNeed lookupNeed = remainingNeed;
+        // Name-only matching: if the same ingredient already exists on the shopping list
+        // (regardless of unit format), skip it to prevent duplicates on re-runs.
         Optional<ShoppingListItem> existingShoppingItem = shoppingItems.stream()
                 .filter(item -> equivalentName(item.getName(), lookupNeed.name()))
-                .filter(item -> compatibleUnits(item.getUnit(), lookupNeed.unit()))
                 .findFirst();
         if (existingShoppingItem.isPresent()) {
             response.getAlreadyOnShoppingList().add(toResponse(remainingNeed, "Bereits auf der Einkaufsliste."));
