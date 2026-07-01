@@ -1,6 +1,8 @@
 package de.htwberlin.webtech.restaurant.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.htwberlin.webtech.restaurant.client.dto.GeoapifyFeature;
+import de.htwberlin.webtech.restaurant.client.dto.GeoapifyProperties;
 import de.htwberlin.webtech.restaurant.client.dto.GeoapifyResponse;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -19,6 +21,7 @@ import java.util.Optional;
 public class GeoapifyClient {
 
     private static final String PLACES_URL = "https://api.geoapify.com/v2/places";
+    private static final String REVERSE_URL = "https://api.geoapify.com/v1/geocode/reverse";
     private static final Duration TIMEOUT = Duration.ofSeconds(5);
 
     private final HttpClient httpClient;
@@ -60,6 +63,29 @@ public class GeoapifyClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new GeoapifyClientException("Geoapify request was interrupted.", e);
+        }
+    }
+
+    public String reverseGeocode(double lat, double lon) {
+        String configuredApiKey = apiKey.filter(v -> !v.isBlank()).orElse(null);
+        if (configuredApiKey == null) return null;
+        String url = REVERSE_URL + "?lat=" + lat + "&lon=" + lon + "&apiKey=" + encode(configuredApiKey);
+        HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).timeout(TIMEOUT).GET().build();
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) return null;
+            GeoapifyResponse geo = objectMapper.readValue(response.body(), GeoapifyResponse.class);
+            if (geo.getFeatures() == null || geo.getFeatures().isEmpty()) return null;
+            GeoapifyFeature feature = geo.getFeatures().get(0);
+            if (feature.getProperties() == null) return null;
+            GeoapifyProperties props = feature.getProperties();
+            if (props.getCity() != null && !props.getCity().isBlank()) return props.getCity();
+            if (props.getTown() != null && !props.getTown().isBlank()) return props.getTown();
+            if (props.getVillage() != null && !props.getVillage().isBlank()) return props.getVillage();
+            if (props.getCounty() != null && !props.getCounty().isBlank()) return props.getCounty();
+            return null;
+        } catch (Exception e) {
+            return null;
         }
     }
 

@@ -230,6 +230,26 @@ class RestaurantResourceTest {
                 .body("results", hasSize(0));
     }
 
+    @Test
+    void tavily_search_gps_only_calls_service_when_only_coords_provided() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(new TavilyRestaurantSearchResponse("ok", List.of(tavilyRestaurant())))
+                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any());
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .queryParam("recipeTitle", "Pasta Carbonara")
+                .queryParam("latitude", 52.52)
+                .queryParam("longitude", 13.405)
+                .when().get("/restaurants/search")
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("ok"));
+
+        verify(tavilyRestaurantSearchService).search("Pasta Carbonara", null, 52.52, 13.405);
+    }
+
     private RestaurantResponse tavilyRestaurant() {
         RestaurantResponse restaurant = new RestaurantResponse();
         restaurant.setName("Pasta Palace Berlin");

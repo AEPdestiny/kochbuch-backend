@@ -62,7 +62,9 @@ public class RestaurantResource {
                                                         @QueryParam("latitude") Double latitude,
                                                         @QueryParam("longitude") Double longitude) {
         userContext.requireUser(authorizationHeader);
-        if (recipeTitle == null || recipeTitle.isBlank() || location == null || location.isBlank()) {
+        boolean hasLocation = location != null && !location.isBlank();
+        boolean hasCoords = latitude != null && longitude != null;
+        if (recipeTitle == null || recipeTitle.isBlank() || (!hasLocation && !hasCoords)) {
             return new TavilyRestaurantSearchResponse("no_results", List.of());
         }
         return tavilyRestaurantSearchService.search(recipeTitle, location, latitude, longitude);

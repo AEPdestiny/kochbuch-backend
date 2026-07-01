@@ -73,7 +73,24 @@ public class TavilyRestaurantSearchService {
     private static final Set<String> GENERIC_PAGE_TITLES = Set.of(
             "speisekarte", "menu", "restaurant menu", "menü", "karte",
             "our menu", "food menu", "dinner menu", "online menu", "full menu",
-            "unsere speisekarte", "unsere karte", "restaurant"
+            "unsere speisekarte", "unsere karte", "restaurant",
+            "blog", "food", "cooking", "foodblog", "rezept", "rezepte", "essen", "kochen"
+    );
+
+    // Platform/brand names that must never appear as restaurant names
+    private static final Set<String> BLOCKED_RESTAURANT_NAMES = Set.of(
+            "tiktok", "instagram", "facebook", "youtube", "twitter",
+            "x", "pinterest", "linkedin", "google", "tripadvisor",
+            "lieferando", "wolt", "ubereats", "deliveroo", "doordash",
+            "yelp", "thefork", "zomato", "opentable", "reddit",
+            "wikipedia", "chefkoch", "allrecipes", "yummly", "snapchat"
+    );
+
+    // Words/phrases that indicate a recipe blog post, not a restaurant page
+    private static final Set<String> RECIPE_BLOG_INDICATORS = Set.of(
+            "recipe", "recipes", "rezept", "rezepte",
+            "how to make", "how to cook", "how to prepare",
+            "step by step", "zubereitung", "ingredients", "instructions"
     );
 
     // Aggregator and social-media domains: the domain name itself is not a restaurant name
@@ -121,15 +138,40 @@ public class TavilyRestaurantSearchService {
         if (!client.isConfigured()) {
             return new TavilyRestaurantSearchResponse("unavailable", List.of());
         }
-        List<TavilyRestaurantResult> raw = client.search(recipeTitle, location);
+
+        String resolvedLocation = null;
+
+        // GPS-only path: derive city from coordinates when no location text supplied
+        if ((location == null || location.isBlank()) && userLat != null && userLon != null) {
+            resolvedLocation = reverseGeocodeLocation(userLat, userLon);
+            if (resolvedLocation == null || resolvedLocation.isBlank()) {
+                return new TavilyRestaurantSearchResponse("no_location", List.of());
+            }
+        }
+
+        final String effectiveLocation = resolvedLocation != null ? resolvedLocation : location;
+        List<TavilyRestaurantResult> raw = client.search(recipeTitle, effectiveLocation);
         String normalizedTitle = normalizeTitle(recipeTitle);
         List<RestaurantResponse> matched = raw.stream()
                 .filter(result -> isPlausible(result, normalizedTitle))
-                .map(result -> toResponse(result, location, recipeTitle, userLat, userLon))
+                .map(result -> toResponse(result, effectiveLocation, recipeTitle, userLat, userLon))
                 .filter(Objects::nonNull)
                 .toList();
         String status = matched.isEmpty() ? "no_results" : "ok";
-        return new TavilyRestaurantSearchResponse(status, matched);
+        TavilyRestaurantSearchResponse response = new TavilyRestaurantSearchResponse(status, matched);
+        if (resolvedLocation != null) {
+            response.setResolvedLocation(resolvedLocation);
+        }
+        return response;
+    }
+
+    private String reverseGeocodeLocation(double lat, double lon) {
+        try {
+            return geoapifyClient.reverseGeocode(lat, lon);
+        } catch (Exception e) {
+            LOG.debugf("Reverse geocoding failed for %.4f,%.4f: %s", lat, lon, e.getMessage());
+            return null;
+        }
     }
 
     private boolean isPlausible(TavilyRestaurantResult result, String normalizedTitle) {
@@ -186,6 +228,9 @@ public class TavilyRestaurantSearchService {
             if (geoResponse == null || geoResponse.getFeatures() == null || geoResponse.getFeatures().isEmpty()) return;
             GeoapifyFeature feature = geoResponse.getFeatures().get(0);
             if (feature.getGeometry() == null || feature.getProperties() == null) return;
+            // Only enrich with results confirmed as catering/restaurant
+            List<String> cats = feature.getProperties().getCategories();
+            if (cats == null || cats.stream().noneMatch(c -> c.startsWith("catering"))) return;
             List<Double> coords = feature.getGeometry().getCoordinates();
             if (coords == null || coords.size() < 2 || coords.get(0) == null || coords.get(1) == null) return;
             double restLon = coords.get(0);
@@ -318,6 +363,8 @@ public class TavilyRestaurantSearchService {
 
         String lower = trimmed.toLowerCase(Locale.ROOT);
         if (GENERIC_PAGE_TITLES.contains(lower)) return false;
+        if (isBlockedName(lower)) return false;
+        if (RECIPE_BLOG_INDICATORS.stream().anyMatch(lower::contains)) return false;
         if (isDishTitle(trimmed, recipeTitle)) return false;
 
         // First word indicates a sentence/snippet, not a proper noun
@@ -327,14 +374,30 @@ public class TavilyRestaurantSearchService {
         return true;
     }
 
+    private boolean isBlockedName(String lower) {
+        for (String word : lower.split("\\s+")) {
+            String clean = word.replaceAll("[^a-z0-9äöüß]", "");
+            if (BLOCKED_RESTAURANT_NAMES.contains(clean)) return true;
+        }
+        return false;
+    }
+
     // Returns true when candidate is (or contains) the dish name — not a valid restaurant name
     boolean isDishTitle(String candidate, String recipeTitle) {
         String normalizedCandidate = normalizeTitle(candidate);
         String normalizedRecipe = normalizeTitle(recipeTitle);
         if (normalizedCandidate.isEmpty() || normalizedRecipe.isEmpty()) return false;
         if (normalizedCandidate.equals(normalizedRecipe)) return true;
-        // Candidate wraps the full dish name (e.g., "Pasta Carbonara Rezept" for recipe "Pasta Carbonara")
+        // Candidate wraps the full dish name (e.g., "Pasta Carbonara Rezept" for "Pasta Carbonara")
         if (normalizedRecipe.length() >= 10 && normalizedCandidate.contains(normalizedRecipe)) return true;
+        // Candidate shares >= 2 non-trivial words with recipe title → likely a dish/blog title
+        Set<String> recipeWordSet = Arrays.stream(normalizedRecipe.split("\\s+")).collect(Collectors.toSet());
+        long sharedWords = Arrays.stream(normalizedCandidate.split("\\s+"))
+                .filter(w -> w.length() >= 4)
+                .filter(recipeWordSet::contains)
+                .filter(w -> !NAME_PARTICLES.contains(w))
+                .count();
+        if (sharedWords >= 2) return true;
         return false;
     }
 

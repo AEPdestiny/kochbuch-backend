@@ -638,6 +638,156 @@ class TavilyRestaurantSearchServiceTest {
         assertTrue(url.contains("Berlin"));
     }
 
+    // === Blocked names / recipe indicators ===
+
+    @Test
+    @DisplayName("filters result when extracted name is a blocked platform name (TikTok)")
+    void filters_when_name_is_blocked_platform_tiktok() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "TikTok",
+                        "https://tiktok.com/@chef",
+                        "Pasta Carbonara recipe tutorial. Restaurant in Berlin."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters result when extracted name is a blocked platform name (Instagram)")
+    void filters_when_name_is_blocked_platform_instagram() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Instagram",
+                        "https://instagram.com/carbonara_lover",
+                        "Pasta Carbonara at our restaurant in Berlin. Menu."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters result when title contains recipe blog indicator 'recipe'")
+    void filters_when_title_contains_recipe_indicator() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Delicious Leek Recipe with Sesame Peanut Sauce",
+                        "https://foodblog.de/leek-recipe",
+                        "Pasta Carbonara and leek recipe. Restaurant-style cooking."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters result when title contains recipe blog indicator 'how to make'")
+    void filters_when_title_contains_how_to_make_indicator() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "How to make Chicken Porridge",
+                        "https://cooking.com/chicken-porridge",
+                        "Chicken Porridge served in our restaurant. Dining in Berlin."
+                )
+        )).when(client).search("Chicken Porridge", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Chicken Porridge", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters result when candidate title shares 2 or more non-trivial words with recipe title")
+    void filters_when_candidate_shares_two_dish_words_with_recipe_title() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Easy Chicken Porridge",
+                        "https://blog.de/easy-chicken-porridge",
+                        "Easy Chicken Porridge recipe. Restaurant in Berlin."
+                )
+        )).when(client).search("Chicken Porridge", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Chicken Porridge", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    // === GPS-only / reverse geocoding ===
+
+    @Test
+    @DisplayName("GPS-only search: returns ok when reverse geocoding succeeds and restaurants found")
+    void gps_only_returns_ok_when_reverse_geocoding_succeeds() {
+        doReturn("Berlin").when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Pasta Palace Berlin",
+                        "https://pasta-palace.de",
+                        "Best Pasta Carbonara in Berlin. Restaurant menu."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", null, 52.52, 13.405);
+
+        assertEquals("ok", result.getStatus());
+        assertEquals(1, result.getResults().size());
+        assertEquals("Berlin", result.getResolvedLocation());
+    }
+
+    @Test
+    @DisplayName("GPS-only search: returns no_location when reverse geocoding returns null")
+    void gps_only_returns_no_location_when_reverse_geocoding_fails() {
+        doReturn(null).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", null, 52.52, 13.405);
+
+        assertEquals("no_location", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("GPS-only search: returns no_location when reverse geocoding throws exception")
+    void gps_only_returns_no_location_when_reverse_geocoding_throws() {
+        doThrow(new RuntimeException("network error")).when(geoapifyClient).reverseGeocode(anyDouble(), anyDouble());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", null, 52.52, 13.405);
+
+        assertEquals("no_location", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("Geoapify enrichment is skipped when result has no catering category")
+    void enrichment_skipped_when_geoapify_returns_non_catering_category() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Pasta Palace Berlin",
+                        "https://pasta-palace.de",
+                        "Best Carbonara in Berlin. Restaurant menu."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+        doReturn(nonCateringGeoapifyResponse(52.5201, 13.4052, "Some Hotel, Berlin"))
+                .when(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        assertEquals("ok", result.getStatus());
+        assertNull(result.getResults().getFirst().getDistanceMeters());
+        assertNull(result.getResults().getFirst().getLatitude());
+    }
+
     // === Helper ===
 
     private GeoapifyResponse geoapifyResponse(double lat, double lon, String formatted) {
@@ -646,6 +796,24 @@ class TavilyRestaurantSearchServiceTest {
 
         GeoapifyProperties properties = new GeoapifyProperties();
         properties.setFormatted(formatted);
+        properties.setCategories(List.of("catering.restaurant"));
+
+        GeoapifyFeature feature = new GeoapifyFeature();
+        feature.setGeometry(geometry);
+        feature.setProperties(properties);
+
+        GeoapifyResponse response = new GeoapifyResponse();
+        response.setFeatures(List.of(feature));
+        return response;
+    }
+
+    private GeoapifyResponse nonCateringGeoapifyResponse(double lat, double lon, String formatted) {
+        GeoapifyGeometry geometry = new GeoapifyGeometry();
+        geometry.setCoordinates(List.of(lon, lat));
+
+        GeoapifyProperties properties = new GeoapifyProperties();
+        properties.setFormatted(formatted);
+        properties.setCategories(List.of("accommodation.hotel"));
 
         GeoapifyFeature feature = new GeoapifyFeature();
         feature.setGeometry(geometry);
