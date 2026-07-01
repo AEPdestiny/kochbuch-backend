@@ -2,7 +2,9 @@ package de.htwberlin.webtech.restaurant;
 
 import de.htwberlin.webtech.restaurant.dto.RestaurantResponse;
 import de.htwberlin.webtech.restaurant.dto.RestaurantSearchRequest;
+import de.htwberlin.webtech.restaurant.dto.TavilyRestaurantSearchResponse;
 import de.htwberlin.webtech.restaurant.service.RestaurantService;
+import de.htwberlin.webtech.restaurant.service.TavilyRestaurantSearchService;
 import de.htwberlin.webtech.security.UserContext;
 import de.htwberlin.webtech.shared.exception.UnauthorizedException;
 import de.htwberlin.webtech.user.entity.AppUser;
@@ -28,13 +30,16 @@ import static org.mockito.Mockito.verify;
 class RestaurantResourceTest {
 
     private RestaurantService restaurantService;
+    private TavilyRestaurantSearchService tavilyRestaurantSearchService;
     private UserContext userContext;
 
     @BeforeEach
     void setUp() {
         restaurantService = mock(RestaurantService.class);
+        tavilyRestaurantSearchService = mock(TavilyRestaurantSearchService.class);
         userContext = mock(UserContext.class);
         QuarkusMock.installMockForType(restaurantService, RestaurantService.class);
+        QuarkusMock.installMockForType(tavilyRestaurantSearchService, TavilyRestaurantSearchService.class);
         QuarkusMock.installMockForType(userContext, UserContext.class);
     }
 
@@ -155,6 +160,85 @@ class RestaurantResourceTest {
                 .body("[0].googleMapsUrl", equalTo("https://www.google.com/maps/search/?api=1&query=52.5201,13.4052"))
                 .body("[0].latitude", equalTo(52.5201f))
                 .body("[0].longitude", equalTo(13.4052f));
+    }
+
+    @Test
+    void tavily_search_should_return_unauthorized_without_token() {
+        doThrow(new UnauthorizedException("Missing or invalid Bearer token."))
+                .when(userContext).requireUser(null);
+
+        given()
+                .when().get("/restaurants/search?recipeTitle=Pasta&location=Berlin")
+                .then()
+                .statusCode(401)
+                .body("message", equalTo("Missing or invalid Bearer token."));
+    }
+
+    @Test
+    void tavily_search_should_return_no_results_for_blank_recipeTitle() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .queryParam("recipeTitle", "")
+                .queryParam("location", "Berlin")
+                .when().get("/restaurants/search")
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("no_results"))
+                .body("results", hasSize(0));
+
+        verify(tavilyRestaurantSearchService, never()).search(any(), any());
+    }
+
+    @Test
+    void tavily_search_should_return_restaurants_with_ok_status() {
+        AppUser currentUser = user(1L);
+        RestaurantResponse restaurant = tavilyRestaurant();
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(new TavilyRestaurantSearchResponse("ok", List.of(restaurant)))
+                .when(tavilyRestaurantSearchService).search(any(), any());
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .queryParam("recipeTitle", "Pasta Carbonara")
+                .queryParam("location", "Berlin")
+                .when().get("/restaurants/search")
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("ok"))
+                .body("results", hasSize(1))
+                .body("results[0].name", equalTo("Pasta Palace Berlin"));
+    }
+
+    @Test
+    void tavily_search_should_return_unavailable_status_when_tavily_not_configured() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(new TavilyRestaurantSearchResponse("unavailable", List.of()))
+                .when(tavilyRestaurantSearchService).search(any(), any());
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .queryParam("recipeTitle", "Pasta Carbonara")
+                .queryParam("location", "Berlin")
+                .when().get("/restaurants/search")
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("unavailable"))
+                .body("results", hasSize(0));
+    }
+
+    private RestaurantResponse tavilyRestaurant() {
+        RestaurantResponse restaurant = new RestaurantResponse();
+        restaurant.setName("Pasta Palace Berlin");
+        restaurant.setAddress(null);
+        restaurant.setDistanceMeters(null);
+        restaurant.setGoogleMapsUrl("https://www.google.com/maps/search/?api=1&query=Pasta+Palace+Berlin+Berlin");
+        restaurant.setLatitude(null);
+        restaurant.setLongitude(null);
+        return restaurant;
     }
 
     private RestaurantResponse restaurant() {
