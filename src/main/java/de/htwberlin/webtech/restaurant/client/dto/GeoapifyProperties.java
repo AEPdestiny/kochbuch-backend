@@ -17,6 +17,11 @@ public class GeoapifyProperties {
     @JsonProperty("address_line1")
     private String addressLine1;
 
+    private String city;
+    private String town;
+    private String village;
+    private String county;
+
     public String getName() {
         return name;
     }
@@ -56,4 +61,16 @@ public class GeoapifyProperties {
     public void setAddressLine1(String addressLine1) {
         this.addressLine1 = addressLine1;
     }
+
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+
+    public String getTown() { return town; }
+    public void setTown(String town) { this.town = town; }
+
+    public String getVillage() { return village; }
+    public void setVillage(String village) { this.village = village; }
+
+    public String getCounty() { return county; }
+    public void setCounty(String county) { this.county = county; }
 }
