@@ -28,6 +28,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 class TavilyRestaurantSearchServiceTest {
 
@@ -965,6 +967,205 @@ class TavilyRestaurantSearchServiceTest {
 
         assertEquals("no_results", result.getStatus());
         assertTrue(result.getResults().isEmpty());
+    }
+
+    // === Two-stage search: exact-first, suggestions-second ===
+
+    @Test
+    @DisplayName("stage 1: returns searchMode 'exact' and skips suggestion search when exact matches exist")
+    void returns_exact_mode_when_exact_matches_exist() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Sushi Circle",
+                        "https://sushi-circle.de",
+                        "Sushi Circle serves a fresh Sushi Bowl in Berlin. Restaurant menu and reservations."
+                )
+        )).when(client).search("Sushi Bowl", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi Bowl", "Berlin", null, null);
+
+        assertEquals("ok", result.getStatus());
+        assertEquals("exact", result.getSearchMode());
+        assertEquals(1, result.getResults().size());
+        verify(client, never()).searchGeneral(anyString());
+    }
+
+    @Test
+    @DisplayName("stage 2: runs suggestion search and returns 'suggestions' mode when exact search yields only reddit")
+    void runs_suggestions_when_exact_only_reddit() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "r/sushi",
+                        "https://reddit.com/r/sushi",
+                        "Sushi Bowl discussion. Restaurant recommendations."
+                )
+        )).when(client).search("Sushi Bowl", "Berlin");
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Sushi Circle",
+                        "https://sushi-circle.de",
+                        "Sushi Circle is a sushi restaurant in Berlin. Menu and reservations."
+                )
+        )).when(client).searchGeneral("sushi restaurant Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi Bowl", "Berlin", null, null);
+
+        assertEquals("ok", result.getStatus());
+        assertEquals("suggestions", result.getSearchMode());
+        assertEquals(1, result.getResults().size());
+        assertEquals("Sushi Circle", result.getResults().getFirst().getName());
+    }
+
+    @Test
+    @DisplayName("stage 2: runs suggestion search when exact search yields only an article list title")
+    void runs_suggestions_when_exact_only_article() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "The top 11 sushi restaurants in Berlin",
+                        "https://guide.de/best-sushi",
+                        "Sushi restaurants in Berlin. Reviews."
+                )
+        )).when(client).search("Sushi Bowl", "Berlin");
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Sushi Circle",
+                        "https://sushi-circle.de",
+                        "Sushi restaurant in Berlin. Menu."
+                )
+        )).when(client).searchGeneral("sushi restaurant Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi Bowl", "Berlin", null, null);
+
+        assertEquals("suggestions", result.getSearchMode());
+        assertEquals(1, result.getResults().size());
+    }
+
+    @Test
+    @DisplayName("derives 'sushi' category and queries 'sushi restaurant Berlin' for suggestions")
+    void derives_sushi_category_for_suggestions() {
+        doReturn(List.of()).when(client).search("Nigiri Sushi Platte", "Berlin");
+        doReturn(List.of()).when(client).searchGeneral(anyString());
+
+        underTest.search("Nigiri Sushi Platte", "Berlin", null, null);
+
+        verify(client).searchGeneral("sushi restaurant Berlin");
+    }
+
+    @Test
+    @DisplayName("derives 'italian' category for spaghetti carbonara")
+    void derives_italian_category_for_carbonara() {
+        doReturn(List.of()).when(client).search("Spaghetti Carbonara", "Berlin");
+        doReturn(List.of()).when(client).searchGeneral(anyString());
+
+        underTest.search("Spaghetti Carbonara", "Berlin", null, null);
+
+        verify(client).searchGeneral("italian restaurant Berlin");
+    }
+
+    @Test
+    @DisplayName("derives 'french' category for ratatouille")
+    void derives_french_category_for_ratatouille() {
+        doReturn(List.of()).when(client).search("Ratatouille", "Berlin");
+        doReturn(List.of()).when(client).searchGeneral(anyString());
+
+        underTest.search("Ratatouille", "Berlin", null, null);
+
+        verify(client).searchGeneral("french restaurant Berlin");
+    }
+
+    @Test
+    @DisplayName("falls back to generic 'restaurants {location}' query when no cuisine category is recognized")
+    void falls_back_to_generic_restaurants_query() {
+        doReturn(List.of()).when(client).search("Grandma's Mystery Stew", "Berlin");
+        doReturn(List.of()).when(client).searchGeneral(anyString());
+
+        underTest.search("Grandma's Mystery Stew", "Berlin", null, null);
+
+        verify(client).searchGeneral("restaurants Berlin");
+    }
+
+    @Test
+    @DisplayName("stage 2: suggestion results that are articles/reddit are filtered → no_results")
+    void suggestions_with_only_junk_returns_no_results() {
+        doReturn(List.of()).when(client).search("Sushi Bowl", "Berlin");
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Best sushi restaurants in Berlin",
+                        "https://guide.de/best",
+                        "Sushi restaurants in Berlin. Reviews."
+                ),
+                new TavilyRestaurantResult(
+                        "r/sushi",
+                        "https://reddit.com/r/sushi",
+                        "Sushi restaurant thread."
+                )
+        )).when(client).searchGeneral("sushi restaurant Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi Bowl", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertNull(result.getSearchMode());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("returns no_results when both exact and suggestion searches are empty")
+    void returns_no_results_when_both_stages_empty() {
+        doReturn(List.of()).when(client).search("Sushi Bowl", "Berlin");
+        doReturn(List.of()).when(client).searchGeneral(anyString());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi Bowl", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertNull(result.getSearchMode());
+    }
+
+    @Test
+    @DisplayName("Geoapify is never called when no plausible restaurant name is extracted")
+    void geoapify_not_called_without_valid_name() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "r/sushi",
+                        "https://reddit.com/r/sushi",
+                        "Sushi restaurant thread."
+                )
+        )).when(client).search("Sushi Bowl", "Berlin");
+        doReturn(List.of()).when(client).searchGeneral(anyString());
+
+        underTest.search("Sushi Bowl", "Berlin", 52.52, 13.405);
+
+        verify(geoapifyClient, never()).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+    }
+
+    @Test
+    @DisplayName("suggestion result has null distance when user coordinates are absent")
+    void suggestion_result_no_distance_without_coords() {
+        doReturn(List.of()).when(client).search("Sushi Bowl", "Berlin");
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Sushi Circle",
+                        "https://sushi-circle.de",
+                        "Sushi restaurant in Berlin. Menu."
+                )
+        )).when(client).searchGeneral("sushi restaurant Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi Bowl", "Berlin", null, null);
+
+        assertEquals("suggestions", result.getSearchMode());
+        assertNull(result.getResults().getFirst().getDistanceMeters());
+        assertNull(result.getResults().getFirst().getLatitude());
+    }
+
+    @Test
+    @DisplayName("deriveRestaurantCategory maps German and English dish terms to cuisines")
+    void derive_category_maps_terms() {
+        assertEquals("sushi", underTest.deriveRestaurantCategory("Maki und Nigiri"));
+        assertEquals("italian", underTest.deriveRestaurantCategory("Nudeln mit Pesto"));
+        assertEquals("pizza", underTest.deriveRestaurantCategory("Pizza Margherita"));
+        assertEquals("turkish", underTest.deriveRestaurantCategory("Döner Kebab"));
+        assertEquals("indian", underTest.deriveRestaurantCategory("Chicken Tikka Masala"));
+        assertEquals("cafe", underTest.deriveRestaurantCategory("Schokoladenkuchen"));
+        assertEquals("restaurant", underTest.deriveRestaurantCategory("Etwas Unbekanntes"));
     }
 
     // === Helper ===

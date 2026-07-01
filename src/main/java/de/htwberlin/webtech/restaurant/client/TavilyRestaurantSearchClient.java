@@ -43,10 +43,21 @@ public class TavilyRestaurantSearchClient {
     }
 
     public List<TavilyRestaurantResult> search(String recipeTitle, String location) {
+        return executeSearch("\"" + recipeTitle + "\" Restaurant " + location);
+    }
+
+    /**
+     * General (non-quoted) search used for cuisine/category suggestions, e.g. "sushi restaurant Berlin".
+     * Unlike {@link #search(String, String)} it does not force an exact-phrase match on the dish title.
+     */
+    public List<TavilyRestaurantResult> searchGeneral(String query) {
+        return executeSearch(query);
+    }
+
+    private List<TavilyRestaurantResult> executeSearch(String query) {
         if (apiKey.isEmpty()) {
             return List.of();
         }
-        String query = "\"" + recipeTitle + "\" Restaurant " + location;
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(SEARCH_URI)

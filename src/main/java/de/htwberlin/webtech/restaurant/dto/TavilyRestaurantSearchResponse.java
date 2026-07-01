@@ -7,6 +7,7 @@ public class TavilyRestaurantSearchResponse {
     private String status;
     private List<RestaurantResponse> results;
     private String resolvedLocation;
+    private String searchMode;
 
     public TavilyRestaurantSearchResponse(String status, List<RestaurantResponse> results) {
         this.status = status;
@@ -21,4 +22,8 @@ public class TavilyRestaurantSearchResponse {
 
     public String getResolvedLocation() { return resolvedLocation; }
     public void setResolvedLocation(String resolvedLocation) { this.resolvedLocation = resolvedLocation; }
+
+    /** "exact" when results match the exact dish, "suggestions" for general cuisine fallback, null otherwise. */
+    public String getSearchMode() { return searchMode; }
+    public void setSearchMode(String searchMode) { this.searchMode = searchMode; }
 }

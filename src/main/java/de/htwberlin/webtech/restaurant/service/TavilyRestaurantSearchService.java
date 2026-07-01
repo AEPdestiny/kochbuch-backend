@@ -170,19 +170,85 @@ public class TavilyRestaurantSearchService {
         }
 
         final String effectiveLocation = resolvedLocation != null ? resolvedLocation : location;
-        List<TavilyRestaurantResult> raw = client.search(recipeTitle, effectiveLocation);
-        String normalizedTitle = normalizeTitle(recipeTitle);
-        List<RestaurantResponse> matched = raw.stream()
-                .filter(result -> isPlausible(result, normalizedTitle))
-                .map(result -> toResponse(result, effectiveLocation, recipeTitle, userLat, userLon))
-                .filter(Objects::nonNull)
-                .toList();
-        String status = matched.isEmpty() ? "no_results" : "ok";
-        TavilyRestaurantSearchResponse response = new TavilyRestaurantSearchResponse(status, matched);
+
+        // Stage 1 — exact dish search: only real restaurants serving exactly this dish
+        List<RestaurantResponse> exact = runExactSearch(recipeTitle, effectiveLocation, userLat, userLon);
+        if (!exact.isEmpty()) {
+            return buildResponse("ok", "exact", exact, resolvedLocation);
+        }
+
+        // Stage 2 — general cuisine suggestions when no exact match survives filtering
+        String category = deriveRestaurantCategory(recipeTitle);
+        List<RestaurantResponse> suggestions = runSuggestionSearch(category, effectiveLocation, recipeTitle, userLat, userLon);
+        if (!suggestions.isEmpty()) {
+            return buildResponse("ok", "suggestions", suggestions, resolvedLocation);
+        }
+
+        return buildResponse("no_results", null, List.of(), resolvedLocation);
+    }
+
+    private TavilyRestaurantSearchResponse buildResponse(String status, String searchMode,
+                                                         List<RestaurantResponse> results, String resolvedLocation) {
+        TavilyRestaurantSearchResponse response = new TavilyRestaurantSearchResponse(status, results);
+        response.setSearchMode(searchMode);
         if (resolvedLocation != null) {
             response.setResolvedLocation(resolvedLocation);
         }
         return response;
+    }
+
+    private List<RestaurantResponse> runExactSearch(String recipeTitle, String location, Double userLat, Double userLon) {
+        List<TavilyRestaurantResult> raw = client.search(recipeTitle, location);
+        String normalizedTitle = normalizeTitle(recipeTitle);
+        return raw.stream()
+                .filter(result -> isPlausible(result, normalizedTitle))
+                .map(result -> toResponse(result, location, recipeTitle, userLat, userLon))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private List<RestaurantResponse> runSuggestionSearch(String category, String location, String recipeTitle,
+                                                         Double userLat, Double userLon) {
+        List<TavilyRestaurantResult> raw = client.searchGeneral(suggestionQuery(category, location));
+        return raw.stream()
+                .filter(this::isPlausibleSuggestion)
+                .map(result -> toResponse(result, location, recipeTitle, userLat, userLon))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private String suggestionQuery(String category, String location) {
+        String loc = location == null ? "" : location.trim();
+        if ("restaurant".equals(category)) {
+            return ("restaurants " + loc).trim();
+        }
+        return (category + " restaurant " + loc).trim();
+    }
+
+    // Derives a cuisine/category keyword from the recipe title (German + English). Public for tests.
+    public String deriveRestaurantCategory(String recipeTitle) {
+        String t = recipeTitle == null ? "" : recipeTitle.toLowerCase(Locale.ROOT);
+        if (containsAny(t, "sushi", "nigiri", "maki", "sashimi")) return "sushi";
+        if (containsAny(t, "ramen", "udon", "teriyaki")) return "japanese";
+        if (containsAny(t, "pizza")) return "pizza";
+        if (containsAny(t, "pasta", "spaghetti", "lasagna", "lasagne", "risotto",
+                "gnocchi", "carbonara", "nudeln", "tagliatelle", "penne")) return "italian";
+        if (containsAny(t, "ratatouille", "quiche", "croissant")) return "french";
+        if (containsAny(t, "curry", "masala", "tikka", "biryani")) return "indian";
+        if (containsAny(t, "taco", "burrito", "quesadilla")) return "mexican";
+        if (containsAny(t, "burger")) return "burger";
+        if (containsAny(t, "kebab", "döner", "doner", "lahmacun")) return "turkish";
+        if (containsAny(t, "falafel", "hummus", "shawarma", "shawerma")) return "middle eastern";
+        if (containsAny(t, "salad", "salat", "bowl")) return "healthy";
+        if (containsAny(t, "cake", "waffle", "waffel", "pancake", "pfannkuchen", "dessert", "kuchen")) return "cafe";
+        return "restaurant";
+    }
+
+    private boolean containsAny(String haystack, String... needles) {
+        for (String needle : needles) {
+            if (haystack.contains(needle)) return true;
+        }
+        return false;
     }
 
     private String reverseGeocodeLocation(double lat, double lon) {
@@ -194,16 +260,28 @@ public class TavilyRestaurantSearchService {
         }
     }
 
-    private boolean isPlausible(TavilyRestaurantResult result, String normalizedTitle) {
-        if (isHardBlockedUrl(result.url())) return false;
-        // Discard the whole result when the source title itself is clearly a listicle,
-        // subreddit, blocked platform, or recipe/how-to page — no URL/content fallback.
+    // Discard the whole result when the source URL or title is clearly a listicle,
+    // subreddit, blocked platform, or recipe/how-to page — no URL/content fallback allowed.
+    private boolean isHardExcluded(TavilyRestaurantResult result) {
+        if (isHardBlockedUrl(result.url())) return true;
         String rawTitleLower = result.title() == null ? "" : result.title().toLowerCase(Locale.ROOT).trim();
         if (!rawTitleLower.isEmpty()) {
-            if (isArticleListTitle(rawTitleLower)) return false;
-            if (isBlockedName(rawTitleLower)) return false;
-            if (RECIPE_BLOG_INDICATORS.stream().anyMatch(rawTitleLower::contains)) return false;
+            if (isArticleListTitle(rawTitleLower)) return true;
+            if (isBlockedName(rawTitleLower)) return true;
+            if (RECIPE_BLOG_INDICATORS.stream().anyMatch(rawTitleLower::contains)) return true;
         }
+        return false;
+    }
+
+    // Suggestion mode: real restaurant page, but NOT required to match the exact dish
+    private boolean isPlausibleSuggestion(TavilyRestaurantResult result) {
+        if (isHardExcluded(result)) return false;
+        String haystack = normalizeTitle(result.title() + " " + result.content());
+        return RESTAURANT_CONTEXT.stream().anyMatch(haystack::contains);
+    }
+
+    private boolean isPlausible(TavilyRestaurantResult result, String normalizedTitle) {
+        if (isHardExcluded(result)) return false;
         String haystack = normalizeTitle(result.title() + " " + result.content());
 
         boolean hasContext = RESTAURANT_CONTEXT.stream().anyMatch(haystack::contains);
