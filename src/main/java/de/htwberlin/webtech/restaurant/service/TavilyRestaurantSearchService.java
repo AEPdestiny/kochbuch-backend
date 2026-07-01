@@ -77,6 +77,26 @@ public class TavilyRestaurantSearchService {
             "blog", "food", "cooking", "foodblog", "rezept", "rezepte", "essen", "kochen"
     );
 
+    // Hosts whose entire result must be dropped (community/forum content, never a restaurant page)
+    private static final Set<String> HARD_BLOCK_HOSTS = Set.of(
+            "reddit.com", "old.reddit.com", "np.reddit.com",
+            "quora.com", "stackexchange.com"
+    );
+
+    // Article/list/guide title phrases (lowercase substrings) — indicate a listicle, not a restaurant
+    private static final List<String> ARTICLE_LIST_INDICATORS = List.of(
+            "best restaurants", "top restaurants", "restaurants in",
+            "where to eat", "guide to", "ultimate guide",
+            "spots in", "places to eat", "best sushi", "best pizza",
+            "best places", "top places", "top sushi", "top pizza"
+    );
+
+    // Article/list title prefixes (lowercase) — words at the very start that indicate a listicle
+    private static final List<String> ARTICLE_LIST_PREFIXES = List.of(
+            "the top ", "top ", "best ", "the best ",
+            "the ultimate ", "where to ", "how to "
+    );
+
     // Platform/brand names that must never appear as restaurant names
     private static final Set<String> BLOCKED_RESTAURANT_NAMES = Set.of(
             "tiktok", "instagram", "facebook", "youtube", "twitter",
@@ -175,6 +195,15 @@ public class TavilyRestaurantSearchService {
     }
 
     private boolean isPlausible(TavilyRestaurantResult result, String normalizedTitle) {
+        if (isHardBlockedUrl(result.url())) return false;
+        // Discard the whole result when the source title itself is clearly a listicle,
+        // subreddit, blocked platform, or recipe/how-to page — no URL/content fallback.
+        String rawTitleLower = result.title() == null ? "" : result.title().toLowerCase(Locale.ROOT).trim();
+        if (!rawTitleLower.isEmpty()) {
+            if (isArticleListTitle(rawTitleLower)) return false;
+            if (isBlockedName(rawTitleLower)) return false;
+            if (RECIPE_BLOG_INDICATORS.stream().anyMatch(rawTitleLower::contains)) return false;
+        }
         String haystack = normalizeTitle(result.title() + " " + result.content());
 
         boolean hasContext = RESTAURANT_CONTEXT.stream().anyMatch(haystack::contains);
@@ -365,6 +394,7 @@ public class TavilyRestaurantSearchService {
         if (GENERIC_PAGE_TITLES.contains(lower)) return false;
         if (isBlockedName(lower)) return false;
         if (RECIPE_BLOG_INDICATORS.stream().anyMatch(lower::contains)) return false;
+        if (isArticleListTitle(lower)) return false;
         if (isDishTitle(trimmed, recipeTitle)) return false;
 
         // First word indicates a sentence/snippet, not a proper noun
@@ -379,6 +409,34 @@ public class TavilyRestaurantSearchService {
             String clean = word.replaceAll("[^a-z0-9äöüß]", "");
             if (BLOCKED_RESTAURANT_NAMES.contains(clean)) return true;
         }
+        return false;
+    }
+
+    private boolean isHardBlockedUrl(String url) {
+        if (url == null || url.isBlank()) return false;
+        try {
+            String host = URI.create(url).getHost();
+            if (host == null) return false;
+            String domain = host.startsWith("www.") ? host.substring(4) : host;
+            return HARD_BLOCK_HOSTS.contains(domain);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isArticleListTitle(String lower) {
+        // Reddit / subreddit prefix
+        if (lower.startsWith("r/")) return true;
+        // Prefix-based patterns like "the top ", "top ", "best ", "where to ", "how to "
+        for (String prefix : ARTICLE_LIST_PREFIXES) {
+            if (lower.startsWith(prefix)) return true;
+        }
+        // Substring patterns like "restaurants in", "where to eat", "guide to"
+        for (String phrase : ARTICLE_LIST_INDICATORS) {
+            if (lower.contains(phrase)) return true;
+        }
+        // Number + restaurants/spots/places pattern (e.g., "11 sushi restaurants", "10 places")
+        if (lower.matches(".*\\b\\d+\\s+\\w*\\s*(restaurants|spots|places).*")) return true;
         return false;
     }
 

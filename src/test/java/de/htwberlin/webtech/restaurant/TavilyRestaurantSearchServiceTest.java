@@ -788,6 +788,185 @@ class TavilyRestaurantSearchServiceTest {
         assertNull(result.getResults().getFirst().getLatitude());
     }
 
+    // === Reddit / article-list titles ===
+
+    @Test
+    @DisplayName("filters Tavily result when URL host is reddit.com")
+    void filters_result_when_url_host_is_reddit() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "r/sushi",
+                        "https://reddit.com/r/sushi/comments/xyz",
+                        "Best sushi in Berlin. Restaurant recommendations."
+                )
+        )).when(client).search("Sushi", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters Tavily result when title starts with 'r/' (subreddit)")
+    void filters_result_when_title_starts_with_r_slash() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "r/sushi",
+                        "https://example.com/sushi-thread",
+                        "Sushi restaurant in Berlin. Dining recommendations."
+                )
+        )).when(client).search("Sushi", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters article-list title 'The top 11 sushi restaurants in Berlin'")
+    void filters_the_top_11_sushi_restaurants_in_berlin() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "The top 11 sushi restaurants in Berlin",
+                        "https://foodguide.de/berlin/top-sushi",
+                        "Berlin's finest sushi restaurants. Dining recommendations and menus."
+                )
+        )).when(client).search("Sushi", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters article-list title 'Top 10 restaurants in Berlin'")
+    void filters_top_10_restaurants_in_berlin() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Top 10 restaurants in Berlin",
+                        "https://guide.de/berlin/top-restaurants",
+                        "Berlin's top restaurants of the year. Menus and reviews."
+                )
+        )).when(client).search("Pasta", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters article-list title 'Best sushi restaurants in Berlin'")
+    void filters_best_sushi_restaurants_in_berlin() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Best sushi restaurants in Berlin",
+                        "https://blog.de/berlin/best-sushi",
+                        "Berlin's best sushi restaurants. Reviews and menus."
+                )
+        )).when(client).search("Sushi", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters article-list title 'Where to eat sushi in Berlin'")
+    void filters_where_to_eat_sushi_in_berlin() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Where to eat sushi in Berlin",
+                        "https://guide.de/berlin/sushi",
+                        "Sushi spots and restaurants in Berlin. Menus and reviews."
+                )
+        )).when(client).search("Sushi", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("filters article-list title 'The ultimate guide to sushi in Berlin'")
+    void filters_ultimate_guide_to_sushi() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "The ultimate guide to sushi in Berlin",
+                        "https://mag.de/berlin/sushi-guide",
+                        "Sushi guide with restaurant menus and reviews for Berlin."
+                )
+        )).when(client).search("Sushi", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
+    @Test
+    @DisplayName("keeps valid restaurant name 'Sushi Circle' — not an article title")
+    void keeps_valid_name_sushi_circle() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Sushi Circle",
+                        "https://sushi-circle.de",
+                        "Sushi Circle serves fresh sushi in Berlin. Menu and reservations."
+                )
+        )).when(client).search("Sushi", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi", "Berlin", null, null);
+
+        assertEquals("ok", result.getStatus());
+        assertEquals(1, result.getResults().size());
+        assertEquals("Sushi Circle", result.getResults().getFirst().getName());
+    }
+
+    @Test
+    @DisplayName("keeps valid restaurant name 'Trattoria Mario' with matching pasta dish")
+    void keeps_valid_name_trattoria_mario_for_pasta() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "Trattoria Mario Berlin",
+                        "https://trattoria-mario.de",
+                        "Trattoria Mario serves authentic Pasta Carbonara. Italian restaurant with menu."
+                )
+        )).when(client).search("Pasta Carbonara", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
+
+        assertEquals("ok", result.getStatus());
+        assertEquals(1, result.getResults().size());
+        assertEquals("Trattoria Mario Berlin", result.getResults().getFirst().getName());
+    }
+
+    @Test
+    @DisplayName("returns no_results when all Tavily results are Reddit or article titles")
+    void returns_no_results_when_all_are_reddit_or_article() {
+        doReturn(List.of(
+                new TavilyRestaurantResult(
+                        "r/sushi",
+                        "https://reddit.com/r/sushi/xyz",
+                        "Sushi restaurant in Berlin. Menus."
+                ),
+                new TavilyRestaurantResult(
+                        "The top 11 sushi restaurants in Berlin",
+                        "https://foodguide.de/best-sushi",
+                        "Sushi restaurants in Berlin. Reviews and menus."
+                )
+        )).when(client).search("Sushi", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Sushi", "Berlin", null, null);
+
+        assertEquals("no_results", result.getStatus());
+        assertTrue(result.getResults().isEmpty());
+    }
+
     // === Helper ===
 
     private GeoapifyResponse geoapifyResponse(double lat, double lon, String formatted) {
