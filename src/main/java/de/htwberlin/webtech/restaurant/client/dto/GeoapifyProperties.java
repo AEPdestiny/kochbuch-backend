@@ -21,6 +21,10 @@ public class GeoapifyProperties {
     private String town;
     private String village;
     private String county;
+    private String country;
+
+    @JsonProperty("country_code")
+    private String countryCode;
 
     public String getName() {
         return name;
@@ -73,4 +77,10 @@ public class GeoapifyProperties {
 
     public String getCounty() { return county; }
     public void setCounty(String county) { this.county = county; }
+
+    public String getCountry() { return country; }
+    public void setCountry(String country) { this.country = country; }
+
+    public String getCountryCode() { return countryCode; }
+    public void setCountryCode(String countryCode) { this.countryCode = countryCode; }
 }

@@ -66,7 +66,11 @@ public class GeoapifyClient {
         }
     }
 
-    public String reverseGeocode(double lat, double lon) {
+    /** Result of reverse geocoding: city name plus country context to disambiguate ambiguous city names. */
+    public record ReverseGeocodeResult(String city, String country, String countryCode) {
+    }
+
+    public ReverseGeocodeResult reverseGeocode(double lat, double lon) {
         String configuredApiKey = apiKey.filter(v -> !v.isBlank()).orElse(null);
         if (configuredApiKey == null) return null;
         String url = REVERSE_URL + "?lat=" + lat + "&lon=" + lon + "&apiKey=" + encode(configuredApiKey);
@@ -79,14 +83,23 @@ public class GeoapifyClient {
             GeoapifyFeature feature = geo.getFeatures().get(0);
             if (feature.getProperties() == null) return null;
             GeoapifyProperties props = feature.getProperties();
-            if (props.getCity() != null && !props.getCity().isBlank()) return props.getCity();
-            if (props.getTown() != null && !props.getTown().isBlank()) return props.getTown();
-            if (props.getVillage() != null && !props.getVillage().isBlank()) return props.getVillage();
-            if (props.getCounty() != null && !props.getCounty().isBlank()) return props.getCounty();
-            return null;
+            String city = firstNonBlank(props.getCity(), props.getTown(), props.getVillage(), props.getCounty());
+            if (city == null) return null;
+            return new ReverseGeocodeResult(city, blankToNull(props.getCountry()), blankToNull(props.getCountryCode()));
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value;
+        }
+        return null;
+    }
+
+    private static String blankToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value;
     }
 
     private URI uri(String query,
