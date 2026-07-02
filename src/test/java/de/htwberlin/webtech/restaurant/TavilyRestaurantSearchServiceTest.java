@@ -1,6 +1,7 @@
 package de.htwberlin.webtech.restaurant;
 
 import de.htwberlin.webtech.restaurant.client.GeoapifyClient;
+import de.htwberlin.webtech.restaurant.client.GeoapifyClient.ReverseGeocodeResult;
 import de.htwberlin.webtech.restaurant.client.GeoapifyClientException;
 import de.htwberlin.webtech.restaurant.client.TavilyRestaurantSearchClient;
 import de.htwberlin.webtech.restaurant.client.TavilyRestaurantSearchClient.TavilyRestaurantResult;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -732,20 +735,20 @@ class TavilyRestaurantSearchServiceTest {
     @Test
     @DisplayName("GPS-only search: returns ok when reverse geocoding succeeds and restaurants found")
     void gps_only_returns_ok_when_reverse_geocoding_succeeds() {
-        doReturn("Berlin").when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
         doReturn(List.of(
                 new TavilyRestaurantResult(
                         "Pasta Palace Berlin",
                         "https://pasta-palace.de",
                         "Best Pasta Carbonara in Berlin. Restaurant menu."
                 )
-        )).when(client).search("Pasta Carbonara", "Berlin");
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
 
         TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", null, 52.52, 13.405);
 
         assertEquals("ok", result.getStatus());
         assertEquals(1, result.getResults().size());
-        assertEquals("Berlin", result.getResolvedLocation());
+        assertEquals("Berlin, Germany", result.getResolvedLocation());
     }
 
     @Test
@@ -1168,6 +1171,224 @@ class TavilyRestaurantSearchServiceTest {
         assertEquals("restaurant", underTest.deriveRestaurantCategory("Etwas Unbekanntes"));
     }
 
+    // === Location disambiguation (country) ===
+
+    @Test
+    @DisplayName("GPS + typed city: exact Tavily query and label are country-qualified (Berlin Germany)")
+    void gps_typed_city_exact_query_is_country_qualified() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Trattoria Mario", "https://trattoria-mario.de",
+                        "Trattoria Mario serves Pasta Carbonara. Italian restaurant with menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        assertEquals("ok", result.getStatus());
+        assertEquals("exact", result.getSearchMode());
+        assertEquals("Berlin, Germany", result.getResolvedLocation());
+        verify(client).search("Pasta Carbonara", "Berlin Germany");
+    }
+
+    @Test
+    @DisplayName("GPS + typed city: sushi suggestion query is country-qualified (sushi restaurant Berlin Germany)")
+    void gps_typed_city_suggestion_query_country_qualified_sushi() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of()).when(client).search("Sushi Bowl", "Berlin Germany");
+        doReturn(List.of()).when(client).searchGeneral(anyString());
+
+        underTest.search("Sushi Bowl", "Berlin", 52.52, 13.405);
+
+        verify(client).searchGeneral("sushi restaurant Berlin Germany");
+    }
+
+    @Test
+    @DisplayName("GPS + typed city: pasta suggestion query is country-qualified (italian restaurant Berlin Germany)")
+    void gps_typed_city_suggestion_query_country_qualified_italian() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of()).when(client).search("Spaghetti Carbonara", "Berlin Germany");
+        doReturn(List.of()).when(client).searchGeneral(anyString());
+
+        underTest.search("Spaghetti Carbonara", "Berlin", 52.52, 13.405);
+
+        verify(client).searchGeneral("italian restaurant Berlin Germany");
+    }
+
+    @Test
+    @DisplayName("Geoapify hit in Berlin, New Jersey is discarded when the user is in Berlin, Germany")
+    void discards_geoapify_hit_in_wrong_country() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Filomena Cucina Rustica", "https://filomena.de",
+                        "Filomena Cucina Rustica serves Pasta Carbonara. Italian restaurant. Menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
+        // Geoapify returns a restaurant in Berlin, New Jersey (~6500 km away)
+        doReturn(geoapifyResponse(39.7912, -74.9291, "Filomena, Berlin, NJ, USA"))
+                .when(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        RestaurantResponse restaurant = result.getResults().getFirst();
+        assertNull(restaurant.getDistanceMeters());
+        assertNull(restaurant.getLatitude());
+        assertNull(restaurant.getLongitude());
+        assertFalse(restaurant.getGoogleMapsUrl().contains("-74.9291"));
+    }
+
+    @Test
+    @DisplayName("Geoapify hit in Berlin, Germany is accepted and a route link is built")
+    void accepts_geoapify_hit_in_correct_country() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Sushi Circle", "https://sushi-circle.de",
+                        "Sushi Circle serves Pasta Carbonara. Restaurant menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
+        doReturn(geoapifyResponse(52.5201, 13.4052, "Sushi Circle, Berlin"))
+                .when(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        RestaurantResponse restaurant = result.getResults().getFirst();
+        assertNotNull(restaurant.getDistanceMeters());
+        assertTrue(restaurant.getGoogleMapsUrl().startsWith("https://www.google.com/maps/dir/?api=1&origin="));
+    }
+
+    @Test
+    @DisplayName("Maps link without restaurant coords uses origin + country-qualified destination when GPS is present")
+    void maps_link_uses_origin_and_country_when_no_rest_coords() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Trattoria Mario", "https://trattoria-mario.de",
+                        "Trattoria Mario serves Pasta Carbonara. Italian restaurant menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        String url = result.getResults().getFirst().getGoogleMapsUrl();
+        assertTrue(url.startsWith("https://www.google.com/maps/dir/?api=1&origin="));
+        assertTrue(url.contains("Germany"));
+    }
+
+    @Test
+    @DisplayName("Maps link without GPS still country-qualifies the search query for a known city (Berlin Germany)")
+    void maps_link_uses_known_city_country_without_gps() {
+        doReturn(List.of(
+                new TavilyRestaurantResult("Trattoria Mario", "https://trattoria-mario.de",
+                        "Trattoria Mario serves Pasta Carbonara. Italian restaurant menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", null, null);
+
+        String url = result.getResults().getFirst().getGoogleMapsUrl();
+        assertTrue(url.startsWith("https://www.google.com/maps/search/?api=1&query="));
+        assertTrue(url.contains("Germany"));
+        assertEquals("Berlin, Germany", result.getResolvedLocation());
+    }
+
+    // === GPS-primary: accuracy, country-code validation, mismatch ===
+
+    @Test
+    @DisplayName("accuracyMeters widens the Geoapify search radius (max(20km, accuracy*2), capped at 50km)")
+    void accuracy_widens_geoapify_radius() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Sushi Circle", "https://sushi-circle.de",
+                        "Sushi Circle serves Pasta Carbonara. Restaurant menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
+        doReturn(geoapifyResponse(52.5201, 13.4052, "Sushi Circle, Berlin"))
+                .when(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        // accuracy 15000 m → radius should be 30000 m
+        underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405, 15000.0);
+
+        verify(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), eq(30000), anyInt());
+    }
+
+    @Test
+    @DisplayName("poor accuracy caps the Geoapify radius at 50km")
+    void poor_accuracy_caps_radius() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Sushi Circle", "https://sushi-circle.de",
+                        "Sushi Circle serves Pasta Carbonara. Restaurant menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
+        doReturn(geoapifyResponse(52.5201, 13.4052, "Sushi Circle, Berlin"))
+                .when(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        // accuracy 90000 m → *2 = 180000, but capped at 50000
+        underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405, 90000.0);
+
+        verify(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), eq(50000), anyInt());
+    }
+
+    @Test
+    @DisplayName("Geoapify hit with a country_code different from the user's is discarded")
+    void discards_geoapify_hit_with_wrong_country_code() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Filomena Cucina Rustica", "https://filomena.de",
+                        "Filomena Cucina Rustica serves Pasta Carbonara. Italian restaurant. Menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
+        // Contrived: nearby coordinates but country_code = us → must be rejected on country mismatch alone
+        doReturn(geoapifyResponseWithCountry(52.5201, 13.4052, "Filomena, Berlin", "us"))
+                .when(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        RestaurantResponse restaurant = result.getResults().getFirst();
+        assertNull(restaurant.getDistanceMeters());
+        assertNull(restaurant.getLatitude());
+    }
+
+    @Test
+    @DisplayName("Geoapify hit with a matching country_code is accepted")
+    void accepts_geoapify_hit_with_matching_country_code() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Sushi Circle", "https://sushi-circle.de",
+                        "Sushi Circle serves Pasta Carbonara. Restaurant menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
+        doReturn(geoapifyResponseWithCountry(52.5201, 13.4052, "Sushi Circle, Berlin", "de"))
+                .when(geoapifyClient).searchRestaurants(anyString(), anyDouble(), anyDouble(), anyInt(), anyInt());
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        assertNotNull(result.getResults().getFirst().getDistanceMeters());
+    }
+
+    @Test
+    @DisplayName("Fall B: typed city in another country than GPS → GPS wins and locationMismatch is set")
+    void gps_wins_when_typed_city_country_conflicts() {
+        // User typed "Berlin" (a German city) but GPS puts them in the USA
+        doReturn(new ReverseGeocodeResult("Chicago", "United States", "us"))
+                .when(geoapifyClient).reverseGeocode(41.8781, -87.6298);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Lou Malnati's", "https://loumalnatis.com",
+                        "Lou Malnati's serves Pasta Carbonara. Italian restaurant menu.")
+        )).when(client).search("Pasta Carbonara", "Chicago United States");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 41.8781, -87.6298);
+
+        assertTrue(result.isLocationMismatch());
+        assertEquals("Chicago, United States", result.getResolvedLocation());
+        // Tavily must have searched the GPS location, not the typed "Berlin"
+        verify(client).search("Pasta Carbonara", "Chicago United States");
+    }
+
+    @Test
+    @DisplayName("Fall A: typed city matches GPS country → no mismatch flag")
+    void no_mismatch_when_typed_city_matches_gps_country() {
+        doReturn(new ReverseGeocodeResult("Berlin", "Germany", "de")).when(geoapifyClient).reverseGeocode(52.52, 13.405);
+        doReturn(List.of(
+                new TavilyRestaurantResult("Sushi Circle", "https://sushi-circle.de",
+                        "Sushi Circle serves Pasta Carbonara. Restaurant menu.")
+        )).when(client).search("Pasta Carbonara", "Berlin Germany");
+
+        TavilyRestaurantSearchResponse result = underTest.search("Pasta Carbonara", "Berlin", 52.52, 13.405);
+
+        assertFalse(result.isLocationMismatch());
+    }
+
     // === Helper ===
 
     private GeoapifyResponse geoapifyResponse(double lat, double lon, String formatted) {
@@ -1177,6 +1398,24 @@ class TavilyRestaurantSearchServiceTest {
         GeoapifyProperties properties = new GeoapifyProperties();
         properties.setFormatted(formatted);
         properties.setCategories(List.of("catering.restaurant"));
+
+        GeoapifyFeature feature = new GeoapifyFeature();
+        feature.setGeometry(geometry);
+        feature.setProperties(properties);
+
+        GeoapifyResponse response = new GeoapifyResponse();
+        response.setFeatures(List.of(feature));
+        return response;
+    }
+
+    private GeoapifyResponse geoapifyResponseWithCountry(double lat, double lon, String formatted, String countryCode) {
+        GeoapifyGeometry geometry = new GeoapifyGeometry();
+        geometry.setCoordinates(List.of(lon, lat));
+
+        GeoapifyProperties properties = new GeoapifyProperties();
+        properties.setFormatted(formatted);
+        properties.setCategories(List.of("catering.restaurant"));
+        properties.setCountryCode(countryCode);
 
         GeoapifyFeature feature = new GeoapifyFeature();
         feature.setGeometry(geometry);

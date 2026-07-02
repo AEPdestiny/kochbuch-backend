@@ -60,13 +60,20 @@ public class RestaurantResource {
                                                         @QueryParam("recipeTitle") String recipeTitle,
                                                         @QueryParam("location") String location,
                                                         @QueryParam("latitude") Double latitude,
-                                                        @QueryParam("longitude") Double longitude) {
+                                                        @QueryParam("longitude") Double longitude,
+                                                        @QueryParam("accuracyMeters") Double accuracyMeters) {
         userContext.requireUser(authorizationHeader);
+        // Ignore out-of-range coordinates instead of failing — search then falls back to the typed city
+        boolean validCoords = latitude != null && longitude != null
+                && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+        Double lat = validCoords ? latitude : null;
+        Double lon = validCoords ? longitude : null;
+        Double accuracy = (accuracyMeters != null && accuracyMeters > 0) ? accuracyMeters : null;
+
         boolean hasLocation = location != null && !location.isBlank();
-        boolean hasCoords = latitude != null && longitude != null;
-        if (recipeTitle == null || recipeTitle.isBlank() || (!hasLocation && !hasCoords)) {
+        if (recipeTitle == null || recipeTitle.isBlank() || (!hasLocation && !validCoords)) {
             return new TavilyRestaurantSearchResponse("no_results", List.of());
         }
-        return tavilyRestaurantSearchService.search(recipeTitle, location, latitude, longitude);
+        return tavilyRestaurantSearchService.search(recipeTitle, location, lat, lon, accuracy);
     }
 }

@@ -189,7 +189,7 @@ class RestaurantResourceTest {
                 .body("status", equalTo("no_results"))
                 .body("results", hasSize(0));
 
-        verify(tavilyRestaurantSearchService, never()).search(any(), any(), any(), any());
+        verify(tavilyRestaurantSearchService, never()).search(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -198,7 +198,7 @@ class RestaurantResourceTest {
         RestaurantResponse restaurant = tavilyRestaurant();
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
         doReturn(new TavilyRestaurantSearchResponse("ok", List.of(restaurant)))
-                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any());
+                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any(), any());
 
         given()
                 .header("Authorization", "Bearer valid-token")
@@ -217,7 +217,7 @@ class RestaurantResourceTest {
         AppUser currentUser = user(1L);
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
         doReturn(new TavilyRestaurantSearchResponse("unavailable", List.of()))
-                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any());
+                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any(), any());
 
         given()
                 .header("Authorization", "Bearer valid-token")
@@ -235,7 +235,7 @@ class RestaurantResourceTest {
         AppUser currentUser = user(1L);
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
         doReturn(new TavilyRestaurantSearchResponse("ok", List.of(tavilyRestaurant())))
-                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any());
+                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any(), any());
 
         given()
                 .header("Authorization", "Bearer valid-token")
@@ -247,7 +247,30 @@ class RestaurantResourceTest {
                 .statusCode(200)
                 .body("status", equalTo("ok"));
 
-        verify(tavilyRestaurantSearchService).search("Pasta Carbonara", null, 52.52, 13.405);
+        verify(tavilyRestaurantSearchService).search("Pasta Carbonara", null, 52.52, 13.405, null);
+    }
+
+    @Test
+    void tavily_search_passes_accuracy_and_ignores_out_of_range_coordinates() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(new TavilyRestaurantSearchResponse("ok", List.of(tavilyRestaurant())))
+                .when(tavilyRestaurantSearchService).search(any(), any(), any(), any(), any());
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .queryParam("recipeTitle", "Pasta Carbonara")
+                .queryParam("location", "Berlin")
+                .queryParam("latitude", 999.0)
+                .queryParam("longitude", 13.405)
+                .queryParam("accuracyMeters", 35.0)
+                .when().get("/restaurants/search")
+                .then()
+                .statusCode(200)
+                .body("status", equalTo("ok"));
+
+        // latitude 999 is out of range → coordinates dropped, accuracy still forwarded
+        verify(tavilyRestaurantSearchService).search("Pasta Carbonara", "Berlin", null, null, 35.0);
     }
 
     private RestaurantResponse tavilyRestaurant() {

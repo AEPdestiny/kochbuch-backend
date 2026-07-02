@@ -8,6 +8,7 @@ public class TavilyRestaurantSearchResponse {
     private List<RestaurantResponse> results;
     private String resolvedLocation;
     private String searchMode;
+    private boolean locationMismatch;
 
     public TavilyRestaurantSearchResponse(String status, List<RestaurantResponse> results) {
         this.status = status;
@@ -26,4 +27,8 @@ public class TavilyRestaurantSearchResponse {
     /** "exact" when results match the exact dish, "suggestions" for general cuisine fallback, null otherwise. */
     public String getSearchMode() { return searchMode; }
     public void setSearchMode(String searchMode) { this.searchMode = searchMode; }
+
+    /** True when the typed city and the GPS location clearly disagree (different country) → GPS was used. */
+    public boolean isLocationMismatch() { return locationMismatch; }
+    public void setLocationMismatch(boolean locationMismatch) { this.locationMismatch = locationMismatch; }
 }

@@ -14,10 +14,13 @@ import org.jboss.logging.Logger;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import de.htwberlin.webtech.restaurant.client.GeoapifyClient.ReverseGeocodeResult;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -143,6 +146,46 @@ public class TavilyRestaurantSearchService {
     private static final int MIN_DISTINCTIVE_LENGTH = 4;
     private static final int MAX_CONTENT_NAME_WORDS = 4;
     private static final int GEO_ENRICH_RADIUS_METERS = 20000;
+    // Upper bound for the Geoapify search circle when GPS accuracy is poor
+    private static final int MAX_ENRICH_RADIUS_METERS = 50000;
+    // A Geoapify hit farther than this from the user is a wrong-city/country match (e.g. Berlin, NJ) → discard
+    private static final int MAX_ENRICH_DISTANCE_METERS = 100000;
+
+    // Known (mostly German) city names → country context, to disambiguate ambiguous names like "Berlin"
+    private record KnownCity(String country, String countryCode) {
+    }
+
+    private static final KnownCity DE = new KnownCity("Germany", "de");
+    private static final Map<String, KnownCity> KNOWN_CITIES = Map.ofEntries(
+            Map.entry("berlin", DE),
+            Map.entry("münchen", DE), Map.entry("munchen", DE), Map.entry("munich", DE),
+            Map.entry("hamburg", DE),
+            Map.entry("köln", DE), Map.entry("koeln", DE), Map.entry("cologne", DE),
+            Map.entry("frankfurt", DE),
+            Map.entry("stuttgart", DE),
+            Map.entry("düsseldorf", DE), Map.entry("dusseldorf", DE),
+            Map.entry("dortmund", DE), Map.entry("leipzig", DE), Map.entry("dresden", DE),
+            Map.entry("bremen", DE), Map.entry("hannover", DE),
+            Map.entry("nürnberg", DE), Map.entry("nuernberg", DE), Map.entry("nuremberg", DE)
+    );
+
+    // Location context resolved from the typed city and/or the user's GPS coordinates.
+    // tavilyCountry is only set from GPS reverse geocoding; mapsCountry additionally uses the known-city table.
+    // mismatch = true when the typed city and the GPS location disagree on country → GPS won.
+    private record LocationContext(String city, String tavilyCountry, String mapsCountry,
+                                   String countryCode, boolean mismatch) {
+        String tavilyLabel() {
+            return tavilyCountry == null ? city : city + " " + tavilyCountry;
+        }
+
+        String mapsQueryLabel() {
+            return mapsCountry == null ? city : city + " " + mapsCountry;
+        }
+
+        String displayLabel() {
+            return mapsCountry == null ? city : city + ", " + mapsCountry;
+        }
+    }
 
     private static final Logger LOG = Logger.getLogger(TavilyRestaurantSearchService.class);
 
@@ -155,64 +198,124 @@ public class TavilyRestaurantSearchService {
     }
 
     public TavilyRestaurantSearchResponse search(String recipeTitle, String location, Double userLat, Double userLon) {
+        return search(recipeTitle, location, userLat, userLon, null);
+    }
+
+    public TavilyRestaurantSearchResponse search(String recipeTitle, String location,
+                                                 Double userLat, Double userLon, Double accuracyMeters) {
         if (!client.isConfigured()) {
             return new TavilyRestaurantSearchResponse("unavailable", List.of());
         }
 
-        String resolvedLocation = null;
+        boolean hasGps = userLat != null && userLon != null;
+        boolean typedBlank = location == null || location.isBlank();
 
-        // GPS-only path: derive city from coordinates when no location text supplied
-        if ((location == null || location.isBlank()) && userLat != null && userLon != null) {
-            resolvedLocation = reverseGeocodeLocation(userLat, userLon);
-            if (resolvedLocation == null || resolvedLocation.isBlank()) {
-                return new TavilyRestaurantSearchResponse("no_location", List.of());
-            }
+        // Reverse geocode the user's coordinates to derive city + country (disambiguates "Berlin")
+        ReverseGeocodeResult geo = hasGps ? reverseGeocodeSafe(userLat, userLon) : null;
+
+        // GPS-only search needs a reverse-geocoded city
+        if (typedBlank && hasGps && (geo == null || geo.city() == null || geo.city().isBlank())) {
+            return new TavilyRestaurantSearchResponse("no_location", List.of());
+        }
+        // No location text and no usable GPS (defensive — the resource already guards this)
+        if (typedBlank && geo == null) {
+            return new TavilyRestaurantSearchResponse("no_results", List.of());
         }
 
-        final String effectiveLocation = resolvedLocation != null ? resolvedLocation : location;
+        LocationContext ctx = buildLocationContext(location, geo);
+        // Show the disambiguated label whenever a country is known or the city came from GPS
+        String resolvedLocation = (ctx.mapsCountry() != null || typedBlank) ? ctx.displayLabel() : null;
+        int radius = enrichRadius(accuracyMeters);
 
         // Stage 1 — exact dish search: only real restaurants serving exactly this dish
-        List<RestaurantResponse> exact = runExactSearch(recipeTitle, effectiveLocation, userLat, userLon);
+        List<RestaurantResponse> exact = runExactSearch(recipeTitle, ctx, userLat, userLon, radius);
         if (!exact.isEmpty()) {
-            return buildResponse("ok", "exact", exact, resolvedLocation);
+            return buildResponse("ok", "exact", exact, resolvedLocation, ctx.mismatch());
         }
 
         // Stage 2 — general cuisine suggestions when no exact match survives filtering
         String category = deriveRestaurantCategory(recipeTitle);
-        List<RestaurantResponse> suggestions = runSuggestionSearch(category, effectiveLocation, recipeTitle, userLat, userLon);
+        List<RestaurantResponse> suggestions = runSuggestionSearch(category, ctx, recipeTitle, userLat, userLon, radius);
         if (!suggestions.isEmpty()) {
-            return buildResponse("ok", "suggestions", suggestions, resolvedLocation);
+            return buildResponse("ok", "suggestions", suggestions, resolvedLocation, ctx.mismatch());
         }
 
-        return buildResponse("no_results", null, List.of(), resolvedLocation);
+        return buildResponse("no_results", null, List.of(), resolvedLocation, ctx.mismatch());
+    }
+
+    // Geoapify search circle: 20 km by default, widened for poor GPS accuracy, capped at 50 km
+    private int enrichRadius(Double accuracyMeters) {
+        if (accuracyMeters == null || accuracyMeters <= 0) return GEO_ENRICH_RADIUS_METERS;
+        int scaled = (int) Math.min(MAX_ENRICH_RADIUS_METERS, Math.max(GEO_ENRICH_RADIUS_METERS, accuracyMeters * 2));
+        return scaled;
+    }
+
+    // Builds the location context: city + country used for Tavily queries, Maps links and display.
+    // GPS coordinates are the primary truth: when the typed city clearly belongs to a different country
+    // than the user's GPS position, GPS wins and the typed city is discarded (Fall B).
+    private LocationContext buildLocationContext(String typedLocation, ReverseGeocodeResult geo) {
+        String typed = typedLocation == null ? "" : typedLocation.trim();
+        String gpsCity = geo != null ? blankToNull(geo.city()) : null;
+        String gpsCountry = geo != null ? blankToNull(geo.country()) : null;
+        String gpsCountryCode = geo != null ? blankToNull(geo.countryCode()) : null;
+
+        if (typed.isBlank()) {
+            // GPS-only: city and country come from reverse geocoding
+            return new LocationContext(gpsCity, gpsCountry, gpsCountry, gpsCountryCode, false);
+        }
+
+        KnownCity known = KNOWN_CITIES.get(typed.toLowerCase(Locale.ROOT));
+        String knownCountryCode = known != null ? known.countryCode() : null;
+
+        // Fall B — typed city belongs to a different country than the GPS position: GPS wins.
+        boolean crossCountryConflict = gpsCountryCode != null && knownCountryCode != null
+                && !gpsCountryCode.equalsIgnoreCase(knownCountryCode);
+        if (crossCountryConflict) {
+            String city = gpsCity != null ? gpsCity : typed;
+            return new LocationContext(city, gpsCountry, gpsCountry, gpsCountryCode, true);
+        }
+
+        // Fall A / same country / unknown typed city: keep the typed city, country from GPS or known table
+        String knownCountry = known != null ? known.country() : null;
+        String countryCode = gpsCountryCode != null ? gpsCountryCode : knownCountryCode;
+        // Tavily query only gets a country when GPS confirms it; Maps/display also use the known-city table
+        String mapsCountry = gpsCountry != null ? gpsCountry : knownCountry;
+        return new LocationContext(typed, gpsCountry, mapsCountry, countryCode, false);
+    }
+
+    private static String blankToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value;
     }
 
     private TavilyRestaurantSearchResponse buildResponse(String status, String searchMode,
-                                                         List<RestaurantResponse> results, String resolvedLocation) {
+                                                         List<RestaurantResponse> results,
+                                                         String resolvedLocation, boolean locationMismatch) {
         TavilyRestaurantSearchResponse response = new TavilyRestaurantSearchResponse(status, results);
         response.setSearchMode(searchMode);
         if (resolvedLocation != null) {
             response.setResolvedLocation(resolvedLocation);
         }
+        response.setLocationMismatch(locationMismatch);
         return response;
     }
 
-    private List<RestaurantResponse> runExactSearch(String recipeTitle, String location, Double userLat, Double userLon) {
-        List<TavilyRestaurantResult> raw = client.search(recipeTitle, location);
+    private List<RestaurantResponse> runExactSearch(String recipeTitle, LocationContext ctx,
+                                                    Double userLat, Double userLon, int radius) {
+        List<TavilyRestaurantResult> raw = client.search(recipeTitle, ctx.tavilyLabel());
         String normalizedTitle = normalizeTitle(recipeTitle);
         return raw.stream()
                 .filter(result -> isPlausible(result, normalizedTitle))
-                .map(result -> toResponse(result, location, recipeTitle, userLat, userLon))
+                .map(result -> toResponse(result, ctx, recipeTitle, userLat, userLon, radius))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
-    private List<RestaurantResponse> runSuggestionSearch(String category, String location, String recipeTitle,
-                                                         Double userLat, Double userLon) {
-        List<TavilyRestaurantResult> raw = client.searchGeneral(suggestionQuery(category, location));
+    private List<RestaurantResponse> runSuggestionSearch(String category, LocationContext ctx, String recipeTitle,
+                                                         Double userLat, Double userLon, int radius) {
+        List<TavilyRestaurantResult> raw = client.searchGeneral(suggestionQuery(category, ctx.tavilyLabel()));
         return raw.stream()
                 .filter(this::isPlausibleSuggestion)
-                .map(result -> toResponse(result, location, recipeTitle, userLat, userLon))
+                .map(result -> toResponse(result, ctx, recipeTitle, userLat, userLon, radius))
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -251,7 +354,7 @@ public class TavilyRestaurantSearchService {
         return false;
     }
 
-    private String reverseGeocodeLocation(double lat, double lon) {
+    private ReverseGeocodeResult reverseGeocodeSafe(double lat, double lon) {
         try {
             return geoapifyClient.reverseGeocode(lat, lon);
         } catch (Exception e) {
@@ -310,7 +413,8 @@ public class TavilyRestaurantSearchService {
         return false;
     }
 
-    private RestaurantResponse toResponse(TavilyRestaurantResult result, String location, String recipeTitle, Double userLat, Double userLon) {
+    private RestaurantResponse toResponse(TavilyRestaurantResult result, LocationContext ctx, String recipeTitle,
+                                          Double userLat, Double userLon, int radius) {
         String name = extractRestaurantName(result, recipeTitle);
         if (name == null) return null;
 
@@ -320,33 +424,46 @@ public class TavilyRestaurantSearchService {
         response.setDistanceMeters(null);
         response.setLatitude(null);
         response.setLongitude(null);
-        enrichWithGeoapify(response, location, userLat, userLon);
-        response.setGoogleMapsUrl(mapsUrl(name, location, response.getLatitude(), response.getLongitude(), userLat, userLon));
+        enrichWithGeoapify(response, ctx, userLat, userLon, radius);
+        response.setGoogleMapsUrl(mapsUrl(name, ctx.mapsQueryLabel(), response.getLatitude(), response.getLongitude(), userLat, userLon));
         return response;
     }
 
-    private void enrichWithGeoapify(RestaurantResponse response, String location, Double userLat, Double userLon) {
+    private void enrichWithGeoapify(RestaurantResponse response, LocationContext ctx,
+                                    Double userLat, Double userLon, int radius) {
         if (userLat == null || userLon == null) return;
         try {
-            String query = (location != null && !location.isBlank())
-                    ? response.getName() + " " + location
-                    : response.getName();
-            GeoapifyResponse geoResponse = geoapifyClient.searchRestaurants(query, userLat, userLon, GEO_ENRICH_RADIUS_METERS, 1);
+            String query = response.getName() + " " + ctx.city();
+            GeoapifyResponse geoResponse = geoapifyClient.searchRestaurants(query, userLat, userLon, radius, 1);
             if (geoResponse == null || geoResponse.getFeatures() == null || geoResponse.getFeatures().isEmpty()) return;
             GeoapifyFeature feature = geoResponse.getFeatures().get(0);
             if (feature.getGeometry() == null || feature.getProperties() == null) return;
             // Only enrich with results confirmed as catering/restaurant
             List<String> cats = feature.getProperties().getCategories();
             if (cats == null || cats.stream().noneMatch(c -> c.startsWith("catering"))) return;
+            // GPS coordinates are the truth: reject a hit whose country differs from the user's country
+            String hitCountryCode = blankToNull(feature.getProperties().getCountryCode());
+            if (ctx.countryCode() != null && hitCountryCode != null
+                    && !hitCountryCode.equalsIgnoreCase(ctx.countryCode())) {
+                LOG.debugf("Discarding Geoapify hit for '%s': country %s != user country %s",
+                        response.getName(), hitCountryCode, ctx.countryCode());
+                return;
+            }
             List<Double> coords = feature.getGeometry().getCoordinates();
             if (coords == null || coords.size() < 2 || coords.get(0) == null || coords.get(1) == null) return;
             double restLon = coords.get(0);
             double restLat = coords.get(1);
+            int distance = haversineMeters(userLat, userLon, restLat, restLon);
+            // Reject hits that are implausibly far away (wrong city/country, e.g. Berlin, New Jersey)
+            if (distance > MAX_ENRICH_DISTANCE_METERS) {
+                LOG.debugf("Discarding Geoapify hit for '%s': %d m from user is too far", response.getName(), distance);
+                return;
+            }
             response.setLatitude(restLat);
             response.setLongitude(restLon);
             String address = feature.getProperties().getFormatted();
             if (address != null && !address.isBlank()) response.setAddress(address);
-            response.setDistanceMeters(haversineMeters(userLat, userLon, restLat, restLon));
+            response.setDistanceMeters(distance);
         } catch (GeoapifyClientException e) {
             LOG.debugf("Geoapify enrichment skipped for '%s': %s", response.getName(), e.getMessage());
         } catch (Exception e) {
@@ -578,16 +695,26 @@ public class TavilyRestaurantSearchService {
                 .trim();
     }
 
-    private String mapsUrl(String restaurantName, String location, Double restLat, Double restLon, Double userLat, Double userLon) {
-        if (restLat != null && restLon != null && userLat != null && userLon != null) {
+    private String mapsUrl(String restaurantName, String mapsQueryLabel, Double restLat, Double restLon, Double userLat, Double userLon) {
+        boolean hasRestCoords = restLat != null && restLon != null;
+        boolean hasUserCoords = userLat != null && userLon != null;
+
+        // Precise route when both endpoints are known
+        if (hasRestCoords && hasUserCoords) {
             String origin = URLEncoder.encode(userLat + "," + userLon, StandardCharsets.UTF_8);
             String dest = URLEncoder.encode(restLat + "," + restLon, StandardCharsets.UTF_8);
             return "https://www.google.com/maps/dir/?api=1&origin=" + origin + "&destination=" + dest;
         }
-        if (restLat != null && restLon != null) {
+        if (hasRestCoords) {
             return "https://www.google.com/maps/search/?api=1&query=" + restLat + "," + restLon;
         }
-        String query = URLEncoder.encode(restaurantName + " " + location, StandardCharsets.UTF_8);
+
+        // No restaurant coordinates: use a country-qualified text query so "Berlin" is never ambiguous
+        String query = URLEncoder.encode(restaurantName + " " + mapsQueryLabel, StandardCharsets.UTF_8);
+        if (hasUserCoords) {
+            String origin = URLEncoder.encode(userLat + "," + userLon, StandardCharsets.UTF_8);
+            return "https://www.google.com/maps/dir/?api=1&origin=" + origin + "&destination=" + query;
+        }
         return "https://www.google.com/maps/search/?api=1&query=" + query;
     }
 }
