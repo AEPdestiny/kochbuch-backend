@@ -49,6 +49,11 @@ public class AiIntentDetector {
             );
         }
 
+        if (isShoppingListConfirmation(normalized) && previousAssistantProvidedShoppingIngredients(history)) {
+            AiActionPlan plan = action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.89, null, null);
+            return result(language, normalized, AiIntent.ADD_TO_SHOPPING_LIST, List.of(plan), false, null, 0.89);
+        }
+
         if ((containsAny(normalized, "einkaufsliste", "shopping list")
                 && containsAny(normalized, "fuge", "fuege", "hinzu", "hinzufugen", "add", "put", "setz", "setze", "zutaten"))
                 || containsAll(normalized, "zutaten", "hinzu")
@@ -142,6 +147,42 @@ public class AiIntentDetector {
             selections.add(Integer.parseInt(matcher.group(1)));
         }
         return new ArrayList<>(selections);
+    }
+
+    private boolean isShoppingListConfirmation(String normalized) {
+        return containsAny(normalized,
+                "alle",
+                "alles",
+                "ja",
+                "ok",
+                "okay",
+                "nimm alle",
+                "fuge alle hinzu",
+                "fuege alle hinzu",
+                "hinzufugen",
+                "add all",
+                "yes",
+                "evet",
+                "tamam");
+    }
+
+    private boolean previousAssistantProvidedShoppingIngredients(List<AiChatRequest.AiChatTurn> history) {
+        if (history == null || history.isEmpty()) {
+            return false;
+        }
+        return history.stream()
+                .filter(turn -> turn != null && "assistant".equalsIgnoreCase(turn.getRole()) && turn.getText() != null)
+                .map(AiChatRequest.AiChatTurn::getText)
+                .map(this::normalize)
+                .anyMatch(text -> containsAny(text,
+                        "zutaten",
+                        "fehlende zutaten",
+                        "folgende zutaten hinzufugen",
+                        "du benotigst",
+                        "brauchst du",
+                        "could add",
+                        "ingredients",
+                        "malzemeler"));
     }
 
     private boolean previousAssistantOfferedNumberedOptions(List<AiChatRequest.AiChatTurn> history) {

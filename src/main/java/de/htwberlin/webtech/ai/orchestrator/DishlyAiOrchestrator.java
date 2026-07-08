@@ -87,6 +87,8 @@ public class DishlyAiOrchestrator {
         String systemPrompt = """
                 Du bist Dishly, ein smarter Koch-Assistent.
                 Du hilfst Nutzern Rezepte zu finden, Mahlzeiten zu planen und Einkaeufe zu verwalten.
+                Wenn du ein ad-hoc Gericht vorschlaegst und eine Einkaufslisten-Folgeaktion anbietest,
+                schreibe immer eine eindeutige Zutatenzeile wie "Zutaten: ..." oder "Fehlende Zutaten: ...".
                 Wenn ein Nutzer beschreibt was er essen moechte, schlage ein Rezept vor und frage:
                 Moechtest du
                 (1) die Zutaten zur Einkaufsliste hinzufuegen,
@@ -131,7 +133,7 @@ public class DishlyAiOrchestrator {
         }
         List<String> ingredients = extractIngredients(context.message(), context.history());
         if (ingredients.isEmpty()) {
-            return new AiChatResponse("Ich habe verstanden, dass du Zutaten zur Einkaufsliste hinzufuegen moechtest. Welche Zutaten soll ich hinzufuegen?", true);
+            return new AiChatResponse("Welche konkreten Zutaten soll ich hinzufuegen? Schreib sie bitte z.B. so: Limette, Olivenoel, Salz.", true);
         }
         try {
             AiShoppingListToolResult result = shoppingListTool.addMissingIngredients(currentUser, ingredients);
@@ -148,6 +150,21 @@ public class DishlyAiOrchestrator {
 
     private String shoppingListToolMessage(AiShoppingListToolResult result) {
         StringBuilder message = new StringBuilder();
+        if (!result.changedAnything() && (!result.skippedPantryItems().isEmpty() || !result.skippedShoppingListItems().isEmpty())) {
+            message.append("Ich habe nichts neu hinzugefuegt, weil ");
+            if (!result.skippedPantryItems().isEmpty()) {
+                message.append(joinNames(result.skippedPantryItems()))
+                        .append(result.skippedPantryItems().size() == 1 ? " bereits im Vorrat ist" : " bereits im Vorrat sind");
+            }
+            if (!result.skippedPantryItems().isEmpty() && !result.skippedShoppingListItems().isEmpty()) {
+                message.append(" und ");
+            }
+            if (!result.skippedShoppingListItems().isEmpty()) {
+                message.append(joinNames(result.skippedShoppingListItems()))
+                        .append(result.skippedShoppingListItems().size() == 1 ? " schon auf deiner Einkaufsliste steht" : " schon auf deiner Einkaufsliste stehen");
+            }
+            return message.append(".").toString();
+        }
         if (result.changedAnything()) {
             message.append("Erledigt. Ich habe ")
                     .append(joinNames(result.addedItems()))
@@ -195,14 +212,14 @@ public class DishlyAiOrchestrator {
         }
         String normalized = text.replaceAll("\\s+", " ").trim();
         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-                "(?i)(?:zutaten|ingredients|malzemeler)\\s*[:\\-]\\s*([^.!?\\n]+)"
+                "(?iu)(?:fehlende\\s+zutaten|zutaten|ingredients|malzemeler|f.r\\s+das\\s+rezept\\s+brauchst\\s+du|fuer\\s+das\\s+rezept\\s+brauchst\\s+du|du\\s+ben.tigst|du\\s+benoetigst|folgende\\s+zutaten\\s+hinzuf.gen|folgende\\s+zutaten\\s+hinzufuegen|could\\s+add)\\s*[:\\-]?\\s*([^.!?\\n]+)"
         );
         java.util.regex.Matcher matcher = pattern.matcher(normalized);
         if (!matcher.find()) {
             return List.of();
         }
         String ingredientText = matcher.group(1)
-                .replaceAll("(?i)\\b(?:moechtest|mochtest|willst|soll ich|would you|ister misin)\\b.*$", "");
+                .replaceAll("(?iu)\\b(?:m.chtest|moechtest|mochtest|willst|soll ich|would you|ister misin)\\b.*$", "");
         return java.util.Arrays.stream(ingredientText.split("\\s*,\\s*|\\s+und\\s+|\\s+and\\s+|\\s+ve\\s+"))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())

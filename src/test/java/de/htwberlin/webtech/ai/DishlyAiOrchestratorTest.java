@@ -114,6 +114,8 @@ class DishlyAiOrchestratorTest {
         String systemPrompt = systemPromptCaptor.getValue();
         String prompt = promptCaptor.getValue();
         assertTrue(systemPrompt.contains("Nutzerantworten wie \"1\", \"2\", \"3\""));
+        assertTrue(systemPrompt.contains("Zutaten: ..."));
+        assertTrue(systemPrompt.contains("Fehlende Zutaten: ..."));
         assertTrue(prompt.contains("Bisheriger Chatverlauf"));
         assertTrue(prompt.contains("User: Was soll ich kochen?"));
         assertTrue(prompt.contains("Assistant: Ich empfehle Dishly Pasta."));
@@ -183,6 +185,42 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
+    void answer_should_extract_following_ingredients_add_pattern_for_numeric_selection() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Olivenoel", "Salz", "Pfeffer");
+        doReturn(new AiShoppingListToolResult(ingredients, List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "1", List.of(
+                turn("assistant", "Folgende Zutaten hinzufuegen: Olivenoel, Salz, Pfeffer. Moechtest du (1) die Zutaten zur Einkaufsliste hinzufuegen?")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Olivenoel, Salz und Pfeffer"));
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_treat_all_as_shopping_list_follow_up_when_previous_message_has_ingredients() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Olivenoel", "Salz", "Pfeffer");
+        doReturn(new AiShoppingListToolResult(ingredients, List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "alle", List.of(
+                turn("assistant", "Folgende Zutaten hinzufuegen: Olivenoel, Salz, Pfeffer.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Olivenoel, Salz und Pfeffer"));
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
     void answer_should_execute_natural_shopping_list_command_when_ingredients_are_clear() {
         AppUser user = user();
         stubEmptyContext(user);
@@ -226,8 +264,29 @@ class DishlyAiOrchestratorTest {
         AiChatResponse response = underTest.answer(user, "fuege es zur Einkaufsliste hinzu", List.of());
 
         assertTrue(response.isConfigured());
-        assertTrue(response.getMessage().contains("Welche Zutaten"));
+        assertTrue(response.getMessage().contains("Welche konkreten Zutaten"));
+        assertTrue(response.getMessage().contains("Limette, Olivenoel, Salz"));
         verifyNoInteractions(shoppingListTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_report_when_all_ingredients_are_already_available_or_listed() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Avocado", "Reis", "Limette");
+        doReturn(new AiShoppingListToolResult(List.of(), List.of("Avocado", "Reis"), List.of("Limette")))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "1", List.of(
+                turn("assistant", "Zutaten: Avocado, Reis, Limette. Moechtest du (1) die Zutaten zur Einkaufsliste hinzufuegen?")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Ich habe nichts neu hinzugefuegt, weil"));
+        assertTrue(response.getMessage().contains("Avocado und Reis bereits im Vorrat sind"));
+        assertTrue(response.getMessage().contains("Limette schon auf deiner Einkaufsliste steht"));
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
         verifyNoInteractions(groqClient);
     }
 
