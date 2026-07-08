@@ -27,6 +27,15 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Turns a week's meal plan into a shopping list: aggregates every planned recipe's
+ * ingredients (summing quantities for the same ingredient across recipes), converts units
+ * to a common base per {@link #unitFamily(String)}/{@link #canonicalUnit(String)} so e.g.
+ * "500 g" and "0.5 kg" of the same ingredient combine correctly, then subtracts what the
+ * user already has in their pantry. Entries the algorithm can't confidently parse or match
+ * (freetext meal plan entries, unparsable quantities, unit families it can't compare) are
+ * routed to the response's "needs review" list instead of silently guessing.
+ */
 @ApplicationScoped
 public class MealPlanShoppingListService {
 
@@ -289,6 +298,10 @@ public class MealPlanShoppingListService {
         return null;
     }
 
+    // Maps both English and German unit spellings (and common abbreviations) to one German
+    // canonical form, so quantities entered in either language still aggregate together.
+    // The frontend also stores German unit labels for its own suggestions (see
+    // ingredientCategories.ts's UNIT_LABELS_DE) — this method is why that's safe to send back.
     private String canonicalUnit(String unit) {
         if (unit == null || unit.isBlank()) {
             return null;

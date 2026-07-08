@@ -12,6 +12,7 @@ import jakarta.transaction.Transactional;
 
 import java.util.List;
 
+/** Owner-scoped CRUD for a user's pantry items (list/create/update/delete). */
 @ApplicationScoped
 public class PantryService {
 

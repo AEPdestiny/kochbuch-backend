@@ -12,6 +12,10 @@ import jakarta.transaction.Transactional;
 
 import java.util.List;
 
+/**
+ * Owner-scoped CRUD for a user's manually managed shopping list items. For the list
+ * auto-generated from the weekly meal plan, see {@link de.htwberlin.webtech.mealplan.service.MealPlanShoppingListService}.
+ */
 @ApplicationScoped
 public class ShoppingListService {
 

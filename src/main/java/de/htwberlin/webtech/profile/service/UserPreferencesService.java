@@ -8,6 +8,11 @@ import de.htwberlin.webtech.user.entity.AppUser;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+/**
+ * Reads and updates a user's profile preferences (diet, allergies, calorie goal, ...).
+ * A user has no preferences row until first accessed; getOrCreate() lazily creates one
+ * with defaults, so callers never have to handle a "not found" case for this entity.
+ */
 @ApplicationScoped
 public class UserPreferencesService {
 

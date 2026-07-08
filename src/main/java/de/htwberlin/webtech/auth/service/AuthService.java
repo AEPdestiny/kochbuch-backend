@@ -13,6 +13,12 @@ import de.htwberlin.webtech.user.repository.AppUserRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+/**
+ * Registration, login, and "current user" lookup. Issues access tokens via
+ * {@link TokenService} on successful register/login; email/username uniqueness is
+ * enforced on registration, and both login failure paths return the same generic
+ * "Invalid email or password" message so a caller can't tell which one was wrong.
+ */
 @ApplicationScoped
 public class AuthService {
 

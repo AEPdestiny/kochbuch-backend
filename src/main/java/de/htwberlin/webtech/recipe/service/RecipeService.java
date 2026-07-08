@@ -15,6 +15,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Core CRUD and query logic for recipes: creation/update/delete with ownership checks,
+ * the caller's own recipes, and the public recipe feed. The public feed is not a plain
+ * "latest N" query — {@link #findAllPublished(String, String)} balances results across
+ * {@link #PUBLIC_CATEGORIES} and deduplicates near-identical entries (see
+ * {@link #duplicateKey} / {@link #qualityScore}) so the feed doesn't collapse into one
+ * category or show the same recipe twice under slightly different metadata.
+ */
 @ApplicationScoped
 public class RecipeService {
 
@@ -64,6 +72,14 @@ public class RecipeService {
         return findAllPublished(language, null);
     }
 
+    /**
+     * Public recipe feed for the given language, optionally filtered by a search term.
+     * With a search term: a single substring search, deduplicated and capped at
+     * {@link #PUBLIC_RECIPE_LIMIT}. Without one: fills a balanced result set by querying
+     * each of {@link #PUBLIC_CATEGORIES} up to {@link #CATEGORY_TARGET} entries each, then
+     * tops up with a general random query if categories didn't fill the page — so the
+     * default feed shows a mix of meal types instead of whichever category has the most rows.
+     */
     public List<Recipe> findAllPublished(String language, String search) {
         String normalizedLanguage = normalizeLanguage(language);
         String normalizedSearch = search == null ? "" : search.trim();
@@ -224,6 +240,10 @@ public class RecipeService {
         }
     }
 
+    // Identity for deduplication: a user's own recipes are always distinct by id; external/
+    // seeded recipes without an owner are matched by external id, then source URL, then a
+    // normalized title+image pair — so the same recipe imported twice under different rows
+    // still collapses to one feed entry.
     private String duplicateKey(Recipe recipe) {
         if (recipe.getOwner() != null) {
             return "user:" + (recipe.getId() == null ? System.identityHashCode(recipe) : recipe.getId());
@@ -254,6 +274,9 @@ public class RecipeService {
         return existing.getId() == null || candidate.getId() < existing.getId();
     }
 
+    // Ranks duplicate candidates so the "best" version wins the slot: published beats
+    // unpublished, having an image beats not, matching the currently-queried category beats
+    // not, and richer ingredients/instructions break remaining ties.
     private int qualityScore(Recipe recipe, String preferredCategory) {
         int score = 0;
         if (recipe.isPublished()) {

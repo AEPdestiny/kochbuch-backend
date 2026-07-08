@@ -18,6 +18,13 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
+/**
+ * Manages a user's weekly meal plan: one entry per (date, slot) pair, each pointing
+ * either at an owned {@link Recipe} or a freetext "custom" meal with optional manually
+ * entered nutrition values (the "snapshot" fields — see {@link #applySnapshots}). Weeks
+ * always start on Monday ({@link #normalizeWeekStart}) regardless of what date is passed in,
+ * so the frontend can request "the week containing this date" without computing that itself.
+ */
 @ApplicationScoped
 public class MealPlanService {
 
@@ -92,6 +99,13 @@ public class MealPlanService {
         mealPlanRepository.delete(mealPlan);
     }
 
+    /**
+     * Moves a planned entry to a different date/slot (e.g. drag-and-drop in the week view).
+     * If the target slot is already occupied, either fails (swapIfOccupied=false) or swaps
+     * the two entries' contents in place (swapIfOccupied=true) rather than deleting either —
+     * both entities keep their original id/date/slot identity, only recipe/title/snapshot
+     * fields trade places, via {@link MealPlanContent}.
+     */
     @Transactional
     public List<MealPlan> moveEntry(AppUser currentUser,
                                     Long entryId,
@@ -174,6 +188,11 @@ public class MealPlanService {
         }
     }
 
+    // A recipe-backed entry always reads its calories/protein/image live from the linked
+    // Recipe, so any stale snapshot on it is cleared. A freetext (no-recipe) entry has no
+    // such live source, so its snapshot values are stored as given (already validated by
+    // validateSnapshotValues) — this is also why a freetext entry can legitimately have
+    // no calories at all: the snapshot fields are optional, unlike a recipe's calories.
     private void applySnapshots(MealPlan mealPlan, Recipe recipe, MealPlanEntryRequest request) {
         if (recipe != null) {
             mealPlan.setCaloriesSnapshot(null);
