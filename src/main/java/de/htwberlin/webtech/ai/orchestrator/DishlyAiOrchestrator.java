@@ -4,7 +4,9 @@ import de.htwberlin.webtech.ai.client.GroqClient;
 import de.htwberlin.webtech.ai.client.GroqClientException;
 import de.htwberlin.webtech.ai.dto.AiChatRequest;
 import de.htwberlin.webtech.ai.dto.AiChatResponse;
+import de.htwberlin.webtech.ai.model.AiActionPlan;
 import de.htwberlin.webtech.ai.model.AiConversationContext;
+import de.htwberlin.webtech.ai.model.AiIntentDetectionResult;
 import de.htwberlin.webtech.favorite.repository.ExternalRecipeFavoriteRepository;
 import de.htwberlin.webtech.mealplan.entity.MealPlan;
 import de.htwberlin.webtech.mealplan.repository.MealPlanRepository;
@@ -49,6 +51,7 @@ public class DishlyAiOrchestrator {
     private final ExternalRecipeFavoriteRepository favoriteRepository;
     private final ShoppingListItemRepository shoppingListItemRepository;
     private final RecipeRepository recipeRepository;
+    private final AiIntentDetector intentDetector;
 
     public DishlyAiOrchestrator(GroqClient groqClient,
                                 UserPreferencesRepository preferencesRepository,
@@ -56,7 +59,8 @@ public class DishlyAiOrchestrator {
                                 MealPlanRepository mealPlanRepository,
                                 ExternalRecipeFavoriteRepository favoriteRepository,
                                 ShoppingListItemRepository shoppingListItemRepository,
-                                RecipeRepository recipeRepository) {
+                                RecipeRepository recipeRepository,
+                                AiIntentDetector intentDetector) {
         this.groqClient = groqClient;
         this.preferencesRepository = preferencesRepository;
         this.pantryItemRepository = pantryItemRepository;
@@ -64,10 +68,12 @@ public class DishlyAiOrchestrator {
         this.favoriteRepository = favoriteRepository;
         this.shoppingListItemRepository = shoppingListItemRepository;
         this.recipeRepository = recipeRepository;
+        this.intentDetector = intentDetector;
     }
 
     public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history) {
         AiConversationContext context = buildConversationContext(currentUser, message, history);
+        AiIntentDetectionResult intent = intentDetector.detect(context.message(), context.history());
         String systemPrompt = """
                 Du bist Dishly, ein smarter Koch-Assistent.
                 Du hilfst Nutzern Rezepte zu finden, Mahlzeiten zu planen und Einkaeufe zu verwalten.
@@ -83,12 +89,18 @@ public class DishlyAiOrchestrator {
                 Empfiehl stattdessen konkrete naechste Schritte, die der Nutzer selbst ausfuehren kann.
                 Nutzerantworten wie "1", "2", "3", "ja", "oeffne das" oder "dieses Gericht" koennen sich auf vorherige Assistant-Optionen beziehen.
                 Nutze den bereitgestellten Chatverlauf, um solche Bezuege aufzuloesen.
+                Nutze den Abschnitt "Detected intent" als interne Orientierung fuer die wahrscheinliche Nutzerabsicht.
                 Wenn der Bezug weiterhin mehrdeutig ist, frage kurz nach.
+                Wenn eine erkannte Aktion noch nicht ausgefuehrt werden kann, sage kurz, dass du die Absicht verstanden hast, und frage nach fehlenden Angaben.
                 Wenn Daten leer oder nicht verfuegbar sind, sage das ehrlich.
                 Wenn eine echte Aktion nicht eindeutig moeglich ist, frage nach den fehlenden Angaben.
-                Antworte kurz, konkret und auf Deutsch.
+                Behaupte nie, dass Einkaufsliste, Wochenplan, Rezeptdetails oder Restaurants bereits geaendert/geoeffnet/gesucht wurden.
+                Antworte kurz, konkret und in der Sprache des Nutzers, wenn sie erkennbar ist.
                 """;
-        String prompt = context.appContextSummary() + buildHistory(context.history()) + "\n\nAktuelle Nutzerfrage: " + context.message();
+        String prompt = context.appContextSummary()
+                + buildHistory(context.history())
+                + buildDetectedIntent(intent)
+                + "\n\nAktuelle Nutzerfrage: " + context.message();
         try {
             return new AiChatResponse(groqClient.complete(systemPrompt, prompt), true);
         } catch (GroqClientException exception) {
@@ -97,6 +109,42 @@ public class DishlyAiOrchestrator {
             }
             return new AiChatResponse("Dishly AI konnte Groq gerade nicht erreichen: " + exception.getMessage(), false);
         }
+    }
+
+    private String buildDetectedIntent(AiIntentDetectionResult intent) {
+        String plans = intent.plannedActions().isEmpty()
+                ? "keine"
+                : intent.plannedActions().stream()
+                .map(this::actionPlanLine)
+                .collect(Collectors.joining("; "));
+        return """
+
+                Detected intent:
+                language=%s
+                normalizedRequest=%s
+                primaryIntent=%s
+                confidence=%.2f
+                plannedActions=%s
+                needsClarification=%s
+                clarificationQuestion=%s
+                executionStatus=not_executed
+                """.formatted(
+                intent.detectedLanguage(),
+                fallback(intent.normalizedUserRequest(), "unbekannt"),
+                intent.primaryIntent(),
+                intent.confidence(),
+                plans,
+                intent.needsClarification(),
+                fallback(intent.clarificationQuestion(), "keine")
+        );
+    }
+
+    private String actionPlanLine(AiActionPlan plan) {
+        return "type=" + plan.type()
+                + ", confidence=" + String.format(Locale.ROOT, "%.2f", plan.confidence())
+                + ", targetDate=" + (plan.targetDate() == null ? "unknown" : plan.targetDate())
+                + ", mealSlot=" + (plan.mealSlot() == null ? "unknown" : plan.mealSlot())
+                + ", requiresConfirmation=" + plan.requiresConfirmation();
     }
 
     private AiConversationContext buildConversationContext(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history) {

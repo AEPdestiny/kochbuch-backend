@@ -4,6 +4,7 @@ import de.htwberlin.webtech.ai.client.GroqClient;
 import de.htwberlin.webtech.ai.client.GroqClientException;
 import de.htwberlin.webtech.ai.dto.AiChatRequest;
 import de.htwberlin.webtech.ai.dto.AiChatResponse;
+import de.htwberlin.webtech.ai.orchestrator.AiIntentDetector;
 import de.htwberlin.webtech.ai.orchestrator.DishlyAiOrchestrator;
 import de.htwberlin.webtech.favorite.repository.ExternalRecipeFavoriteRepository;
 import de.htwberlin.webtech.mealplan.repository.MealPlanRepository;
@@ -48,7 +49,8 @@ class DishlyAiOrchestratorTest {
             mealPlanRepository,
             favoriteRepository,
             shoppingListItemRepository,
-            recipeRepository
+            recipeRepository,
+            new AiIntentDetector()
     );
 
     @Test
@@ -110,6 +112,9 @@ class DishlyAiOrchestratorTest {
         assertTrue(prompt.contains("Bisheriger Chatverlauf"));
         assertTrue(prompt.contains("User: Was soll ich kochen?"));
         assertTrue(prompt.contains("Assistant: Ich empfehle Dishly Pasta."));
+        assertTrue(prompt.contains("Detected intent"));
+        assertTrue(prompt.contains("primaryIntent=FOLLOW_UP_SELECTION"));
+        assertTrue(prompt.contains("plannedActions=type=FIND_RESTAURANT"));
         assertTrue(prompt.contains("Aktuelle Nutzerfrage: 2"));
     }
 
