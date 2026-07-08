@@ -6,7 +6,10 @@ import de.htwberlin.webtech.ai.dto.AiChatRequest;
 import de.htwberlin.webtech.ai.dto.AiChatResponse;
 import de.htwberlin.webtech.ai.model.AiActionPlan;
 import de.htwberlin.webtech.ai.model.AiConversationContext;
+import de.htwberlin.webtech.ai.model.AiIntent;
 import de.htwberlin.webtech.ai.model.AiIntentDetectionResult;
+import de.htwberlin.webtech.ai.tools.AiShoppingListTool;
+import de.htwberlin.webtech.ai.tools.AiShoppingListToolResult;
 import de.htwberlin.webtech.favorite.repository.ExternalRecipeFavoriteRepository;
 import de.htwberlin.webtech.mealplan.entity.MealPlan;
 import de.htwberlin.webtech.mealplan.repository.MealPlanRepository;
@@ -52,6 +55,7 @@ public class DishlyAiOrchestrator {
     private final ShoppingListItemRepository shoppingListItemRepository;
     private final RecipeRepository recipeRepository;
     private final AiIntentDetector intentDetector;
+    private final AiShoppingListTool shoppingListTool;
 
     public DishlyAiOrchestrator(GroqClient groqClient,
                                 UserPreferencesRepository preferencesRepository,
@@ -60,7 +64,8 @@ public class DishlyAiOrchestrator {
                                 ExternalRecipeFavoriteRepository favoriteRepository,
                                 ShoppingListItemRepository shoppingListItemRepository,
                                 RecipeRepository recipeRepository,
-                                AiIntentDetector intentDetector) {
+                                AiIntentDetector intentDetector,
+                                AiShoppingListTool shoppingListTool) {
         this.groqClient = groqClient;
         this.preferencesRepository = preferencesRepository;
         this.pantryItemRepository = pantryItemRepository;
@@ -69,11 +74,16 @@ public class DishlyAiOrchestrator {
         this.shoppingListItemRepository = shoppingListItemRepository;
         this.recipeRepository = recipeRepository;
         this.intentDetector = intentDetector;
+        this.shoppingListTool = shoppingListTool;
     }
 
     public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history) {
         AiConversationContext context = buildConversationContext(currentUser, message, history);
         AiIntentDetectionResult intent = intentDetector.detect(context.message(), context.history());
+        AiChatResponse toolResponse = tryExecuteShoppingListTool(currentUser, context, intent);
+        if (toolResponse != null) {
+            return toolResponse;
+        }
         String systemPrompt = """
                 Du bist Dishly, ein smarter Koch-Assistent.
                 Du hilfst Nutzern Rezepte zu finden, Mahlzeiten zu planen und Einkaeufe zu verwalten.
@@ -109,6 +119,105 @@ public class DishlyAiOrchestrator {
             }
             return new AiChatResponse("Dishly AI konnte Groq gerade nicht erreichen: " + exception.getMessage(), false);
         }
+    }
+
+    private AiChatResponse tryExecuteShoppingListTool(AppUser currentUser, AiConversationContext context, AiIntentDetectionResult intent) {
+        if (intent.primaryIntent() != AiIntent.ADD_TO_SHOPPING_LIST
+                && !hasShoppingListFollowUpAction(intent)) {
+            return null;
+        }
+        if (intent.confidence() < 0.85) {
+            return null;
+        }
+        List<String> ingredients = extractIngredients(context.message(), context.history());
+        if (ingredients.isEmpty()) {
+            return new AiChatResponse("Ich habe verstanden, dass du Zutaten zur Einkaufsliste hinzufuegen moechtest. Welche Zutaten soll ich hinzufuegen?", true);
+        }
+        try {
+            AiShoppingListToolResult result = shoppingListTool.addMissingIngredients(currentUser, ingredients);
+            return new AiChatResponse(shoppingListToolMessage(result), true);
+        } catch (RuntimeException exception) {
+            return new AiChatResponse("Ich konnte die Zutaten gerade nicht zur Einkaufsliste hinzufuegen: " + exception.getMessage(), false);
+        }
+    }
+
+    private boolean hasShoppingListFollowUpAction(AiIntentDetectionResult intent) {
+        return intent.plannedActions().stream()
+                .anyMatch(plan -> plan.type() == de.htwberlin.webtech.ai.model.AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST);
+    }
+
+    private String shoppingListToolMessage(AiShoppingListToolResult result) {
+        StringBuilder message = new StringBuilder();
+        if (result.changedAnything()) {
+            message.append("Erledigt. Ich habe ")
+                    .append(joinNames(result.addedItems()))
+                    .append(" zur Einkaufsliste hinzugefuegt.");
+        } else {
+            message.append("Ich habe nichts neu hinzugefuegt.");
+        }
+        if (!result.skippedPantryItems().isEmpty()) {
+            message.append(" ")
+                    .append(joinNames(result.skippedPantryItems()))
+                    .append(result.skippedPantryItems().size() == 1 ? " hast du bereits im Vorrat." : " hast du bereits im Vorrat.");
+        }
+        if (!result.skippedShoppingListItems().isEmpty()) {
+            message.append(" ")
+                    .append(joinNames(result.skippedShoppingListItems()))
+                    .append(result.skippedShoppingListItems().size() == 1 ? " steht bereits auf deiner Einkaufsliste." : " stehen bereits auf deiner Einkaufsliste.");
+        }
+        return message.toString();
+    }
+
+    private List<String> extractIngredients(String message, List<AiChatRequest.AiChatTurn> history) {
+        List<String> fromUserMessage = extractIngredientsFromText(message);
+        if (!fromUserMessage.isEmpty()) {
+            return fromUserMessage;
+        }
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+        for (int i = history.size() - 1; i >= 0; i--) {
+            AiChatRequest.AiChatTurn turn = history.get(i);
+            if (turn == null || !"assistant".equalsIgnoreCase(turn.getRole())) {
+                continue;
+            }
+            List<String> ingredients = extractIngredientsFromText(turn.getText());
+            if (!ingredients.isEmpty()) {
+                return ingredients;
+            }
+        }
+        return List.of();
+    }
+
+    private List<String> extractIngredientsFromText(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+        String normalized = text.replaceAll("\\s+", " ").trim();
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "(?i)(?:zutaten|ingredients|malzemeler)\\s*[:\\-]\\s*([^.!?\\n]+)"
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(normalized);
+        if (!matcher.find()) {
+            return List.of();
+        }
+        String ingredientText = matcher.group(1)
+                .replaceAll("(?i)\\b(?:moechtest|mochtest|willst|soll ich|would you|ister misin)\\b.*$", "");
+        return java.util.Arrays.stream(ingredientText.split("\\s*,\\s*|\\s+und\\s+|\\s+and\\s+|\\s+ve\\s+"))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .filter(value -> value.length() <= 60)
+                .toList();
+    }
+
+    private String joinNames(List<String> names) {
+        if (names.isEmpty()) {
+            return "";
+        }
+        if (names.size() == 1) {
+            return names.getFirst();
+        }
+        return String.join(", ", names.subList(0, names.size() - 1)) + " und " + names.getLast();
     }
 
     private String buildDetectedIntent(AiIntentDetectionResult intent) {

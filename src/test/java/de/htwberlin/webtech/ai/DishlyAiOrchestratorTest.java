@@ -6,6 +6,8 @@ import de.htwberlin.webtech.ai.dto.AiChatRequest;
 import de.htwberlin.webtech.ai.dto.AiChatResponse;
 import de.htwberlin.webtech.ai.orchestrator.AiIntentDetector;
 import de.htwberlin.webtech.ai.orchestrator.DishlyAiOrchestrator;
+import de.htwberlin.webtech.ai.tools.AiShoppingListTool;
+import de.htwberlin.webtech.ai.tools.AiShoppingListToolResult;
 import de.htwberlin.webtech.favorite.repository.ExternalRecipeFavoriteRepository;
 import de.htwberlin.webtech.mealplan.repository.MealPlanRepository;
 import de.htwberlin.webtech.pantry.repository.PantryItemRepository;
@@ -32,6 +34,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class DishlyAiOrchestratorTest {
 
@@ -42,6 +45,7 @@ class DishlyAiOrchestratorTest {
     private final ExternalRecipeFavoriteRepository favoriteRepository = mock(ExternalRecipeFavoriteRepository.class);
     private final ShoppingListItemRepository shoppingListItemRepository = mock(ShoppingListItemRepository.class);
     private final RecipeRepository recipeRepository = mock(RecipeRepository.class);
+    private final AiShoppingListTool shoppingListTool = mock(AiShoppingListTool.class);
     private final DishlyAiOrchestrator underTest = new DishlyAiOrchestrator(
             groqClient,
             preferencesRepository,
@@ -50,7 +54,8 @@ class DishlyAiOrchestratorTest {
             favoriteRepository,
             shoppingListItemRepository,
             recipeRepository,
-            new AiIntentDetector()
+            new AiIntentDetector(),
+            shoppingListTool
     );
 
     @Test
@@ -156,6 +161,108 @@ class DishlyAiOrchestratorTest {
 
         assertFalse(response.isConfigured());
         assertTrue(response.getMessage().contains("Groq request failed with status 401."));
+    }
+
+    @Test
+    void answer_should_execute_shopping_list_follow_up_selection_when_ingredients_are_clear() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Avocado", "Reis", "Limette");
+        doReturn(new AiShoppingListToolResult(List.of("Limette"), List.of("Avocado", "Reis"), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "1", List.of(
+                turn("assistant", "Ich empfehle eine Bowl. Zutaten: Avocado, Reis, Limette. Moechtest du (1) die Zutaten zur Einkaufsliste hinzufuegen?")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Limette"));
+        assertTrue(response.getMessage().contains("Avocado und Reis"));
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_execute_natural_shopping_list_command_when_ingredients_are_clear() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Tomaten", "Basilikum");
+        doReturn(new AiShoppingListToolResult(ingredients, List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "fuege es zur Einkaufsliste hinzu", List.of(
+                turn("assistant", "Gute Idee: Pasta. Zutaten: Tomaten, Basilikum.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Tomaten und Basilikum"));
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_execute_turkish_shopping_list_command_when_ingredients_are_clear() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Nohut", "Limon");
+        doReturn(new AiShoppingListToolResult(ingredients, List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "bunu alisveris listesine ekle", List.of(
+                turn("assistant", "Malzemeler: Nohut, Limon.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Nohut und Limon"));
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_ask_clarification_for_shopping_list_intent_without_clear_ingredients() {
+        AppUser user = user();
+        stubEmptyContext(user);
+
+        AiChatResponse response = underTest.answer(user, "fuege es zur Einkaufsliste hinzu", List.of());
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Welche Zutaten"));
+        verifyNoInteractions(shoppingListTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_not_claim_success_when_shopping_list_tool_fails() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Limette");
+        doThrow(new RuntimeException("persist failed"))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "fuege es zur Einkaufsliste hinzu", List.of(
+                turn("assistant", "Zutaten: Limette.")
+        ));
+
+        assertFalse(response.isConfigured());
+        assertTrue(response.getMessage().contains("konnte"));
+        assertTrue(response.getMessage().contains("persist failed"));
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_not_execute_meal_plan_intent_in_shopping_list_step() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        doReturn("Ich brauche dafuer noch eine Bestaetigung.").when(groqClient).complete(any(), any());
+
+        AiChatResponse response = underTest.answer(user, "mach es morgen abend rein", List.of(
+                turn("assistant", "Zutaten: Limette.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Ich brauche dafuer noch eine Bestaetigung.", response.getMessage());
+        verifyNoInteractions(shoppingListTool);
+        verify(groqClient).complete(any(), any());
     }
 
     private void stubEmptyContext(AppUser user) {

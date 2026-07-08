@@ -49,7 +49,11 @@ public class AiIntentDetector {
             );
         }
 
-        if (containsAny(normalized, "einkaufsliste", "shopping list", "alisveris listesi", "alisveris listesine")
+        if ((containsAny(normalized, "einkaufsliste", "shopping list")
+                && containsAny(normalized, "fuge", "fuege", "hinzu", "hinzufugen", "add", "put", "setz", "setze", "zutaten"))
+                || containsAll(normalized, "zutaten", "hinzu")
+                || containsAll(normalized, "ingredients", "add")
+                || containsAny(normalized, "alisveris listesi", "alisveris listesine")
                 || containsAll(normalized, "add", "shopping")
                 || containsAll(normalized, "ekle", "alisveris")) {
             AiActionPlan plan = action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.86, null, null);
