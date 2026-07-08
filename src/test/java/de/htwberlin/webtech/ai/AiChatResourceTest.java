@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -62,12 +63,36 @@ class AiChatResourceTest {
     void chat_should_return_answer() {
         AppUser user = user();
         doReturn(user).when(userContext).requireUser("Bearer valid-token");
-        doReturn(new AiChatResponse("Antwort", true)).when(service).answer(user, "Hallo");
+        doReturn(new AiChatResponse("Antwort", true)).when(service).answer(user, "Hallo", java.util.List.of());
 
         given()
                 .contentType(ContentType.JSON)
                 .header("Authorization", "Bearer valid-token")
                 .body("{\"message\":\"Hallo\"}")
+                .when().post("/ai/chat")
+                .then()
+                .statusCode(200)
+                .body("message", equalTo("Antwort"))
+                .body("configured", equalTo(true));
+    }
+
+    @Test
+    void chat_should_accept_optional_history() {
+        AppUser user = user();
+        doReturn(user).when(userContext).requireUser("Bearer valid-token");
+        doReturn(new AiChatResponse("Antwort", true)).when(service).answer(org.mockito.ArgumentMatchers.eq(user), org.mockito.ArgumentMatchers.eq("2"), anyList());
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "message": "2",
+                          "history": [
+                            { "role": "assistant", "text": "Moechtest du (1) Details oder (2) Restaurant?" }
+                          ]
+                        }
+                        """)
                 .when().post("/ai/chat")
                 .then()
                 .statusCode(200)

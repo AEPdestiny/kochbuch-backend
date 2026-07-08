@@ -2,6 +2,7 @@ package de.htwberlin.webtech.ai.service;
 
 import de.htwberlin.webtech.ai.client.GroqClient;
 import de.htwberlin.webtech.ai.client.GroqClientException;
+import de.htwberlin.webtech.ai.dto.AiChatRequest;
 import de.htwberlin.webtech.ai.dto.AiChatResponse;
 import de.htwberlin.webtech.favorite.repository.ExternalRecipeFavoriteRepository;
 import de.htwberlin.webtech.mealplan.entity.MealPlan;
@@ -19,6 +20,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -36,6 +38,8 @@ public class AiChatService {
     private static final int PUBLISHED_RECIPE_LIMIT = 15;
     private static final int FAVORITE_LIMIT = 15;
     private static final int INGREDIENT_SUMMARY_LIMIT = 140;
+    private static final int HISTORY_LIMIT = 10;
+    private static final int HISTORY_TURN_LIMIT = 500;
 
     private final GroqClient groqClient;
     private final UserPreferencesRepository preferencesRepository;
@@ -62,6 +66,10 @@ public class AiChatService {
     }
 
     public AiChatResponse answer(AppUser currentUser, String message) {
+        return answer(currentUser, message, List.of());
+    }
+
+    public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history) {
         String systemPrompt = """
                 Du bist Dishly, ein smarter Koch-Assistent.
                 Du hilfst Nutzern Rezepte zu finden, Mahlzeiten zu planen und Einkaeufe zu verwalten.
@@ -75,11 +83,14 @@ public class AiChatService {
                 Erfinde keine Vorrats-, Einkaufslisten- oder Rezeptdaten.
                 Behaupte nie, dass du App-Aktionen ausgefuehrt hast.
                 Empfiehl stattdessen konkrete naechste Schritte, die der Nutzer selbst ausfuehren kann.
+                Nutzerantworten wie "1", "2", "3", "ja", "oeffne das" oder "dieses Gericht" koennen sich auf vorherige Assistant-Optionen beziehen.
+                Nutze den bereitgestellten Chatverlauf, um solche Bezuege aufzuloesen.
+                Wenn der Bezug weiterhin mehrdeutig ist, frage kurz nach.
                 Wenn Daten leer oder nicht verfuegbar sind, sage das ehrlich.
                 Wenn eine echte Aktion nicht eindeutig moeglich ist, frage nach den fehlenden Angaben.
                 Antworte kurz, konkret und auf Deutsch.
                 """;
-        String prompt = buildContext(currentUser) + "\n\nNutzerfrage: " + message;
+        String prompt = buildContext(currentUser) + buildHistory(history) + "\n\nAktuelle Nutzerfrage: " + message;
         try {
             return new AiChatResponse(groqClient.complete(systemPrompt, prompt), true);
         } catch (GroqClientException exception) {
@@ -159,6 +170,26 @@ public class AiChatService {
                 publishedRecipes.isBlank() ? "keine passenden Dishly-Rezepte verfuegbar" : publishedRecipes,
                 favorites.isBlank() ? "keine externen Favoriten" : favorites
         );
+    }
+
+    private String buildHistory(List<AiChatRequest.AiChatTurn> history) {
+        if (history == null || history.isEmpty()) {
+            return "\n\nBisheriger Chatverlauf: keiner";
+        }
+        String turns = history.stream()
+                .filter(turn -> turn != null && turn.getText() != null && !turn.getText().isBlank())
+                .skip(Math.max(0, history.size() - HISTORY_LIMIT))
+                .map(this::historyLine)
+                .collect(Collectors.joining("\n"));
+        if (turns.isBlank()) {
+            return "\n\nBisheriger Chatverlauf: keiner";
+        }
+        return "\n\nBisheriger Chatverlauf:\n" + turns;
+    }
+
+    private String historyLine(AiChatRequest.AiChatTurn turn) {
+        String role = "assistant".equalsIgnoreCase(turn.getRole()) ? "Assistant" : "User";
+        return role + ": " + shortText(turn.getText(), HISTORY_TURN_LIMIT);
     }
 
     private String preferencesText(UserPreferences preferences) {

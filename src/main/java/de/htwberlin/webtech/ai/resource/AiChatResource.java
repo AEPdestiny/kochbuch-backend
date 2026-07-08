@@ -28,6 +28,6 @@ public class AiChatResource {
     @POST
     public AiChatResponse chat(@HeaderParam("Authorization") String authorizationHeader,
                                @Valid AiChatRequest request) {
-        return service.answer(userContext.requireUser(authorizationHeader), request.getMessage());
+        return service.answer(userContext.requireUser(authorizationHeader), request.getMessage(), request.getHistory());
     }
 }

@@ -2,6 +2,7 @@ package de.htwberlin.webtech.ai;
 
 import de.htwberlin.webtech.ai.client.GroqClient;
 import de.htwberlin.webtech.ai.client.GroqClientException;
+import de.htwberlin.webtech.ai.dto.AiChatRequest;
 import de.htwberlin.webtech.ai.dto.AiChatResponse;
 import de.htwberlin.webtech.ai.service.AiChatService;
 import de.htwberlin.webtech.favorite.repository.ExternalRecipeFavoriteRepository;
@@ -54,7 +55,7 @@ class AiChatServiceTest {
     void answer_should_call_groq_with_real_context() {
         AppUser user = user();
         stubEmptyContext(user);
-        doReturn("Nutze Pasta aus deinem Vorrat.").when(groqClient).complete(any(), contains("Nutzerfrage: Was soll ich kochen?"));
+        doReturn("Nutze Pasta aus deinem Vorrat.").when(groqClient).complete(any(), contains("Aktuelle Nutzerfrage: Was soll ich kochen?"));
 
         AiChatResponse response = underTest.answer(user, "Was soll ich kochen?");
 
@@ -87,6 +88,29 @@ class AiChatServiceTest {
         assertTrue(prompt.contains("Zutaten=Nudeln, Tomaten, Basilikum"));
         assertTrue(prompt.contains("Dishly recipe catalog"));
         assertTrue(prompt.contains("Dishly Bowl"));
+    }
+
+    @Test
+    void answer_should_include_limited_chat_history_for_follow_up_messages() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        doReturn("Antwort").when(groqClient).complete(any(), any());
+
+        underTest.answer(user, "2", List.of(
+                turn("user", "Was soll ich kochen?"),
+                turn("assistant", "Ich empfehle Dishly Pasta. Moechtest du (1) Details oder (2) Restaurant?")
+        ));
+
+        ArgumentCaptor<String> systemPromptCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(groqClient).complete(systemPromptCaptor.capture(), promptCaptor.capture());
+        String systemPrompt = systemPromptCaptor.getValue();
+        String prompt = promptCaptor.getValue();
+        assertTrue(systemPrompt.contains("Nutzerantworten wie \"1\", \"2\", \"3\""));
+        assertTrue(prompt.contains("Bisheriger Chatverlauf"));
+        assertTrue(prompt.contains("User: Was soll ich kochen?"));
+        assertTrue(prompt.contains("Assistant: Ich empfehle Dishly Pasta."));
+        assertTrue(prompt.contains("Aktuelle Nutzerfrage: 2"));
     }
 
     @Test
@@ -157,6 +181,13 @@ class AiChatServiceTest {
         recipe.setIngredients(ingredients);
         recipe.setPublished(true);
         return recipe;
+    }
+
+    private AiChatRequest.AiChatTurn turn(String role, String text) {
+        AiChatRequest.AiChatTurn turn = new AiChatRequest.AiChatTurn();
+        turn.setRole(role);
+        turn.setText(text);
+        return turn;
     }
 
     private AppUser user() {
