@@ -123,6 +123,10 @@ class AiShoppingListToolTest {
                 "Zutaten: Milchreis",
                 "koennen Sie den Milchreis mit Milch",
                 "einem wenig Zucker oder Suessstoff kochen",
+                "Scheiben Brot. Du hast bereits Eier",
+                "Kartoffeln. Du hast bereits Eier",
+                "Rapsoel im Vorrat",
+                "aber noch keine Kartoffeln",
                 "bitte in die Einkaufsliste",
                 "Salz"
         ));

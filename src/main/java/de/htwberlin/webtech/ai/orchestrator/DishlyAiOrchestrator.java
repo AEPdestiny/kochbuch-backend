@@ -162,23 +162,27 @@ public class DishlyAiOrchestrator {
 
     private ShoppingListExecution executeShoppingListTool(AppUser currentUser, AiConversationContext context) {
         IngredientExtraction extraction = extractIngredients(context.message(), context.history());
+        if (!extraction.ambiguousTitles().isEmpty()) {
+            return new ShoppingListExecution(true, false, "Fuer welche Idee soll ich die fehlenden Zutaten hinzufuegen: "
+                    + joinOptions(extraction.ambiguousTitles()) + "?", null, null);
+        }
         if (extraction.noMissingIngredients()) {
-            return new ShoppingListExecution(true, true, "Ich habe nichts hinzugefuegt, weil keine fehlenden Zutaten angegeben sind.", null);
+            return new ShoppingListExecution(true, true, "Ich habe nichts hinzugefuegt, weil keine fehlenden Zutaten angegeben sind.", null, extraction.recipeTitle());
         }
         if (extraction.ingredients().isEmpty()) {
             if (!extraction.optionalIngredients().isEmpty()) {
-                return new ShoppingListExecution(true, false, "Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", null);
+                return new ShoppingListExecution(true, false, "Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", null, extraction.recipeTitle());
             }
-            return new ShoppingListExecution(true, false, "Welche konkreten Zutaten soll ich hinzufuegen? Schreib sie bitte z.B. so: Limette, Olivenoel, Salz.", null);
+            return new ShoppingListExecution(true, false, "Welche konkreten Zutaten soll ich hinzufuegen? Schreib sie bitte z.B. so: Limette, Olivenoel, Salz.", null, extraction.recipeTitle());
         }
         try {
             AiShoppingListToolResult result = shoppingListTool.addMissingIngredients(currentUser, extraction.ingredients());
             if (!result.changedAnything() && !extraction.optionalIngredients().isEmpty()) {
-                return new ShoppingListExecution(true, false, "Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", result);
+                return new ShoppingListExecution(true, false, "Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", result, extraction.recipeTitle());
             }
-            return new ShoppingListExecution(true, true, shoppingListToolMessage(result), result);
+            return new ShoppingListExecution(true, true, shoppingListToolMessage(result, extraction.recipeTitle()), result, extraction.recipeTitle());
         } catch (RuntimeException exception) {
-            return new ShoppingListExecution(false, true, "Ich konnte die Zutaten gerade nicht zur Einkaufsliste hinzufuegen: " + exception.getMessage(), null);
+            return new ShoppingListExecution(false, true, "Ich konnte die Zutaten gerade nicht zur Einkaufsliste hinzufuegen: " + exception.getMessage(), null, extraction.recipeTitle());
         }
     }
 
@@ -248,6 +252,10 @@ public class DishlyAiOrchestrator {
         }
         String title = firstNonBlank(plan.recipeTitle(), extractMealPlanTitle(context.message(), context.history(), intent));
         if (title == null) {
+            List<String> ambiguousTitles = ambiguousMealPlanTitles(context.message(), context.history());
+            if (!ambiguousTitles.isEmpty()) {
+                return new MealPlanExecution(false, true, "Meinst du " + joinOptions(ambiguousTitles) + "?", null, plan.targetDate(), plan.mealSlot());
+            }
             return new MealPlanExecution(false, true, "Welches Gericht soll ich eintragen?", null, plan.targetDate(), plan.mealSlot());
         }
         try {
@@ -298,7 +306,7 @@ public class DishlyAiOrchestrator {
         return "Fuer welchen Tag soll ich es eintragen?";
     }
 
-    private String shoppingListToolMessage(AiShoppingListToolResult result) {
+    private String shoppingListToolMessage(AiShoppingListToolResult result, String recipeTitle) {
         StringBuilder message = new StringBuilder();
         if (!result.changedAnything() && (!result.skippedPantryItems().isEmpty() || !result.skippedShoppingListItems().isEmpty())) {
             message.append("Ich habe nichts neu hinzugefuegt, weil ");
@@ -317,8 +325,11 @@ public class DishlyAiOrchestrator {
         }
         if (result.changedAnything()) {
             message.append("Erledigt. Ich habe ")
-                    .append(joinNames(result.addedItems()))
-                    .append(" zur Einkaufsliste hinzugefuegt.");
+                    .append(joinNames(result.addedItems()));
+            if (recipeTitle != null && !recipeTitle.isBlank()) {
+                message.append(" fuer ").append(recipeTitle);
+            }
+            message.append(" zur Einkaufsliste hinzugefuegt.");
         } else {
             message.append("Ich habe nichts neu hinzugefuegt.");
         }
@@ -365,6 +376,23 @@ public class DishlyAiOrchestrator {
         if (history == null || history.isEmpty()) {
             return null;
         }
+        String fromLastShoppingAction = extractLastShoppingActionTitle(history);
+        if (fromLastShoppingAction != null) {
+            return fromLastShoppingAction;
+        }
+        List<RecipeIdea> ideas = lastRecipeIdeas(history);
+        if (!ideas.isEmpty()) {
+            RecipeIdea selected = selectRecipeIdea(message, ideas);
+            if (selected != null) {
+                return selected.title();
+            }
+            if (ideas.size() > 1 && normalizeForIngredientIntent(message).matches(".*\\b(es|das|dies)\\b.*")) {
+                return null;
+            }
+            if (ideas.size() == 1) {
+                return ideas.getFirst().title();
+            }
+        }
         for (int i = history.size() - 1; i >= 0; i--) {
             AiChatRequest.AiChatTurn turn = history.get(i);
             if (turn == null || !"assistant".equalsIgnoreCase(turn.getRole()) || turn.getText() == null) {
@@ -373,6 +401,30 @@ public class DishlyAiOrchestrator {
             String title = extractRecipeIdeaTitle(turn.getText());
             if (title != null) {
                 return title;
+            }
+        }
+        return null;
+    }
+
+    private List<String> ambiguousMealPlanTitles(String message, List<AiChatRequest.AiChatTurn> history) {
+        List<RecipeIdea> ideas = lastRecipeIdeas(history);
+        if (ideas.size() <= 1 || !normalizeForIngredientIntent(message).matches(".*\\b(es|das|dies)\\b.*")) {
+            return List.of();
+        }
+        return ideas.stream().map(RecipeIdea::title).toList();
+    }
+
+    private String extractLastShoppingActionTitle(List<AiChatRequest.AiChatTurn> history) {
+        for (int i = history.size() - 1; i >= 0; i--) {
+            AiChatRequest.AiChatTurn turn = history.get(i);
+            if (turn == null || !"assistant".equalsIgnoreCase(turn.getRole()) || turn.getText() == null) {
+                continue;
+            }
+            java.util.regex.Matcher matcher = java.util.regex.Pattern
+                    .compile("(?iu)\\bf(?:uer|ür)\\s+(.+?)\\s+zur\\s+einkaufsliste\\s+hinzugef")
+                    .matcher(turn.getText());
+            if (matcher.find()) {
+                return cleanMealTitle(matcher.group(1));
             }
         }
         return null;
@@ -392,6 +444,10 @@ public class DishlyAiOrchestrator {
     }
 
     private String extractRecipeIdeaTitle(String text) {
+        List<RecipeIdea> ideas = extractRecipeIdeas(text);
+        if (ideas.size() == 1) {
+            return ideas.getFirst().title();
+        }
         for (String line : text.split("\\R+")) {
             String trimmed = line.trim();
             if (trimmed.isBlank() || trimmed.matches("^\\s*(?:[-*]\\s*)?\\(?[123]\\)?[.)\\-:].*")) {
@@ -414,6 +470,54 @@ public class DishlyAiOrchestrator {
             }
         }
         return null;
+    }
+
+    private List<RecipeIdea> extractRecipeIdeas(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "(?iu)(ein\\s+weiterer\\s+vorschlag\\s+(?:waere|w.re)|eine\\s+weitere\\s+idee\\s+(?:waere|w.re)|wie\\s+(?:waere|w.re)\\s+es\\s+mit|eine\\s+moegliche\\s+idee\\s+waere|eine\\s+m.gliche\\s+idee\\s+w.re|ich\\s+empfehle|gute\\s+idee:?)\\s+(.+?)(?:[?.!]|$)"
+        );
+        java.util.regex.Matcher matcher = pattern.matcher(text);
+        List<RecipeMatch> matches = new java.util.ArrayList<>();
+        while (matcher.find()) {
+            String title = cleanMealTitle(matcher.group(2));
+            if (title != null) {
+                matches.add(new RecipeMatch(title, matcher.end(), matcher.start()));
+            }
+        }
+        if (matches.isEmpty()) {
+            return List.of();
+        }
+        List<RecipeIdea> ideas = new java.util.ArrayList<>();
+        for (int i = 0; i < matches.size(); i++) {
+            RecipeMatch match = matches.get(i);
+            int end = i + 1 < matches.size() ? matches.get(i + 1).start() : text.length();
+            String segment = text.substring(match.contentStart(), end);
+            List<String> missing = extractMissingIngredientsFromStatus(segment);
+            if (missing.isEmpty()) {
+                IngredientExtraction markerIngredients = extractIngredientsFromText(segment);
+                missing = markerIngredients.noMissingIngredients() ? List.of() : markerIngredients.ingredients();
+            }
+            List<String> allIngredients = extractIngredientsFromText(segment).ingredients();
+            ideas.add(new RecipeIdea(match.title(), allIngredients, missing));
+        }
+        return ideas;
+    }
+
+    private List<String> extractMissingIngredientsFromStatus(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+        List<String> missing = new java.util.ArrayList<>();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(?iu)aber\\s+noch\\s+kein(?:e|en|er|es)?\\s+(.+?)(?:[.;!?]|$)")
+                .matcher(text);
+        while (matcher.find()) {
+            missing.addAll(splitIngredientText(matcher.group(1)));
+        }
+        return List.copyOf(missing);
     }
 
     private String cleanMealTitle(String value) {
@@ -498,12 +602,16 @@ public class DishlyAiOrchestrator {
         if (!shouldPreferHistoryIngredients(message)) {
             List<String> fromDirectUserCommand = extractIngredientsFromUserCommand(message);
             if (!fromDirectUserCommand.isEmpty()) {
-                return new IngredientExtraction(fromDirectUserCommand, List.of(), false);
+                return IngredientExtraction.ingredients(fromDirectUserCommand);
             }
             IngredientExtraction fromUserMessage = extractIngredientsFromText(message);
             if (fromUserMessage.hasSignal()) {
                 return fromUserMessage;
             }
+        }
+        IngredientExtraction fromRecipeIdeas = extractIngredientsFromRecipeIdeas(message, history);
+        if (fromRecipeIdeas.hasSignal()) {
+            return fromRecipeIdeas;
         }
         if (history == null || history.isEmpty()) {
             return IngredientExtraction.empty();
@@ -519,6 +627,53 @@ public class DishlyAiOrchestrator {
             }
         }
         return IngredientExtraction.empty();
+    }
+
+    private IngredientExtraction extractIngredientsFromRecipeIdeas(String message, List<AiChatRequest.AiChatTurn> history) {
+        List<RecipeIdea> ideas = lastRecipeIdeas(history);
+        if (ideas.isEmpty()) {
+            return IngredientExtraction.empty();
+        }
+        RecipeIdea selected = selectRecipeIdea(message, ideas);
+        if (selected != null) {
+            List<String> ingredients = selected.missingIngredients().isEmpty()
+                    ? selected.ingredients()
+                    : selected.missingIngredients();
+            return IngredientExtraction.forRecipe(ingredients, selected.title());
+        }
+        if (ideas.size() > 1) {
+            return IngredientExtraction.ambiguous(ideas.stream().map(RecipeIdea::title).toList());
+        }
+        RecipeIdea only = ideas.getFirst();
+        List<String> ingredients = only.missingIngredients().isEmpty()
+                ? only.ingredients()
+                : only.missingIngredients();
+        return IngredientExtraction.forRecipe(ingredients, only.title());
+    }
+
+    private List<RecipeIdea> lastRecipeIdeas(List<AiChatRequest.AiChatTurn> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+        for (int i = history.size() - 1; i >= 0; i--) {
+            AiChatRequest.AiChatTurn turn = history.get(i);
+            if (turn == null || !"assistant".equalsIgnoreCase(turn.getRole()) || turn.getText() == null) {
+                continue;
+            }
+            List<RecipeIdea> ideas = extractRecipeIdeas(turn.getText());
+            if (!ideas.isEmpty()) {
+                return ideas;
+            }
+        }
+        return List.of();
+    }
+
+    private RecipeIdea selectRecipeIdea(String message, List<RecipeIdea> ideas) {
+        String normalizedMessage = normalizeForIngredientIntent(message);
+        return ideas.stream()
+                .filter(idea -> normalizedMessage.contains(normalizeForIngredientIntent(idea.title())))
+                .findFirst()
+                .orElse(null);
     }
 
     private boolean shouldPreferHistoryIngredients(String message) {
@@ -620,7 +775,7 @@ public class DishlyAiOrchestrator {
                 continue;
             }
             if (markerLine.missing() && isNoMissing(markerLine.value())) {
-                return new IngredientExtraction(List.of(), List.of(), true);
+                return IngredientExtraction.noMissing();
             }
             IngredientExtraction extracted = splitIngredientLine(markerLine.value());
             if (markerLine.missing()) {
@@ -690,7 +845,9 @@ public class DishlyAiOrchestrator {
         return new IngredientExtraction(
                 splitIngredientText(optionalSplit.requiredText()),
                 splitIngredientText(optionalSplit.optionalText()),
-                false
+                false,
+                null,
+                List.of()
         );
     }
 
@@ -753,6 +910,16 @@ public class DishlyAiOrchestrator {
             return names.getFirst();
         }
         return String.join(", ", names.subList(0, names.size() - 1)) + " und " + names.getLast();
+    }
+
+    private String joinOptions(List<String> names) {
+        if (names.isEmpty()) {
+            return "";
+        }
+        if (names.size() == 1) {
+            return names.getFirst();
+        }
+        return String.join(", ", names.subList(0, names.size() - 1)) + " oder " + names.getLast();
     }
 
     private String buildDetectedIntent(AiIntentDetectionResult intent) {
@@ -1020,13 +1187,33 @@ public class DishlyAiOrchestrator {
         return " (" + quantity + (unit == null || unit.isBlank() ? "" : " " + unit) + ")";
     }
 
-    private record IngredientExtraction(List<String> ingredients, List<String> optionalIngredients, boolean noMissingIngredients) {
+    private record IngredientExtraction(List<String> ingredients,
+                                        List<String> optionalIngredients,
+                                        boolean noMissingIngredients,
+                                        String recipeTitle,
+                                        List<String> ambiguousTitles) {
         static IngredientExtraction empty() {
-            return new IngredientExtraction(List.of(), List.of(), false);
+            return new IngredientExtraction(List.of(), List.of(), false, null, List.of());
+        }
+
+        static IngredientExtraction ingredients(List<String> ingredients) {
+            return new IngredientExtraction(ingredients, List.of(), false, null, List.of());
+        }
+
+        static IngredientExtraction forRecipe(List<String> ingredients, String recipeTitle) {
+            return new IngredientExtraction(ingredients, List.of(), false, recipeTitle, List.of());
+        }
+
+        static IngredientExtraction noMissing() {
+            return new IngredientExtraction(List.of(), List.of(), true, null, List.of());
+        }
+
+        static IngredientExtraction ambiguous(List<String> titles) {
+            return new IngredientExtraction(List.of(), List.of(), false, null, titles);
         }
 
         boolean hasSignal() {
-            return noMissingIngredients || !ingredients.isEmpty() || !optionalIngredients.isEmpty();
+            return noMissingIngredients || !ingredients.isEmpty() || !optionalIngredients.isEmpty() || !ambiguousTitles.isEmpty();
         }
 
         boolean isEmpty() {
@@ -1040,6 +1227,12 @@ public class DishlyAiOrchestrator {
     private record OptionalSplit(String requiredText, String optionalText) {
     }
 
+    private record RecipeIdea(String title, List<String> ingredients, List<String> missingIngredients) {
+    }
+
+    private record RecipeMatch(String title, int contentStart, int start) {
+    }
+
     private record MealPlanExecution(boolean success,
                                      boolean configured,
                                      String message,
@@ -1051,7 +1244,8 @@ public class DishlyAiOrchestrator {
     private record ShoppingListExecution(boolean configured,
                                          boolean actionable,
                                          String message,
-                                         AiShoppingListToolResult result) {
+                                         AiShoppingListToolResult result,
+                                         String recipeTitle) {
         List<String> addedItems() {
             return result == null ? List.of() : result.addedItems();
         }

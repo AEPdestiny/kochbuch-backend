@@ -26,7 +26,7 @@ public class AiIntentDetector {
 
     private static final Pattern NUMERIC_SELECTION = Pattern.compile("\\b([123])\\b");
     private static final Pattern NUMBERED_OPTION_LINE = Pattern.compile("^\\s*(?:[-*]\\s*)?\\(?([123])\\)?[.)\\-:]?\\s+(.+?)\\s*$");
-    private static final Pattern NUMBERED_OPTION_INLINE = Pattern.compile("(?:^|\\s)\\(?([123])\\)?[.)]?[\\s:-]+(.+?)(?=\\s+\\(?[123]\\)?[.)]?[\\s:-]+|$)");
+    private static final Pattern NUMBERED_OPTION_INLINE = Pattern.compile("(?:^|\\s)(?:\\(([123])\\)|([123])[.)])\\s*[:\\-]?\\s+(.+?)(?=\\s+(?:\\([123]\\)|[123][.)])\\s*[:\\-]?\\s+|$)");
 
     public AiIntentDetectionResult detect(String message, List<AiChatRequest.AiChatTurn> history) {
         String normalized = normalize(message);
@@ -58,6 +58,11 @@ public class AiIntentDetector {
                     !plans.isEmpty() && needsClarification(plans),
                     clarificationFor(plans)
             );
+        }
+
+        if (!selections.isEmpty() && previousAssistantProvidedShoppingIngredients(history)) {
+            AiActionPlan plan = action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.86, null, null);
+            return result(language, normalized, AiIntent.ADD_TO_SHOPPING_LIST, List.of(plan), false, null, 0.86);
         }
 
         if (isShoppingListConfirmation(normalized)
@@ -223,8 +228,8 @@ public class AiIntentDetector {
         String compact = text.replaceAll("\\s+", " ").trim();
         Matcher matcher = NUMBERED_OPTION_INLINE.matcher(compact);
         while (matcher.find()) {
-            int number = Integer.parseInt(matcher.group(1));
-            String option = cleanOptionText(matcher.group(2));
+            int number = Integer.parseInt(matcher.group(1) == null ? matcher.group(2) : matcher.group(1));
+            String option = cleanOptionText(matcher.group(3));
             if (!option.isBlank()) {
                 options.put(number, option);
             }

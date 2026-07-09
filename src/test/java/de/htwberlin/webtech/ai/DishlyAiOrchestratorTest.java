@@ -459,6 +459,40 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
+    void answer_should_ask_which_recipe_for_missing_ingredients_when_multiple_ideas_exist() {
+        AppUser user = user();
+        stubEmptyContext(user);
+
+        AiChatResponse response = underTest.answer(user, "2", List.of(
+                turn("assistant", multipleRecipeIdeas())
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Fuer welche Idee soll ich die fehlenden Zutaten hinzufuegen: Eiersandwich oder Omelett mit Kartoffeln?", response.getMessage());
+        verifyNoInteractions(shoppingListTool);
+        verifyNoInteractions(mealPlanTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_add_missing_ingredients_for_explicit_recipe_idea_only() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        doReturn(new AiShoppingListToolResult(List.of("Kartoffeln"), List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, List.of("Kartoffeln"));
+
+        AiChatResponse response = underTest.answer(user, "fuege die fehlenden Zutaten fuer Omelett mit Kartoffeln hinzu", List.of(
+                turn("assistant", multipleRecipeIdeas())
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Erledigt. Ich habe Kartoffeln fuer Omelett mit Kartoffeln zur Einkaufsliste hinzugefuegt.", response.getMessage());
+        verify(shoppingListTool).addMissingIngredients(user, List.of("Kartoffeln"));
+        verifyNoInteractions(mealPlanTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
     void answer_should_report_when_all_ingredients_are_already_available_or_listed() {
         AppUser user = user();
         stubEmptyContext(user);
@@ -633,6 +667,41 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
+    void answer_should_use_last_shopping_list_action_title_for_meal_plan_follow_up() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        LocalDate sunday = nextOrSame(java.time.DayOfWeek.SUNDAY);
+        doReturn(new AiMealPlanToolResult(true, false, "Omelett mit Kartoffeln", null, sunday, MealSlot.DINNER))
+                .when(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Omelett mit Kartoffeln");
+
+        AiChatResponse response = underTest.answer(user, "bitte fuege es fuer sonntag abend hinzu", List.of(
+                turn("assistant", "Erledigt. Ich habe Kartoffeln fuer Omelett mit Kartoffeln zur Einkaufsliste hinzugefuegt.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Erledigt. Ich habe Omelett mit Kartoffeln fuer Sonntag Abend in deinen Wochenplan eingetragen.", response.getMessage());
+        verify(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Omelett mit Kartoffeln");
+        verifyNoInteractions(shoppingListTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_ask_which_recipe_for_ambiguous_meal_plan_follow_up() {
+        AppUser user = user();
+        stubEmptyContext(user);
+
+        AiChatResponse response = underTest.answer(user, "fuege es fuer sonntag abend hinzu", List.of(
+                turn("assistant", multipleRecipeIdeas())
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Meinst du Eiersandwich oder Omelett mit Kartoffeln?", response.getMessage());
+        verifyNoInteractions(mealPlanTool);
+        verifyNoInteractions(shoppingListTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
     void answer_should_execute_combined_meal_plan_and_missing_shopping_list_command() {
         AppUser user = user();
         stubEmptyContext(user);
@@ -757,6 +826,13 @@ class DishlyAiOrchestratorTest {
         recipe.setPublished(true);
         recipe.setLanguage(language);
         return recipe;
+    }
+
+    private String multipleRecipeIdeas() {
+        return """
+                Ein weiterer Vorschlag waere ein einfaches Eiersandwich. Zutaten: 2 Eier, Salz, Pfeffer, 1 EL Rapsoel, 2 Scheiben Brot. Du hast bereits Eier und Rapsoel im Vorrat, aber noch kein Brot.
+                Eine weitere Idee waere ein Omelett mit Kartoffeln. Zutaten: 2 Eier, Salz, Pfeffer, 1 EL Rapsoel, 1-2 Kartoffeln. Du hast bereits Eier und Rapsoel im Vorrat, aber noch keine Kartoffeln.
+                """;
     }
 
     private AiChatRequest.AiChatTurn turn(String role, String text) {
