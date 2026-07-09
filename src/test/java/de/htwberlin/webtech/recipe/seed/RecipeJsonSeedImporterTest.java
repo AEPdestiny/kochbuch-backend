@@ -30,7 +30,7 @@ class RecipeJsonSeedImporterTest {
     );
 
     @Test
-    void seedFiles_should_support_language_folder_structure_and_legacy_english_files() {
+    void seedFiles_should_support_german_english_folder_structure_and_legacy_english_files() {
         RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(mock(RecipeSeedPersistence.class), new ObjectMapper());
 
         List<RecipeJsonSeedImporter.SeedFile> files = importer.seedFiles();
@@ -41,9 +41,9 @@ class RecipeJsonSeedImporterTest {
         assertTrue(files.stream().anyMatch(file -> file.language().equals("de")
                 && file.category().equals("lunch")
                 && file.fileNames().contains("recipes/de/lunch.json")));
-        assertTrue(files.stream().anyMatch(file -> file.language().equals("ru")
-                && file.category().equals("snack")
-                && file.fileNames().contains("recipes/ru/snacks.json")));
+        assertTrue(files.stream().allMatch(file -> file.language().equals("en") || file.language().equals("de")));
+        assertFalse(files.stream().anyMatch(file -> file.fileNames().stream()
+                .anyMatch(name -> name.matches(".*recipes/(ar|pl|ru|tr|zh)/.*"))));
         assertTrue(files.stream().anyMatch(file -> file.language().equals("en")
                 && file.category().equals("breakfast")
                 && file.fileNames().contains("recipesbreakfast.json")));

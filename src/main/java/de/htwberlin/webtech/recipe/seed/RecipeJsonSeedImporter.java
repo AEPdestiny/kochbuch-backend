@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 public class RecipeJsonSeedImporter {
 
     private static final Logger LOG = Logger.getLogger(RecipeJsonSeedImporter.class);
-    private static final List<String> LANGUAGES = List.of("en", "de", "tr", "ar", "zh", "ru", "pl", "ja");
+    private static final List<String> LANGUAGES = List.of("en", "de");
     private static final int MAX_TITLE_LENGTH = 240;
     private static final List<CategoryFile> CATEGORY_FILES = List.of(
             new CategoryFile("breakfast.json", "breakfast"),
