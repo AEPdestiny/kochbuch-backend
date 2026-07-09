@@ -9,12 +9,14 @@ import de.htwberlin.webtech.user.entity.AppUser;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItems;
@@ -23,6 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @QuarkusTest
 class UserPreferencesResourceTest {
@@ -98,6 +101,58 @@ class UserPreferencesResourceTest {
     }
 
     @Test
+    void putPreferences_should_accept_zero_calorie_targets() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(preferences(currentUser)).when(service).update(any(UserPreferencesRequest.class), eq(currentUser));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "calorieGoal": 0,
+                          "dailyCalorieTarget": 0
+                        }
+                        """)
+                .when().put("/profile/preferences")
+                .then()
+                .statusCode(200);
+
+        ArgumentCaptor<UserPreferencesRequest> requestCaptor = ArgumentCaptor.forClass(UserPreferencesRequest.class);
+        verify(service).update(requestCaptor.capture(), eq(currentUser));
+        UserPreferencesRequest request = requestCaptor.getValue();
+        assertThat(request.getCalorieGoal(), equalTo(0));
+        assertThat(request.getDailyCalorieTarget(), equalTo(0));
+    }
+
+    @Test
+    void putPreferences_should_accept_null_calorie_targets() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(preferences(currentUser)).when(service).update(any(UserPreferencesRequest.class), eq(currentUser));
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "calorieGoal": null,
+                          "dailyCalorieTarget": null
+                        }
+                        """)
+                .when().put("/profile/preferences")
+                .then()
+                .statusCode(200);
+
+        ArgumentCaptor<UserPreferencesRequest> requestCaptor = ArgumentCaptor.forClass(UserPreferencesRequest.class);
+        verify(service).update(requestCaptor.capture(), eq(currentUser));
+        UserPreferencesRequest request = requestCaptor.getValue();
+        assertThat(request.getCalorieGoal(), equalTo(null));
+        assertThat(request.getDailyCalorieTarget(), equalTo(null));
+    }
+
+    @Test
     void putPreferences_should_reject_invalid_numbers() {
         AppUser currentUser = user(1L);
         doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
@@ -109,6 +164,24 @@ class UserPreferencesResourceTest {
                         {
                           "maxPrepTimeMinutes": 0,
                           "calorieGoal": -1
+                        }
+                        """)
+                .when().put("/profile/preferences")
+                .then()
+                .statusCode(400);
+    }
+
+    @Test
+    void putPreferences_should_reject_negative_daily_calorie_target() {
+        AppUser currentUser = user(1L);
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer valid-token")
+                .body("""
+                        {
+                          "dailyCalorieTarget": -1
                         }
                         """)
                 .when().put("/profile/preferences")

@@ -22,12 +22,12 @@ public class UserPreferencesRequest {
     @Min(value = 1, message = "must be greater than or equal to 1")
     private Integer maxPrepTimeMinutes;
 
-    @Min(value = 1, message = "must be greater than or equal to 1")
+    @Min(value = 0, message = "must be greater than or equal to 0")
     private Integer calorieGoal;
 
     private UserGoal goal = UserGoal.MAINTAIN;
 
-    @Min(value = 1, message = "must be greater than or equal to 1")
+    @Min(value = 0, message = "must be greater than or equal to 0")
     private Integer dailyCalorieTarget;
 
     public Set<String> getLikes() {

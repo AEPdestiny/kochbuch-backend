@@ -48,9 +48,6 @@ public class UserPreferencesMapper {
         Integer dailyTarget = request.getDailyCalorieTarget() != null
                 ? request.getDailyCalorieTarget()
                 : request.getCalorieGoal();
-        if (dailyTarget == null) {
-            dailyTarget = 2200;
-        }
         preferences.setDailyCalorieTarget(dailyTarget);
         preferences.setCalorieGoal(dailyTarget);
     }

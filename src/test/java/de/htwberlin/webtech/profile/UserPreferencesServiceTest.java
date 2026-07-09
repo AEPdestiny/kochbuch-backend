@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
@@ -55,6 +56,38 @@ class UserPreferencesServiceTest {
         assertEquals(null, result.getMaxPrepTimeMinutes());
         assertEquals(2200, result.getCalorieGoal());
         assertEquals(2200, result.getDailyCalorieTarget());
+    }
+
+    @Test
+    void update_should_keep_zero_calorie_target() {
+        AppUser owner = user(1L);
+        UserPreferences existing = new UserPreferences();
+        existing.setOwner(owner);
+        doReturn(Optional.of(existing)).when(repository).findByOwner(owner);
+
+        UserPreferencesRequest request = new UserPreferencesRequest();
+        request.setCalorieGoal(0);
+        request.setDailyCalorieTarget(0);
+
+        UserPreferences result = underTest.update(request, owner);
+
+        assertEquals(0, result.getCalorieGoal());
+        assertEquals(0, result.getDailyCalorieTarget());
+    }
+
+    @Test
+    void update_should_keep_null_calorie_target() {
+        AppUser owner = user(1L);
+        UserPreferences existing = new UserPreferences();
+        existing.setOwner(owner);
+        existing.setCalorieGoal(2200);
+        existing.setDailyCalorieTarget(2200);
+        doReturn(Optional.of(existing)).when(repository).findByOwner(owner);
+
+        UserPreferences result = underTest.update(new UserPreferencesRequest(), owner);
+
+        assertNull(result.getCalorieGoal());
+        assertNull(result.getDailyCalorieTarget());
     }
 
     private UserPreferencesRequest request() {
