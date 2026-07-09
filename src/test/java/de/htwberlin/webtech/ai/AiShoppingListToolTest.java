@@ -93,6 +93,26 @@ class AiShoppingListToolTest {
         assertEquals(List.of("Limette"), result.skippedShoppingListItems());
     }
 
+    @Test
+    void addMissingIngredients_should_normalize_quantities_preparation_notes_and_plural_for_pantry_skip() {
+        AppUser user = user();
+        doReturn(List.of()).when(shoppingListService).listMine(user);
+        doReturn(List.of(pantryItem("Ei"), pantryItem("Rapsöl"))).when(pantryItemRepository).findByOwner(user);
+
+        AiShoppingListToolResult result = underTest.addMissingIngredients(user, List.of(
+                "2 Eier",
+                "1 EL Rapsöl zum Braten",
+                "Salz",
+                "Pfeffer nach Geschmack"
+        ));
+
+        assertEquals(List.of("Salz", "Pfeffer"), result.addedItems());
+        assertEquals(List.of("Eier", "Rapsöl"), result.skippedPantryItems());
+        ArgumentCaptor<ShoppingListItemRequest> requestCaptor = ArgumentCaptor.forClass(ShoppingListItemRequest.class);
+        verify(shoppingListService, times(2)).create(requestCaptor.capture(), eq(user));
+        assertEquals(List.of("Salz", "Pfeffer"), requestCaptor.getAllValues().stream().map(ShoppingListItemRequest::getName).toList());
+    }
+
     private ShoppingListItem shoppingItem(String name) {
         ShoppingListItem item = new ShoppingListItem();
         item.setName(name);

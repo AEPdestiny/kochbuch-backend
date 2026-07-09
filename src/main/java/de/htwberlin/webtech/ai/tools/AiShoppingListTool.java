@@ -85,7 +85,8 @@ public class AiShoppingListTool {
         }
         return value
                 .replaceAll("^[\\-_*\\d.)\\s]+", "")
-                .replaceAll("(?i)^(g|kg|ml|l|stueck|stk|tl|el|prise|prisen|cup|cups)\\s+", "")
+                .replaceAll("(?iu)^(g|kg|gr|gramm|ml|l|liter|stueck|stück|stk|tl|el|essloeffel|esslöffel|teeloeffel|teelöffel|prise|prisen|cup|cups|tasse|tassen|packung|dose)\\s+", "")
+                .replaceAll("(?iu)\\b(?:zum\\s+braten|nach\\s+geschmack|gehackt|frisch|frische|frischer|optional)\\b", "")
                 .replaceAll("[.;:]+$", "")
                 .replaceAll("\\s+", " ")
                 .trim();
@@ -101,8 +102,31 @@ public class AiShoppingListTool {
                 .replaceAll("\\s+", " ")
                 .trim()
                 .toLowerCase(Locale.ROOT);
+        normalized = normalized
+                .replaceAll("^\\d+\\s*", "")
+                .replaceAll("^(g|kg|gr|gramm|ml|l|liter|stueck|stuck|stk|tl|el|essloeffel|essloffel|teeloeffel|teeloffel|prise|prisen|cup|cups|tasse|tassen|packung|dose)\\s+", "")
+                .replaceAll("\\b(zum braten|nach geschmack|gehackt|frisch|frische|frischer|optional)\\b", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+        normalized = singularize(normalized);
+        return normalized;
+    }
+
+    private String singularize(String normalized) {
+        if (normalized.equals("eier")) {
+            return "ei";
+        }
+        if (normalized.endsWith("nen") && normalized.length() > 5) {
+            return normalized.substring(0, normalized.length() - 1);
+        }
+        if (normalized.endsWith("en") && normalized.length() > 4) {
+            return normalized.substring(0, normalized.length() - 1);
+        }
+        if (normalized.endsWith("e") && normalized.length() > 4) {
+            return normalized.substring(0, normalized.length() - 1);
+        }
         if (normalized.endsWith("s") && normalized.length() > 3) {
-            normalized = normalized.substring(0, normalized.length() - 1);
+            return normalized.substring(0, normalized.length() - 1);
         }
         return normalized;
     }

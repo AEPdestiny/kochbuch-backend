@@ -25,7 +25,8 @@ import java.util.regex.Pattern;
 public class AiIntentDetector {
 
     private static final Pattern NUMERIC_SELECTION = Pattern.compile("\\b([123])\\b");
-    private static final Pattern NUMBERED_OPTION = Pattern.compile("(?:^|\\s|\\()([123])\\)?\\s*(?:=|:|-)?\\s*([^()]+?)(?=\\s*\\(?[123]\\)?\\s*(?:=|:|-)?\\s+|$)");
+    private static final Pattern NUMBERED_OPTION_LINE = Pattern.compile("^\\s*(?:[-*]\\s*)?\\(?([123])\\)?[.)\\-:]?\\s+(.+?)\\s*$");
+    private static final Pattern NUMBERED_OPTION_INLINE = Pattern.compile("(?:^|\\s)\\(?([123])\\)?[.)]?[\\s:-]+(.+?)(?=\\s+\\(?[123]\\)?[.)]?[\\s:-]+|$)");
 
     public AiIntentDetectionResult detect(String message, List<AiChatRequest.AiChatTurn> history) {
         String normalized = normalize(message);
@@ -63,9 +64,13 @@ public class AiIntentDetector {
         }
 
         if ((containsAny(normalized, "einkaufsliste", "shopping list")
-                && containsAny(normalized, "fuge", "fuege", "hinzu", "hinzufugen", "add", "put", "setz", "setze", "zutaten"))
+                && containsAny(normalized, "mach", "fuge", "fuege", "hinzu", "hinzufugen", "add", "put", "pack", "packen", "setz", "setze", "zutaten", "brauche", "fehlt", "vorrat"))
                 || containsAll(normalized, "zutaten", "hinzu")
                 || containsAll(normalized, "ingredients", "add")
+                || containsAll(normalized, "fuge", "hinzu")
+                || containsAll(normalized, "fuege", "hinzu")
+                || containsAll(normalized, "brauche", "einkaufsliste")
+                || containsAll(normalized, "fehlt", "einkaufsliste")
                 || containsAny(normalized, "alisveris listesi", "alisveris listesine")
                 || containsAll(normalized, "add", "shopping")
                 || containsAll(normalized, "ekle", "alisveris")) {
@@ -194,21 +199,42 @@ public class AiIntentDetector {
     }
 
     private java.util.Map<Integer, String> parseNumberedOptions(String text) {
-        String compact = text.replaceAll("\\s+", " ").trim();
-        Matcher matcher = NUMBERED_OPTION.matcher(compact);
         java.util.Map<Integer, String> options = new java.util.LinkedHashMap<>();
+        for (String line : text.split("\\R+")) {
+            Matcher lineMatcher = NUMBERED_OPTION_LINE.matcher(line);
+            if (lineMatcher.find()) {
+                int number = Integer.parseInt(lineMatcher.group(1));
+                String option = cleanOptionText(lineMatcher.group(2));
+                if (!option.isBlank()) {
+                    options.put(number, option);
+                }
+            }
+        }
+        if (!options.isEmpty()) {
+            return options;
+        }
+
+        String compact = text.replaceAll("\\s+", " ").trim();
+        Matcher matcher = NUMBERED_OPTION_INLINE.matcher(compact);
         while (matcher.find()) {
             int number = Integer.parseInt(matcher.group(1));
-            String option = matcher.group(2)
-                    .replaceAll("(?i)\\b(?:moechtest|mochtest|willst|soll ich|oder)\\b", "")
-                    .replaceAll("[?.!]+$", "")
-                    .replaceAll("\\s+", " ")
-                    .trim();
+            String option = cleanOptionText(matcher.group(2));
             if (!option.isBlank()) {
                 options.put(number, option);
             }
         }
         return options;
+    }
+
+    private String cleanOptionText(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replaceAll("(?i)^\\s*(?:moechtest|mochtest|willst|soll ich|oder)\\b\\s*", "")
+                .replaceAll("[?.!]+$", "")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private boolean isShoppingListConfirmation(String normalized) {
@@ -254,10 +280,7 @@ public class AiIntentDetector {
         return history.stream()
                 .filter(turn -> turn != null && "assistant".equalsIgnoreCase(turn.getRole()) && turn.getText() != null)
                 .map(AiChatRequest.AiChatTurn::getText)
-                .map(this::normalize)
-                .anyMatch(text -> text.contains("(1)") || text.contains("1)") || text.contains(" 1 ")
-                        || text.contains("(2)") || text.contains("2)") || text.contains(" 2 ")
-                        || text.contains("(3)") || text.contains("3)") || text.contains(" 3 "));
+                .anyMatch(text -> !parseNumberedOptions(text).isEmpty());
     }
 
     private record ResolvedOption(int number, String text) {

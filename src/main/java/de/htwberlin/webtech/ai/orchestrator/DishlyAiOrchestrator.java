@@ -126,6 +126,9 @@ public class DishlyAiOrchestrator {
             if (exception.getMessage() != null && exception.getMessage().contains("GROQ_API_KEY")) {
                 return new AiChatResponse("Dishly AI ist noch nicht konfiguriert. Setze GROQ_API_KEY im Backend, damit echte Antworten erzeugt werden.", false);
             }
+            if (exception.getMessage() != null && exception.getMessage().contains("status 429")) {
+                return new AiChatResponse("Dishly AI ist gerade kurz ausgelastet. Bitte versuche es gleich nochmal.", false);
+            }
             return new AiChatResponse("Dishly AI konnte Groq gerade nicht erreichen: " + exception.getMessage(), false);
         }
     }
@@ -193,6 +196,10 @@ public class DishlyAiOrchestrator {
     }
 
     private List<String> extractIngredients(String message, List<AiChatRequest.AiChatTurn> history) {
+        List<String> fromDirectUserCommand = extractIngredientsFromUserCommand(message);
+        if (!fromDirectUserCommand.isEmpty()) {
+            return fromDirectUserCommand;
+        }
         List<String> fromUserMessage = extractIngredientsFromText(message);
         if (!fromUserMessage.isEmpty()) {
             return fromUserMessage;
@@ -213,6 +220,42 @@ public class DishlyAiOrchestrator {
         return List.of();
     }
 
+    private List<String> extractIngredientsFromUserCommand(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+        String normalized = text.replaceAll("\\s+", " ").trim();
+        List<java.util.regex.Pattern> patterns = List.of(
+                java.util.regex.Pattern.compile("(?iu)(?:kannst du(?: mir)?\\s+)?(.+?)\\s+(?:in meine|in die|auf die|zur)\\s+einkaufsliste\\s+(?:packen|setzen|setze|hinzufuegen|hinzufügen|tun)"),
+                java.util.regex.Pattern.compile("(?iu)(?:fuege|füge|packe|setz(?:e)?)\\s+(.+?)\\s+(?:hinzu|auf die einkaufsliste|in die einkaufsliste|in meine einkaufsliste)"),
+                java.util.regex.Pattern.compile("(?iu)ich\\s+brauche\\s+(.+?)(?:\\s+auf der einkaufsliste|\\s+in der einkaufsliste|[?.!]|$)"),
+                java.util.regex.Pattern.compile("(?iu)ich\\s+habe\\s+(.+?)\\s+nicht\\s+im\\s+vorrat"),
+                java.util.regex.Pattern.compile("(?iu)(.+?)\\s+fehlt(?:\\s+mir)?(?:[?.!]|$)")
+        );
+        for (java.util.regex.Pattern pattern : patterns) {
+            java.util.regex.Matcher matcher = pattern.matcher(normalized);
+            if (matcher.find()) {
+                List<String> ingredients = splitIngredientText(matcher.group(1)).stream()
+                        .filter(this::isConcreteIngredient)
+                        .toList();
+                if (!ingredients.isEmpty()) {
+                    return ingredients;
+                }
+            }
+        }
+        return List.of();
+    }
+
+    private boolean isConcreteIngredient(String value) {
+        if (value == null) {
+            return false;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return !normalized.isBlank()
+                && !normalized.contains("einkaufsliste")
+                && !List.of("es", "das", "dies", "diese", "die", "alle", "alles").contains(normalized);
+    }
+
     private List<String> extractIngredientsFromText(String text) {
         if (text == null || text.isBlank()) {
             return List.of();
@@ -227,7 +270,18 @@ public class DishlyAiOrchestrator {
         }
         String ingredientText = matcher.group(1)
                 .replaceAll("(?iu)\\b(?:m.chtest|moechtest|mochtest|willst|soll ich|would you|ister misin)\\b.*$", "");
-        return java.util.Arrays.stream(ingredientText.split("\\s*,\\s*|\\s+und\\s+|\\s+and\\s+|\\s+ve\\s+"))
+        return splitIngredientText(ingredientText);
+    }
+
+    private List<String> splitIngredientText(String ingredientText) {
+        if (ingredientText == null || ingredientText.isBlank()) {
+            return List.of();
+        }
+        String cleaned = ingredientText
+                .replaceAll("(?iu)\\b(?:nach\\s+geschmack|zum\\s+braten|ich\\s+habe\\s+es\\s+nicht\\s+im\\s+vorrat)\\b", "")
+                .replaceAll("\\?.*$", "")
+                .trim();
+        return java.util.Arrays.stream(cleaned.split("\\s*,\\s*|\\s*&\\s*|\\s+und\\s+|\\s+and\\s+|\\s+ve\\s+"))
                 .map(String::trim)
                 .filter(value -> !value.isBlank())
                 .filter(value -> value.length() <= 60)

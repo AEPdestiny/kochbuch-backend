@@ -239,6 +239,18 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
+    void answer_should_return_friendly_rate_limit_message() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        doThrow(new GroqClientException("Groq request failed with status 429.")).when(groqClient).complete(any(), any());
+
+        AiChatResponse response = underTest.answer(user, "Hallo", List.of());
+
+        assertFalse(response.isConfigured());
+        assertEquals("Dishly AI ist gerade kurz ausgelastet. Bitte versuche es gleich nochmal.", response.getMessage());
+    }
+
+    @Test
     void answer_should_execute_shopping_list_follow_up_selection_when_ingredients_are_clear() {
         AppUser user = user();
         stubEmptyContext(user);
@@ -312,6 +324,37 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
+    void answer_should_execute_direct_shopping_list_command_from_user_message() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Salz", "Pfeffer");
+        doReturn(new AiShoppingListToolResult(ingredients, List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "kannst du mir Salz und Pfeffer nach geschmack in meine einkaufsliste packen? ich habe es nicht im vorrat", List.of());
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Salz und Pfeffer"));
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_extract_salt_and_pepper_without_taste_suffix() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Salz", "Pfeffer");
+        doReturn(new AiShoppingListToolResult(ingredients, List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "fuege Salz und Pfeffer nach Geschmack hinzu", List.of());
+
+        assertTrue(response.isConfigured());
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
     void answer_should_execute_turkish_shopping_list_command_when_ingredients_are_clear() {
         AppUser user = user();
         stubEmptyContext(user);
@@ -334,7 +377,7 @@ class DishlyAiOrchestratorTest {
         AppUser user = user();
         stubEmptyContext(user);
 
-        AiChatResponse response = underTest.answer(user, "fuege es zur Einkaufsliste hinzu", List.of());
+        AiChatResponse response = underTest.answer(user, "mach Einkaufsliste", List.of());
 
         assertTrue(response.isConfigured());
         assertTrue(response.getMessage().contains("Welche konkreten Zutaten"));

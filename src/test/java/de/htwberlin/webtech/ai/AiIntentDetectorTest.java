@@ -58,6 +58,24 @@ class AiIntentDetectorTest {
     }
 
     @Test
+    void detect_should_resolve_dot_numbered_shopping_list_option_without_hardcoded_mapping() {
+        AiIntentDetectionResult result = underTest.detect("2", List.of(
+                turn("assistant", """
+                        1. Das Tomaten-Ei-Omelett ausprobieren
+                        2. Eine Einkaufsliste fuer fehlende Zutaten erstellen
+                        3. Weitere Rezeptideen erhalten
+                        """)
+        ));
+
+        assertEquals(AiIntent.FOLLOW_UP_SELECTION, result.primaryIntent());
+        assertTrue(result.normalizedUserRequest().contains("Option 2"));
+        assertTrue(result.normalizedUserRequest().contains("Eine Einkaufsliste fuer fehlende Zutaten erstellen"));
+        assertEquals(1, result.plannedActions().size());
+        assertEquals(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, result.plannedActions().getFirst().type());
+        assertFalse(result.plannedActions().stream().anyMatch(plan -> plan.type() == AiActionType.FIND_RESTAURANT));
+    }
+
+    @Test
     void detect_should_map_german_shopping_list_command() {
         AiIntentDetectionResult result = underTest.detect("fuege es zur einkaufsliste hinzu", List.of());
 
