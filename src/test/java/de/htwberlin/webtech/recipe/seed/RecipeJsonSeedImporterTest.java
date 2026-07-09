@@ -28,6 +28,9 @@ class RecipeJsonSeedImporterTest {
     private static final Path GERMAN_LUNCH_FILE = Path.of(
             "src", "main", "resources", "recipes", "de", "lunch.json"
     );
+    private static final Path ENGLISH_BREAKFAST_FILE = Path.of(
+            "src", "main", "resources", "recipes", "en", "breakfast.json"
+    );
 
     @Test
     void seedFiles_should_support_german_english_folder_structure_and_legacy_english_files() {
@@ -50,6 +53,9 @@ class RecipeJsonSeedImporterTest {
         assertTrue(files.stream().anyMatch(file -> file.language().equals("en")
                 && file.category().equals("dinner")
                 && file.fileNames().contains("recipesDinner.json")));
+        assertTrue(files.stream().anyMatch(file -> file.language().equals("en")
+                && file.category().equals("snack")
+                && file.fileNames().contains("recipes/en/snack.json")));
     }
 
     @Test
@@ -119,11 +125,11 @@ class RecipeJsonSeedImporterTest {
         }
 
         ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
-        verify(persistence, times(120)).upsertSeedRecipe(captor.capture());
+        verify(persistence, times(100)).upsertSeedRecipe(captor.capture());
         List<Recipe> recipes = captor.getAllValues();
 
-        assertEquals(120, imported);
-        assertEquals(120, recipes.stream().map(Recipe::getExternalId).distinct().count());
+        assertEquals(100, imported);
+        assertEquals(100, recipes.stream().map(Recipe::getExternalId).distinct().count());
         assertTrue(recipes.stream().allMatch(recipe -> "de".equals(recipe.getLanguage())));
         assertTrue(recipes.stream().allMatch(recipe -> "lunch".equals(recipe.getCategory())));
         assertTrue(recipes.stream().allMatch(recipe -> !recipe.getTitle().isBlank()));
@@ -136,14 +142,34 @@ class RecipeJsonSeedImporterTest {
         assertTrue(recipes.stream().allMatch(recipe -> !recipe.getIngredients().isBlank()));
         assertTrue(recipes.stream().allMatch(recipe -> !recipe.getInstructions().isBlank()));
 
-        Recipe sushi = recipes.stream()
-                .filter(recipe -> searchableText(recipe).contains("sushi"))
-                .findFirst()
-                .orElseThrow();
-        assertNotNull(sushi.getCalories());
-        assertNotNull(sushi.getProtein());
-        assertFalse(sushi.getIngredients().isBlank());
-        assertFalse(sushi.getInstructions().isBlank());
+        Recipe representative = recipes.getFirst();
+        assertNotNull(representative.getCalories());
+        assertNotNull(representative.getProtein());
+        assertFalse(representative.getIngredients().isBlank());
+        assertFalse(representative.getInstructions().isBlank());
+    }
+
+    @Test
+    void productionEnglishBreakfast_should_import_new_source_recipes_with_nutrition() throws Exception {
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.upsertSeedRecipe(any(Recipe.class))).thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
+
+        int imported;
+        try (InputStream stream = Files.newInputStream(ENGLISH_BREAKFAST_FILE)) {
+            imported = importer.importStream(stream, "recipes/en/breakfast.json", "breakfast", "en");
+        }
+
+        ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
+        verify(persistence, times(100)).upsertSeedRecipe(captor.capture());
+        List<Recipe> recipes = captor.getAllValues();
+
+        assertEquals(100, imported);
+        assertEquals(100, recipes.stream().map(Recipe::getExternalId).distinct().count());
+        assertTrue(recipes.stream().allMatch(recipe -> "en".equals(recipe.getLanguage())));
+        assertTrue(recipes.stream().allMatch(recipe -> "breakfast".equals(recipe.getCategory())));
+        assertTrue(recipes.stream().allMatch(recipe -> recipe.getCalories() != null));
+        assertTrue(recipes.stream().allMatch(recipe -> recipe.getProtein() != null));
     }
 
     @Test

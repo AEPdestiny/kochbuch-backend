@@ -27,7 +27,7 @@ public class RecipeJsonSeedImporter {
             new CategoryFile("breakfast.json", "breakfast"),
             new CategoryFile("lunch.json", "lunch"),
             new CategoryFile("dinner.json", "dinner"),
-            new CategoryFile("snacks.json", "snack")
+            new CategoryFile("snack.json", "snack", "snacks.json")
     );
 
     private final RecipeSeedPersistence persistence;
@@ -59,7 +59,7 @@ public class RecipeJsonSeedImporter {
         for (String language : LANGUAGES) {
             for (CategoryFile categoryFile : CATEGORY_FILES) {
                 files.add(new SeedFile(
-                        List.of("recipes/" + language + "/" + categoryFile.fileName()),
+                        categoryFile.resourceNames(language),
                         categoryFile.category(),
                         language
                 ));
@@ -587,6 +587,14 @@ public class RecipeJsonSeedImporter {
     record SeedFile(List<String> fileNames, String category, String language) {
     }
 
-    record CategoryFile(String fileName, String category) {
+    record CategoryFile(String fileName, String category, String... fallbackFileNames) {
+        List<String> resourceNames(String language) {
+            List<String> names = new ArrayList<>();
+            names.add("recipes/" + language + "/" + fileName);
+            for (String fallbackFileName : fallbackFileNames) {
+                names.add("recipes/" + language + "/" + fallbackFileName);
+            }
+            return names;
+        }
     }
 }
