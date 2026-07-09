@@ -90,6 +90,10 @@ public class DishlyAiOrchestrator {
 
     public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history, String locale) {
         AiConversationContext context = buildConversationContext(currentUser, message, history, locale);
+        AiChatResponse clarificationResponse = tryHandleOpenShoppingListClarification(currentUser, context);
+        if (clarificationResponse != null) {
+            return clarificationResponse;
+        }
         AiIntentDetectionResult intent = intentDetector.detect(context.message(), context.history());
         AiChatResponse toolResponse = tryExecuteCombinedTools(currentUser, context, intent);
         if (toolResponse != null) {
@@ -146,6 +150,85 @@ public class DishlyAiOrchestrator {
             }
             return new AiChatResponse("Dishly AI konnte Groq gerade nicht erreichen: " + exception.getMessage(), false);
         }
+    }
+
+    private AiChatResponse tryHandleOpenShoppingListClarification(AppUser currentUser, AiConversationContext context) {
+        String lastAssistantText = lastAssistantText(context.history());
+        if (!isShoppingListClarification(lastAssistantText)) {
+            return null;
+        }
+        if (isAbortMessage(context.message())) {
+            return new AiChatResponse("Alles klar, ich mache das nicht.", true);
+        }
+        List<String> ingredients = extractIngredientsFromClarificationAnswer(context.message());
+        if (ingredients.isEmpty()) {
+            return new AiChatResponse("Alles klar, ich fuege nichts hinzu.", true);
+        }
+        try {
+            AiShoppingListToolResult result = shoppingListTool.addMissingIngredients(currentUser, ingredients);
+            return new AiChatResponse(shoppingListToolMessage(result, null), true);
+        } catch (RuntimeException exception) {
+            return new AiChatResponse("Ich konnte die Zutaten gerade nicht zur Einkaufsliste hinzufuegen: " + exception.getMessage(), false);
+        }
+    }
+
+    private String lastAssistantText(List<AiChatRequest.AiChatTurn> history) {
+        if (history == null || history.isEmpty()) {
+            return "";
+        }
+        for (int i = history.size() - 1; i >= 0; i--) {
+            AiChatRequest.AiChatTurn turn = history.get(i);
+            if (turn != null && "assistant".equalsIgnoreCase(turn.getRole()) && turn.getText() != null) {
+                return turn.getText();
+            }
+        }
+        return "";
+    }
+
+    private boolean isShoppingListClarification(String text) {
+        String normalized = normalizeForIngredientIntent(text);
+        return normalized.contains("welche konkreten zutaten")
+                || normalized.contains("welche zutaten soll ich")
+                || normalized.contains("schreib sie bitte")
+                || normalized.contains("welche fehlenden zutaten")
+                || normalized.contains("zutaten soll ich zusaetzlich")
+                || normalized.contains("zutaten soll ich zusatzlich");
+    }
+
+    private boolean isAbortMessage(String message) {
+        String normalized = normalizeForIngredientIntent(message);
+        return normalized.equals("nein")
+                || normalized.equals("ne")
+                || normalized.equals("no")
+                || normalized.equals("egal")
+                || normalized.equals("weiss nicht")
+                || normalized.equals("weis nicht")
+                || normalized.contains("doch nicht")
+                || normalized.contains("abbrechen")
+                || normalized.equals("lass")
+                || normalized.startsWith("lass ");
+    }
+
+    private List<String> extractIngredientsFromClarificationAnswer(String message) {
+        if (message == null || message.isBlank()) {
+            return List.of();
+        }
+        String cleaned = message
+                .replaceAll("(?iu)\\b(?:am\\s+besten|nach\\s+geschmack|bitte|danke)\\b", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return splitIngredientText(cleaned).stream()
+                .filter(this::isConcreteIngredient)
+                .map(this::capitalizeIngredient)
+                .toList();
+    }
+
+    private String capitalizeIngredient(String ingredient) {
+        if (ingredient == null || ingredient.isBlank()) {
+            return "";
+        }
+        String trimmed = ingredient.trim();
+        return trimmed.substring(0, 1).toUpperCase(Locale.ROOT) + trimmed.substring(1);
     }
 
     private AiChatResponse tryExecuteShoppingListTool(AppUser currentUser, AiConversationContext context, AiIntentDetectionResult intent) {

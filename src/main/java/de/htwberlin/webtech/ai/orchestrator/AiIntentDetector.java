@@ -197,16 +197,28 @@ public class AiIntentDetector {
         if (history == null || history.isEmpty()) {
             return "";
         }
-        for (int i = history.size() - 1; i >= 0; i--) {
-            AiChatRequest.AiChatTurn turn = history.get(i);
-            if (turn == null || !"assistant".equalsIgnoreCase(turn.getRole()) || turn.getText() == null) {
-                continue;
-            }
-            if (previousAssistantOfferedNumberedOptions(List.of(turn))) {
-                return turn.getText();
-            }
+        List<AiChatRequest.AiChatTurn> assistantTurns = history.stream()
+                .filter(turn -> turn != null && "assistant".equalsIgnoreCase(turn.getRole()) && turn.getText() != null)
+                .toList();
+        if (assistantTurns.isEmpty()) {
+            return "";
+        }
+        AiChatRequest.AiChatTurn latestAssistant = assistantTurns.getLast();
+        if (!parseNumberedOptions(latestAssistant.getText()).isEmpty()) {
+            return latestAssistant.getText();
+        }
+        if (assistantTurns.size() < 2) {
+            return "";
+        }
+        AiChatRequest.AiChatTurn previousAssistant = assistantTurns.get(assistantTurns.size() - 2);
+        if (!parseNumberedOptions(previousAssistant.getText()).isEmpty()) {
+            return previousAssistant.getText();
         }
         return "";
+    }
+
+    private boolean previousAssistantOfferedNumberedOptions(List<AiChatRequest.AiChatTurn> history) {
+        return !lastAssistantTextWithNumberedOptions(history).isBlank();
     }
 
     private java.util.Map<Integer, String> parseNumberedOptions(String text) {
@@ -302,16 +314,6 @@ public class AiIntentDetector {
                         "could add",
                         "ingredients",
                         "malzemeler"));
-    }
-
-    private boolean previousAssistantOfferedNumberedOptions(List<AiChatRequest.AiChatTurn> history) {
-        if (history == null || history.isEmpty()) {
-            return false;
-        }
-        return history.stream()
-                .filter(turn -> turn != null && "assistant".equalsIgnoreCase(turn.getRole()) && turn.getText() != null)
-                .map(AiChatRequest.AiChatTurn::getText)
-                .anyMatch(text -> !parseNumberedOptions(text).isEmpty());
     }
 
     private record ResolvedOption(int number, String text) {

@@ -275,6 +275,86 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
+    void answer_should_execute_shopping_list_clarification_follow_up_with_and() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Salz", "Pfeffer");
+        doReturn(new AiShoppingListToolResult(ingredients, List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "salz und pfeffer am besten", List.of(
+                turn("assistant", "Welche konkreten Zutaten soll ich hinzufuegen? Schreib sie bitte z.B. so: Limette, Olivenoel, Salz.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Erledigt. Ich habe Salz und Pfeffer zur Einkaufsliste hinzugefuegt.", response.getMessage());
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_execute_shopping_list_clarification_follow_up_with_commas() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Salz", "Pfeffer", "Olivenoel");
+        doReturn(new AiShoppingListToolResult(ingredients, List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "salz, pfeffer, olivenoel", List.of(
+                turn("assistant", "Welche Zutaten soll ich hinzufuegen?")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Salz, Pfeffer und Olivenoel"));
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_abort_shopping_list_clarification_without_mutation() {
+        AppUser user = user();
+        stubEmptyContext(user);
+
+        AiChatResponse response = underTest.answer(user, "nein", List.of(
+                turn("assistant", "Welche konkreten Zutaten soll ich hinzufuegen? Schreib sie bitte z.B. so: Limette, Olivenoel, Salz.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Alles klar, ich mache das nicht.", response.getMessage());
+        verifyNoInteractions(shoppingListTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_resolve_numeric_reply_against_latest_assistant_options() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        doReturn("Ich koche mit deinem aktuellen Vorrat weiter.").when(groqClient).complete(any(), any());
+
+        AiChatResponse response = underTest.answer(user, "3", List.of(
+                turn("assistant", """
+                        1. Pizza
+                        2. Test Pasta
+                        3. Pommes
+                        """),
+                turn("user", "Was kann ich sonst tun?"),
+                turn("assistant", """
+                        1. Einkaufsliste erstellen
+                        2. Weitere Rezeptideen anzeigen
+                        3. Mit dem aktuellen Vorrat kochen
+                        """)
+        ));
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(groqClient).complete(any(), promptCaptor.capture());
+        assertTrue(response.isConfigured());
+        assertEquals("Ich koche mit deinem aktuellen Vorrat weiter.", response.getMessage());
+        assertTrue(promptCaptor.getValue().contains("Der Nutzer hat Option 3 gewaehlt: Mit dem aktuellen Vorrat kochen"));
+        assertFalse(promptCaptor.getValue().contains("Der Nutzer hat Option 3 gewaehlt: Pommes"));
+        verifyNoInteractions(shoppingListTool);
+    }
+
+    @Test
     void answer_should_not_extract_instruction_text_after_ingredient_line_and_should_ask_for_optional_choice() {
         AppUser user = user();
         stubEmptyContext(user);

@@ -76,6 +76,51 @@ class AiIntentDetectorTest {
     }
 
     @Test
+    void detect_should_resolve_numeric_reply_against_latest_assistant_options() {
+        AiIntentDetectionResult result = underTest.detect("3", List.of(
+                turn("assistant", """
+                        1. Pizza
+                        2. Test Pasta
+                        3. Pommes
+                        """),
+                turn("user", "Zeig mir andere Optionen."),
+                turn("assistant", """
+                        1. Einkaufsliste erstellen
+                        2. Weitere Rezeptideen anzeigen
+                        3. Mit dem aktuellen Vorrat kochen
+                        """)
+        ));
+
+        assertEquals(AiIntent.FOLLOW_UP_SELECTION, result.primaryIntent());
+        assertTrue(result.normalizedUserRequest().contains("Option 3"));
+        assertTrue(result.normalizedUserRequest().contains("Mit dem aktuellen Vorrat kochen"));
+        assertFalse(result.normalizedUserRequest().contains("Pommes"));
+        assertTrue(result.plannedActions().isEmpty());
+    }
+
+    @Test
+    void detect_should_resolve_current_first_option_against_latest_assistant_options() {
+        AiIntentDetectionResult result = underTest.detect("1", List.of(
+                turn("assistant", """
+                        1. Pizza
+                        2. Test Pasta
+                        3. Pommes
+                        """),
+                turn("assistant", """
+                        1. Einkaufsliste erstellen
+                        2. Weitere Rezeptideen anzeigen
+                        3. Mit aktuellem Vorrat kochen
+                        """)
+        ));
+
+        assertEquals(AiIntent.FOLLOW_UP_SELECTION, result.primaryIntent());
+        assertTrue(result.normalizedUserRequest().contains("Option 1"));
+        assertTrue(result.normalizedUserRequest().contains("Einkaufsliste erstellen"));
+        assertFalse(result.normalizedUserRequest().contains("Pizza"));
+        assertEquals(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, result.plannedActions().getFirst().type());
+    }
+
+    @Test
     void detect_should_map_german_shopping_list_command() {
         AiIntentDetectionResult result = underTest.detect("fuege es zur einkaufsliste hinzu", List.of());
 
