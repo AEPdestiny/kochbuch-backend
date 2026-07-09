@@ -38,8 +38,10 @@ public class AiIntentDetector {
         List<Integer> selections = selectedNumbers(normalized);
         if (!selections.isEmpty() && previousAssistantOfferedNumberedOptions(history)) {
             List<ResolvedOption> resolvedOptions = resolveSelectedOptions(selections, history);
+            MealSlot slot = detectMealSlot(normalized);
+            LocalDate date = detectTargetDate(normalized);
             List<AiActionPlan> plans = resolvedOptions.stream()
-                    .map(option -> planForOptionText(option.text()))
+                    .map(option -> planForResolvedOption(option.text(), date, slot))
                     .filter(plan -> plan != null)
                     .toList();
             String normalizedSelection = resolvedOptions.isEmpty()
@@ -63,22 +65,7 @@ public class AiIntentDetector {
             return result(language, normalized, AiIntent.ADD_TO_SHOPPING_LIST, List.of(plan), false, null, 0.89);
         }
 
-        if ((containsAny(normalized, "einkaufsliste", "shopping list")
-                && containsAny(normalized, "mach", "fuge", "fuege", "hinzu", "hinzufugen", "add", "put", "pack", "packen", "setz", "setze", "zutaten", "brauche", "fehlt", "vorrat"))
-                || containsAll(normalized, "zutaten", "hinzu")
-                || containsAll(normalized, "ingredients", "add")
-                || containsAll(normalized, "fuge", "hinzu")
-                || containsAll(normalized, "fuege", "hinzu")
-                || containsAll(normalized, "brauche", "einkaufsliste")
-                || containsAll(normalized, "fehlt", "einkaufsliste")
-                || containsAny(normalized, "alisveris listesi", "alisveris listesine")
-                || containsAll(normalized, "add", "shopping")
-                || containsAll(normalized, "ekle", "alisveris")) {
-            AiActionPlan plan = action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.86, null, null);
-            return result(language, normalized, AiIntent.ADD_TO_SHOPPING_LIST, List.of(plan), false, null, 0.86);
-        }
-
-        if (isMealPlanIntent(normalized)) {
+        if (isMealPlanIntent(normalized, history)) {
             MealSlot slot = detectMealSlot(normalized);
             LocalDate date = detectTargetDate(normalized);
             boolean needsClarification = slot == null || date == null;
@@ -92,6 +79,21 @@ public class AiIntentDetector {
                     needsClarification ? mealPlanClarification(slot, date) : null,
                     0.82
             );
+        }
+
+        if ((containsAny(normalized, "einkaufsliste", "shopping list")
+                && containsAny(normalized, "mach", "fuge", "fuege", "hinzu", "hinzufugen", "add", "put", "pack", "packen", "setz", "setze", "zutaten", "brauche", "fehlt", "vorrat"))
+                || containsAll(normalized, "zutaten", "hinzu")
+                || containsAll(normalized, "ingredients", "add")
+                || containsAll(normalized, "fuge", "hinzu")
+                || containsAll(normalized, "fuege", "hinzu")
+                || containsAll(normalized, "brauche", "einkaufsliste")
+                || containsAll(normalized, "fehlt", "einkaufsliste")
+                || containsAny(normalized, "alisveris listesi", "alisveris listesine")
+                || containsAll(normalized, "add", "shopping")
+                || containsAll(normalized, "ekle", "alisveris")) {
+            AiActionPlan plan = action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.86, null, null);
+            return result(language, normalized, AiIntent.ADD_TO_SHOPPING_LIST, List.of(plan), false, null, 0.86);
         }
 
         if (containsAny(normalized, "details", "detail", "rezept offnen", "recipe details", "open recipe", "davon", "dieses gericht")) {
@@ -129,13 +131,13 @@ public class AiIntentDetector {
         return new AiIntentDetectionResult(language, normalized, intent, plans, confidence, needsClarification, clarificationQuestion);
     }
 
-    private AiActionPlan planForOptionText(String optionText) {
+    private AiActionPlan planForResolvedOption(String optionText, LocalDate targetDate, MealSlot mealSlot) {
         String normalized = normalize(optionText);
         if (containsAny(normalized, "einkaufsliste", "shopping list", "zutaten hinzufugen", "zutaten hinzufuegen", "alisveris")) {
             return action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.95, null, null);
         }
         if (containsAny(normalized, "wochenplan", "meal plan", "planen", "einplanen")) {
-            return action(AiActionType.ADD_RECIPE_TO_MEAL_PLAN, 0.95, null, null);
+            return action(AiActionType.ADD_RECIPE_TO_MEAL_PLAN, 0.95, targetDate, mealSlot);
         }
         if (containsAny(normalized, "restaurant", "lokal", "essen gehen", "find restaurant")) {
             return action(AiActionType.FIND_RESTAURANT, 0.95, null, null);
@@ -143,16 +145,23 @@ public class AiIntentDetector {
         if (containsAny(normalized, "details", "detail", "rezept offnen", "recipe details")) {
             return action(AiActionType.OPEN_RECIPE, 0.90, null, null);
         }
+        if (targetDate != null || mealSlot != null) {
+            return action(AiActionType.ADD_RECIPE_TO_MEAL_PLAN, 0.95, targetDate, mealSlot, optionText);
+        }
         return null;
     }
 
     private AiActionPlan action(AiActionType type, double confidence, LocalDate targetDate, MealSlot mealSlot) {
+        return action(type, confidence, targetDate, mealSlot, null);
+    }
+
+    private AiActionPlan action(AiActionType type, double confidence, LocalDate targetDate, MealSlot mealSlot, String recipeTitle) {
         return new AiActionPlan(
                 type,
                 confidence,
                 null,
                 null,
-                null,
+                recipeTitle,
                 targetDate,
                 mealSlot,
                 List.of(),
@@ -286,27 +295,47 @@ public class AiIntentDetector {
     private record ResolvedOption(int number, String text) {
     }
 
-    private boolean isMealPlanIntent(String normalized) {
-        return containsAny(normalized,
+    private boolean isMealPlanIntent(String normalized, List<AiChatRequest.AiChatTurn> history) {
+        if (containsAny(normalized,
                 "wochenplan",
                 "meal plan",
                 "plan",
                 "plana",
                 "rein",
+                "trag",
+                "trage",
+                "eintragen",
                 "morgen abend",
                 "morge abnd",
                 "yarin aksam",
-                "yarin plana");
+                "yarin plana")) {
+            return true;
+        }
+        boolean hasDate = detectTargetDate(normalized) != null;
+        boolean hasSlot = detectMealSlot(normalized) != null;
+        return (hasDate && hasSlot) || ((hasDate || hasSlot) && previousAssistantProvidedRecipeIdea(history));
+    }
+
+    private boolean previousAssistantProvidedRecipeIdea(List<AiChatRequest.AiChatTurn> history) {
+        if (history == null || history.isEmpty()) {
+            return false;
+        }
+        return history.stream()
+                .filter(turn -> turn != null && "assistant".equalsIgnoreCase(turn.getRole()) && turn.getText() != null)
+                .map(AiChatRequest.AiChatTurn::getText)
+                .map(this::normalize)
+                .anyMatch(text -> containsAny(text, "rezept", "gericht", "idee", "omelett", "pudding", "salat")
+                        || !parseNumberedOptions(text).isEmpty());
     }
 
     private MealSlot detectMealSlot(String normalized) {
-        if (containsAny(normalized, "fruhstuck", "breakfast", "kahvalti")) {
+        if (containsAny(normalized, "fruhstuck", "morgens", "breakfast", "kahvalti")) {
             return MealSlot.BREAKFAST;
         }
-        if (containsAny(normalized, "mittag", "lunch", "ogle", "oglen")) {
+        if (containsAny(normalized, "mittag", "mittags", "lunch", "ogle", "oglen")) {
             return MealSlot.LUNCH;
         }
-        if (containsAny(normalized, "abend", "abnd", "dinner", "aksam")) {
+        if (containsAny(normalized, "abend", "abends", "abendessen", "abnd", "dinner", "aksam")) {
             return MealSlot.DINNER;
         }
         if (containsAny(normalized, "snack", "zwischenmahlzeit")) {
@@ -317,6 +346,9 @@ public class AiIntentDetector {
 
     private LocalDate detectTargetDate(String normalized) {
         LocalDate today = LocalDate.now();
+        if (containsAny(normalized, "ubermorgen", "uebermorgen", "day after tomorrow")) {
+            return today.plusDays(2);
+        }
         if (containsAny(normalized, "morgen", "morge", "tomorrow", "yarin")) {
             return today.plusDays(1);
         }
@@ -356,7 +388,8 @@ public class AiIntentDetector {
     }
 
     private boolean needsClarification(List<AiActionPlan> plans) {
-        return plans.stream().anyMatch(plan -> plan.type() == AiActionType.ADD_RECIPE_TO_MEAL_PLAN);
+        return plans.stream().anyMatch(plan -> plan.type() == AiActionType.ADD_RECIPE_TO_MEAL_PLAN
+                && (plan.targetDate() == null || plan.mealSlot() == null));
     }
 
     private String clarificationFor(List<AiActionPlan> plans) {
@@ -374,9 +407,15 @@ public class AiIntentDetector {
             return "Fuer welchen Tag und welche Mahlzeit soll ich das planen?";
         }
         if (slot == null) {
+            if (date != null && date.equals(LocalDate.now().plusDays(1))) {
+                return "Fuer morgen: Fruehstueck, Mittag oder Abendessen?";
+            }
             return "Fuer welche Mahlzeit soll ich das planen?";
         }
-        return "Fuer welchen Tag soll ich das planen?";
+        if (slot == MealSlot.DINNER) {
+            return "Fuer welchen Tag soll ich es zum Abendessen eintragen?";
+        }
+        return "Fuer welchen Tag soll ich es eintragen?";
     }
 
     private AiDetectedLanguage detectLanguage(String original, String normalized) {

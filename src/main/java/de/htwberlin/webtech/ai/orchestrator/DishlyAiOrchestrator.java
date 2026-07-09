@@ -5,13 +5,17 @@ import de.htwberlin.webtech.ai.client.GroqClientException;
 import de.htwberlin.webtech.ai.dto.AiChatRequest;
 import de.htwberlin.webtech.ai.dto.AiChatResponse;
 import de.htwberlin.webtech.ai.model.AiActionPlan;
+import de.htwberlin.webtech.ai.model.AiActionType;
 import de.htwberlin.webtech.ai.model.AiConversationContext;
 import de.htwberlin.webtech.ai.model.AiIntent;
 import de.htwberlin.webtech.ai.model.AiIntentDetectionResult;
+import de.htwberlin.webtech.ai.tools.AiMealPlanTool;
+import de.htwberlin.webtech.ai.tools.AiMealPlanToolResult;
 import de.htwberlin.webtech.ai.tools.AiShoppingListTool;
 import de.htwberlin.webtech.ai.tools.AiShoppingListToolResult;
 import de.htwberlin.webtech.favorite.repository.ExternalRecipeFavoriteRepository;
 import de.htwberlin.webtech.mealplan.entity.MealPlan;
+import de.htwberlin.webtech.mealplan.entity.MealSlot;
 import de.htwberlin.webtech.mealplan.repository.MealPlanRepository;
 import de.htwberlin.webtech.pantry.repository.PantryItemRepository;
 import de.htwberlin.webtech.profile.entity.UserPreferences;
@@ -56,6 +60,7 @@ public class DishlyAiOrchestrator {
     private final RecipeRepository recipeRepository;
     private final AiIntentDetector intentDetector;
     private final AiShoppingListTool shoppingListTool;
+    private final AiMealPlanTool mealPlanTool;
 
     public DishlyAiOrchestrator(GroqClient groqClient,
                                 UserPreferencesRepository preferencesRepository,
@@ -65,7 +70,8 @@ public class DishlyAiOrchestrator {
                                 ShoppingListItemRepository shoppingListItemRepository,
                                 RecipeRepository recipeRepository,
                                 AiIntentDetector intentDetector,
-                                AiShoppingListTool shoppingListTool) {
+                                AiShoppingListTool shoppingListTool,
+                                AiMealPlanTool mealPlanTool) {
         this.groqClient = groqClient;
         this.preferencesRepository = preferencesRepository;
         this.pantryItemRepository = pantryItemRepository;
@@ -75,6 +81,7 @@ public class DishlyAiOrchestrator {
         this.recipeRepository = recipeRepository;
         this.intentDetector = intentDetector;
         this.shoppingListTool = shoppingListTool;
+        this.mealPlanTool = mealPlanTool;
     }
 
     public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history) {
@@ -85,6 +92,10 @@ public class DishlyAiOrchestrator {
         AiConversationContext context = buildConversationContext(currentUser, message, history, locale);
         AiIntentDetectionResult intent = intentDetector.detect(context.message(), context.history());
         AiChatResponse toolResponse = tryExecuteShoppingListTool(currentUser, context, intent);
+        if (toolResponse != null) {
+            return toolResponse;
+        }
+        toolResponse = tryExecuteMealPlanTool(currentUser, context, intent);
         if (toolResponse != null) {
             return toolResponse;
         }
@@ -164,7 +175,66 @@ public class DishlyAiOrchestrator {
 
     private boolean hasShoppingListFollowUpAction(AiIntentDetectionResult intent) {
         return intent.plannedActions().stream()
-                .anyMatch(plan -> plan.type() == de.htwberlin.webtech.ai.model.AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST);
+                .anyMatch(plan -> plan.type() == AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST);
+    }
+
+    private AiChatResponse tryExecuteMealPlanTool(AppUser currentUser, AiConversationContext context, AiIntentDetectionResult intent) {
+        AiActionPlan plan = mealPlanAction(intent);
+        if (plan == null || plan.confidence() < 0.80) {
+            return null;
+        }
+        if (plan.targetDate() == null || plan.mealSlot() == null) {
+            return new AiChatResponse(fallback(intent.clarificationQuestion(), mealPlanClarification(plan)), true);
+        }
+        String title = firstNonBlank(plan.recipeTitle(), extractMealPlanTitle(context.message(), context.history(), intent));
+        if (title == null) {
+            return new AiChatResponse("Welches Gericht soll ich eintragen?", true);
+        }
+        try {
+            AiMealPlanToolResult result = mealPlanTool.addToMealPlan(currentUser, plan.targetDate(), plan.mealSlot(), plan.recipeId(), title);
+            if (result.conflict()) {
+                return new AiChatResponse("Fuer " + dateSlotLabel(result.targetDate(), result.mealSlot())
+                        + " ist bereits " + fallback(result.existingTitle(), "ein Gericht")
+                        + " eingetragen. Soll ich es ersetzen?", true);
+            }
+            return new AiChatResponse("Erledigt. Ich habe " + fallback(result.plannedTitle(), title)
+                    + " fuer " + dateSlotLabel(result.targetDate(), result.mealSlot())
+                    + " in deinen Wochenplan eingetragen.", true);
+        } catch (RuntimeException exception) {
+            return new AiChatResponse("Ich konnte das Gericht leider nicht in den Wochenplan eintragen. Bitte versuche es nochmal.", false);
+        }
+    }
+
+    private AiActionPlan mealPlanAction(AiIntentDetectionResult intent) {
+        if (intent.primaryIntent() == AiIntent.ADD_TO_MEAL_PLAN) {
+            return intent.plannedActions().stream()
+                    .filter(plan -> plan.type() == AiActionType.ADD_RECIPE_TO_MEAL_PLAN)
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (intent.primaryIntent() == AiIntent.FOLLOW_UP_SELECTION) {
+            return intent.plannedActions().stream()
+                    .filter(plan -> plan.type() == AiActionType.ADD_RECIPE_TO_MEAL_PLAN)
+                    .findFirst()
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    private String mealPlanClarification(AiActionPlan plan) {
+        if (plan.targetDate() == null && plan.mealSlot() == null) {
+            return "Fuer welchen Tag und welche Mahlzeit soll ich es eintragen?";
+        }
+        if (plan.mealSlot() == null) {
+            if (plan.targetDate().equals(LocalDate.now().plusDays(1))) {
+                return "Fuer morgen: Fruehstueck, Mittag oder Abendessen?";
+            }
+            return "Fuer welche Mahlzeit soll ich es eintragen?";
+        }
+        if (plan.mealSlot() == MealSlot.DINNER) {
+            return "Fuer welchen Tag soll ich es zum Abendessen eintragen?";
+        }
+        return "Fuer welchen Tag soll ich es eintragen?";
     }
 
     private String shoppingListToolMessage(AiShoppingListToolResult result) {
@@ -202,6 +272,119 @@ public class DishlyAiOrchestrator {
                     .append(result.skippedShoppingListItems().size() == 1 ? " steht bereits auf deiner Einkaufsliste." : " stehen bereits auf deiner Einkaufsliste.");
         }
         return message.toString();
+    }
+
+    private String extractMealPlanTitle(String message, List<AiChatRequest.AiChatTurn> history, AiIntentDetectionResult intent) {
+        String fromIntent = extractOptionTitle(intent.normalizedUserRequest());
+        if (fromIntent != null) {
+            return fromIntent;
+        }
+        if (history == null || history.isEmpty()) {
+            return null;
+        }
+        for (int i = history.size() - 1; i >= 0; i--) {
+            AiChatRequest.AiChatTurn turn = history.get(i);
+            if (turn == null || !"assistant".equalsIgnoreCase(turn.getRole()) || turn.getText() == null) {
+                continue;
+            }
+            String title = extractRecipeIdeaTitle(turn.getText());
+            if (title != null) {
+                return title;
+            }
+        }
+        return null;
+    }
+
+    private String extractOptionTitle(String normalizedRequest) {
+        if (normalizedRequest == null || normalizedRequest.isBlank()) {
+            return null;
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(?i)option\\s+\\d+\\s+gewaehlt:\\s*(.+?)(?:;|$)")
+                .matcher(normalizedRequest);
+        if (!matcher.find()) {
+            return null;
+        }
+        return cleanMealTitle(matcher.group(1));
+    }
+
+    private String extractRecipeIdeaTitle(String text) {
+        for (String line : text.split("\\R+")) {
+            String trimmed = line.trim();
+            if (trimmed.isBlank() || trimmed.matches("^\\s*(?:[-*]\\s*)?\\(?[123]\\)?[.)\\-:].*")) {
+                continue;
+            }
+            List<java.util.regex.Pattern> patterns = List.of(
+                    java.util.regex.Pattern.compile("(?iu)(?:eine\\s+moegliche\\s+idee\\s+waere|eine\\s+m.gliche\\s+idee\\s+w.re|ich\\s+empfehle|gute\\s+idee:?|rezeptidee:?|gerichtsidee:?)\\s+(.+)$"),
+                    java.util.regex.Pattern.compile("(?iu)^(.+?)\\s+(?:waere|w.re)\\s+eine\\s+gute\\s+idee\\b.*$")
+            );
+            for (java.util.regex.Pattern pattern : patterns) {
+                java.util.regex.Matcher matcher = pattern.matcher(trimmed);
+                if (matcher.find()) {
+                    String title = cleanMealTitle(matcher.group(1));
+                    if (title != null) {
+                        return title;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private String cleanMealTitle(String value) {
+        if (value == null) {
+            return null;
+        }
+        String cleaned = value
+                .replaceAll("(?iu)\\b(?:mit\\s+zutaten|zutaten|fehlende\\s+zutaten|moechtest|mochtest|m.chtest|willst\\s+du|soll\\s+ich)\\b.*$", "")
+                .replaceAll("[\"'`]+", "")
+                .replaceAll("[.;:!?]+$", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (cleaned.isBlank()
+                || cleaned.length() > 160
+                || cleaned.toLowerCase(Locale.ROOT).contains("wochenplan")
+                || cleaned.toLowerCase(Locale.ROOT).contains("einkaufsliste")) {
+            return null;
+        }
+        return cleaned;
+    }
+
+    private String dateSlotLabel(LocalDate targetDate, MealSlot mealSlot) {
+        String dateLabel;
+        if (targetDate.equals(LocalDate.now())) {
+            dateLabel = "heute";
+        } else if (targetDate.equals(LocalDate.now().plusDays(1))) {
+            dateLabel = "morgen";
+        } else if (targetDate.equals(LocalDate.now().plusDays(2))) {
+            dateLabel = "uebermorgen";
+        } else {
+            dateLabel = targetDate.toString();
+        }
+        return dateLabel + " " + mealSlotLabel(mealSlot);
+    }
+
+    private String mealSlotLabel(MealSlot mealSlot) {
+        if (mealSlot == MealSlot.BREAKFAST) {
+            return "Fruehstueck";
+        }
+        if (mealSlot == MealSlot.LUNCH) {
+            return "Mittag";
+        }
+        if (mealSlot == MealSlot.DINNER) {
+            return "Abend";
+        }
+        return "Snack";
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first.trim();
+        }
+        if (second != null && !second.isBlank()) {
+            return second.trim();
+        }
+        return null;
     }
 
     private IngredientExtraction extractIngredients(String message, List<AiChatRequest.AiChatTurn> history) {

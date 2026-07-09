@@ -6,9 +6,12 @@ import de.htwberlin.webtech.ai.dto.AiChatRequest;
 import de.htwberlin.webtech.ai.dto.AiChatResponse;
 import de.htwberlin.webtech.ai.orchestrator.AiIntentDetector;
 import de.htwberlin.webtech.ai.orchestrator.DishlyAiOrchestrator;
+import de.htwberlin.webtech.ai.tools.AiMealPlanTool;
+import de.htwberlin.webtech.ai.tools.AiMealPlanToolResult;
 import de.htwberlin.webtech.ai.tools.AiShoppingListTool;
 import de.htwberlin.webtech.ai.tools.AiShoppingListToolResult;
 import de.htwberlin.webtech.favorite.repository.ExternalRecipeFavoriteRepository;
+import de.htwberlin.webtech.mealplan.entity.MealSlot;
 import de.htwberlin.webtech.mealplan.repository.MealPlanRepository;
 import de.htwberlin.webtech.pantry.repository.PantryItemRepository;
 import de.htwberlin.webtech.profile.repository.UserPreferencesRepository;
@@ -46,6 +49,7 @@ class DishlyAiOrchestratorTest {
     private final ShoppingListItemRepository shoppingListItemRepository = mock(ShoppingListItemRepository.class);
     private final RecipeRepository recipeRepository = mock(RecipeRepository.class);
     private final AiShoppingListTool shoppingListTool = mock(AiShoppingListTool.class);
+    private final AiMealPlanTool mealPlanTool = mock(AiMealPlanTool.class);
     private final DishlyAiOrchestrator underTest = new DishlyAiOrchestrator(
             groqClient,
             preferencesRepository,
@@ -55,7 +59,8 @@ class DishlyAiOrchestratorTest {
             shoppingListItemRepository,
             recipeRepository,
             new AiIntentDetector(),
-            shoppingListTool
+            shoppingListTool,
+            mealPlanTool
     );
 
     @Test
@@ -492,19 +497,139 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
-    void answer_should_not_execute_meal_plan_intent_in_shopping_list_step() {
+    void answer_should_execute_meal_plan_command_with_previous_recipe_idea() {
         AppUser user = user();
         stubEmptyContext(user);
-        doReturn("Ich brauche dafuer noch eine Bestaetigung.").when(groqClient).complete(any(), any());
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        doReturn(new AiMealPlanToolResult(true, false, "Tomaten-Ei-Omelett", null, tomorrow, MealSlot.DINNER))
+                .when(mealPlanTool).addToMealPlan(user, tomorrow, MealSlot.DINNER, null, "Tomaten-Ei-Omelett");
 
-        AiChatResponse response = underTest.answer(user, "mach es morgen abend rein", List.of(
-                turn("assistant", "Zutaten: Limette.")
+        AiChatResponse response = underTest.answer(user, "fuege es morgen Abend zum Wochenplan hinzu", List.of(
+                turn("assistant", "Eine moegliche Idee waere Tomaten-Ei-Omelett.")
         ));
 
         assertTrue(response.isConfigured());
-        assertEquals("Ich brauche dafuer noch eine Bestaetigung.", response.getMessage());
+        assertTrue(response.getMessage().contains("Tomaten-Ei-Omelett"));
+        assertTrue(response.getMessage().contains("morgen Abend"));
+        verify(mealPlanTool).addToMealPlan(user, tomorrow, MealSlot.DINNER, null, "Tomaten-Ei-Omelett");
         verifyNoInteractions(shoppingListTool);
-        verify(groqClient).complete(any(), any());
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_execute_short_tomorrow_dinner_with_previous_recipe_idea() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        doReturn(new AiMealPlanToolResult(true, false, "Tomaten-Ei-Omelett", null, tomorrow, MealSlot.DINNER))
+                .when(mealPlanTool).addToMealPlan(user, tomorrow, MealSlot.DINNER, null, "Tomaten-Ei-Omelett");
+
+        AiChatResponse response = underTest.answer(user, "morgen Abend", List.of(
+                turn("assistant", "Eine moegliche Idee waere Tomaten-Ei-Omelett.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Tomaten-Ei-Omelett"));
+        verify(mealPlanTool).addToMealPlan(user, tomorrow, MealSlot.DINNER, null, "Tomaten-Ei-Omelett");
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_execute_numeric_recipe_option_for_tomorrow_dinner() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        doReturn(new AiMealPlanToolResult(true, false, "Milchreis-Pudding", null, tomorrow, MealSlot.DINNER))
+                .when(mealPlanTool).addToMealPlan(user, tomorrow, MealSlot.DINNER, null, "Milchreis-Pudding");
+
+        AiChatResponse response = underTest.answer(user, "2 morgen Abend", List.of(
+                turn("assistant", """
+                        1. Omelett
+                        2. Milchreis-Pudding
+                        3. Glasnudelsalat
+                        """)
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Milchreis-Pudding"));
+        verify(mealPlanTool).addToMealPlan(user, tomorrow, MealSlot.DINNER, null, "Milchreis-Pudding");
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_ask_for_date_and_slot_when_meal_plan_command_is_incomplete() {
+        AppUser user = user();
+        stubEmptyContext(user);
+
+        AiChatResponse response = underTest.answer(user, "zum Wochenplan hinzufuegen", List.of(
+                turn("assistant", "Eine moegliche Idee waere Tomaten-Ei-Omelett.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Fuer welchen Tag und welche Mahlzeit"));
+        verifyNoInteractions(mealPlanTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_ask_for_slot_when_only_date_is_present() {
+        AppUser user = user();
+        stubEmptyContext(user);
+
+        AiChatResponse response = underTest.answer(user, "morgen", List.of(
+                turn("assistant", "Eine moegliche Idee waere Tomaten-Ei-Omelett.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Fuer morgen: Fruehstueck, Mittag oder Abendessen?", response.getMessage());
+        verifyNoInteractions(mealPlanTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_ask_for_date_when_only_slot_is_present() {
+        AppUser user = user();
+        stubEmptyContext(user);
+
+        AiChatResponse response = underTest.answer(user, "Abendessen", List.of(
+                turn("assistant", "Eine moegliche Idee waere Tomaten-Ei-Omelett.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Fuer welchen Tag soll ich es zum Abendessen eintragen?", response.getMessage());
+        verifyNoInteractions(mealPlanTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_ask_before_overwriting_existing_meal_plan_slot() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        doReturn(new AiMealPlanToolResult(false, true, "Tomaten-Ei-Omelett", "Pasta", tomorrow, MealSlot.DINNER))
+                .when(mealPlanTool).addToMealPlan(user, tomorrow, MealSlot.DINNER, null, "Tomaten-Ei-Omelett");
+
+        AiChatResponse response = underTest.answer(user, "morgen Abend", List.of(
+                turn("assistant", "Eine moegliche Idee waere Tomaten-Ei-Omelett.")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Fuer morgen Abend ist bereits Pasta eingetragen. Soll ich es ersetzen?", response.getMessage());
+        verify(mealPlanTool).addToMealPlan(user, tomorrow, MealSlot.DINNER, null, "Tomaten-Ei-Omelett");
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_ask_for_meal_title_when_no_recipe_context_exists() {
+        AppUser user = user();
+        stubEmptyContext(user);
+
+        AiChatResponse response = underTest.answer(user, "trag es morgen Abend ein", List.of());
+
+        assertTrue(response.isConfigured());
+        assertEquals("Welches Gericht soll ich eintragen?", response.getMessage());
+        verifyNoInteractions(mealPlanTool);
+        verifyNoInteractions(groqClient);
     }
 
     private void stubEmptyContext(AppUser user) {

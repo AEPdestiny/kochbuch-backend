@@ -96,6 +96,78 @@ class AiIntentDetectorTest {
     }
 
     @Test
+    void detect_should_map_short_tomorrow_dinner_with_recipe_history() {
+        AiIntentDetectionResult result = underTest.detect("morgen Abend", List.of(
+                turn("assistant", "Eine moegliche Idee waere Tomaten-Ei-Omelett.")
+        ));
+
+        assertEquals(AiIntent.ADD_TO_MEAL_PLAN, result.primaryIntent());
+        assertEquals(MealSlot.DINNER, result.plannedActions().getFirst().mealSlot());
+        assertEquals(LocalDate.now().plusDays(1), result.plannedActions().getFirst().targetDate());
+        assertFalse(result.needsClarification());
+    }
+
+    @Test
+    void detect_should_map_numeric_recipe_option_with_tomorrow_dinner_to_meal_plan() {
+        AiIntentDetectionResult result = underTest.detect("2 morgen Abend", List.of(
+                turn("assistant", """
+                        1. Omelett
+                        2. Milchreis-Pudding
+                        3. Glasnudelsalat
+                        """)
+        ));
+
+        assertEquals(AiIntent.FOLLOW_UP_SELECTION, result.primaryIntent());
+        assertEquals(AiActionType.ADD_RECIPE_TO_MEAL_PLAN, result.plannedActions().getFirst().type());
+        assertEquals("Milchreis-Pudding", result.plannedActions().getFirst().recipeTitle());
+        assertEquals(MealSlot.DINNER, result.plannedActions().getFirst().mealSlot());
+        assertEquals(LocalDate.now().plusDays(1), result.plannedActions().getFirst().targetDate());
+        assertFalse(result.needsClarification());
+    }
+
+    @Test
+    void detect_should_map_numeric_meal_plan_option_without_date_slot_to_clarification() {
+        AiIntentDetectionResult result = underTest.detect("3", List.of(
+                turn("assistant", """
+                        1. Detaillierte Anleitung
+                        2. Andere Rezepte
+                        3. Zum Wochenplan hinzufuegen
+                        """)
+        ));
+
+        assertEquals(AiIntent.FOLLOW_UP_SELECTION, result.primaryIntent());
+        assertEquals(AiActionType.ADD_RECIPE_TO_MEAL_PLAN, result.plannedActions().getFirst().type());
+        assertTrue(result.needsClarification());
+        assertEquals("Fuer welchen Tag und welche Mahlzeit soll ich das planen?", result.clarificationQuestion());
+    }
+
+    @Test
+    void detect_should_ask_slot_for_tomorrow_only_with_recipe_history() {
+        AiIntentDetectionResult result = underTest.detect("morgen", List.of(
+                turn("assistant", "Eine moegliche Idee waere Tomaten-Ei-Omelett.")
+        ));
+
+        assertEquals(AiIntent.ADD_TO_MEAL_PLAN, result.primaryIntent());
+        assertEquals(LocalDate.now().plusDays(1), result.plannedActions().getFirst().targetDate());
+        assertEquals(null, result.plannedActions().getFirst().mealSlot());
+        assertTrue(result.needsClarification());
+        assertEquals("Fuer morgen: Fruehstueck, Mittag oder Abendessen?", result.clarificationQuestion());
+    }
+
+    @Test
+    void detect_should_ask_date_for_dinner_only_with_recipe_history() {
+        AiIntentDetectionResult result = underTest.detect("Abendessen", List.of(
+                turn("assistant", "Eine moegliche Idee waere Tomaten-Ei-Omelett.")
+        ));
+
+        assertEquals(AiIntent.ADD_TO_MEAL_PLAN, result.primaryIntent());
+        assertEquals(MealSlot.DINNER, result.plannedActions().getFirst().mealSlot());
+        assertEquals(null, result.plannedActions().getFirst().targetDate());
+        assertTrue(result.needsClarification());
+        assertEquals("Fuer welchen Tag soll ich es zum Abendessen eintragen?", result.clarificationQuestion());
+    }
+
+    @Test
     void detect_should_map_recipe_detail_request() {
         AiIntentDetectionResult result = underTest.detect("details davon", List.of());
 
