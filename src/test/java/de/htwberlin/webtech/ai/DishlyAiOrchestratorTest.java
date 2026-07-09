@@ -632,6 +632,98 @@ class DishlyAiOrchestratorTest {
         verifyNoInteractions(groqClient);
     }
 
+    @Test
+    void answer_should_execute_combined_meal_plan_and_missing_shopping_list_command() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        LocalDate sunday = nextOrSame(java.time.DayOfWeek.SUNDAY);
+        List<String> ingredients = List.of("Ei", "Salz", "Pfeffer");
+        doReturn(new AiMealPlanToolResult(true, false, "Eiersalat", null, sunday, MealSlot.DINNER))
+                .when(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
+        doReturn(new AiShoppingListToolResult(List.of("Salz", "Pfeffer"), List.of("Ei"), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user,
+                "ja bitte fuege es fuer sonntag abend hinzu und fuege die fehlenden zutaten in meine einkaufsliste",
+                List.of(turn("assistant", """
+                        Wie waere es mit einem einfachen Eiersalat?
+                        Zutaten: Ei, Salz, Pfeffer
+                        Wenn Sie diese Idee interessant finden, kann ich Ihnen helfen, die fehlenden Zutaten auf Ihre Einkaufsliste zu setzen.
+                        """)));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Erledigt. Ich habe Eiersalat fuer Sonntag Abend in deinen Wochenplan eingetragen und Salz und Pfeffer zur Einkaufsliste hinzugefuegt.", response.getMessage());
+        verify(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_execute_combined_command_and_skip_existing_shopping_item() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        LocalDate sunday = nextOrSame(java.time.DayOfWeek.SUNDAY);
+        List<String> ingredients = List.of("Ei", "Salz", "Pfeffer");
+        doReturn(new AiMealPlanToolResult(true, false, "Eiersalat", null, sunday, MealSlot.DINNER))
+                .when(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
+        doReturn(new AiShoppingListToolResult(List.of("Pfeffer"), List.of("Ei"), List.of("Salz")))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user,
+                "ja bitte fuer sonntag abend und die fehlenden zutaten einkaufsliste",
+                List.of(turn("assistant", """
+                        Wie waere es mit einem einfachen Eiersalat?
+                        Zutaten: Ei, Salz, Pfeffer
+                        """)));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Erledigt. Ich habe Eiersalat fuer Sonntag Abend in deinen Wochenplan eingetragen und Pfeffer zur Einkaufsliste hinzugefuegt.", response.getMessage());
+        verify(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_not_run_shopping_list_for_plain_meal_plan_command() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        LocalDate sunday = nextOrSame(java.time.DayOfWeek.SUNDAY);
+        doReturn(new AiMealPlanToolResult(true, false, "Eiersalat", null, sunday, MealSlot.DINNER))
+                .when(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
+
+        AiChatResponse response = underTest.answer(user, "fuege es fuer sonntag abend hinzu", List.of(
+                turn("assistant", "Wie waere es mit einem einfachen Eiersalat? Zutaten: Ei, Salz, Pfeffer")
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Eiersalat"));
+        verify(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
+        verifyNoInteractions(shoppingListTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_stop_combined_command_when_meal_plan_slot_is_occupied() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        LocalDate sunday = nextOrSame(java.time.DayOfWeek.SUNDAY);
+        doReturn(new AiMealPlanToolResult(false, true, "Eiersalat", "Pasta", sunday, MealSlot.DINNER))
+                .when(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
+
+        AiChatResponse response = underTest.answer(user,
+                "ja bitte fuege es fuer sonntag abend hinzu und fuege die fehlenden zutaten in meine einkaufsliste",
+                List.of(turn("assistant", """
+                        Wie waere es mit einem einfachen Eiersalat?
+                        Zutaten: Ei, Salz, Pfeffer
+                        """)));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Fuer Sonntag Abend ist bereits Pasta eingetragen. Soll ich es ersetzen? Die fehlenden Zutaten habe ich nicht hinzugefuegt, bis wir das geklaert haben.", response.getMessage());
+        verify(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
+        verifyNoInteractions(shoppingListTool);
+        verifyNoInteractions(groqClient);
+    }
+
     private void stubEmptyContext(AppUser user) {
         doReturn(Optional.empty()).when(preferencesRepository).findByOwner(user);
         doReturn(List.of()).when(pantryItemRepository).findByOwner(user);
@@ -681,5 +773,9 @@ class DishlyAiOrchestratorTest {
         user.setEmail("user@example.com");
         user.setPasswordHash("hash");
         return user;
+    }
+
+    private LocalDate nextOrSame(java.time.DayOfWeek dayOfWeek) {
+        return LocalDate.now().with(java.time.temporal.TemporalAdjusters.nextOrSame(dayOfWeek));
     }
 }

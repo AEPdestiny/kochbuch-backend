@@ -91,11 +91,15 @@ public class DishlyAiOrchestrator {
     public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history, String locale) {
         AiConversationContext context = buildConversationContext(currentUser, message, history, locale);
         AiIntentDetectionResult intent = intentDetector.detect(context.message(), context.history());
-        AiChatResponse toolResponse = tryExecuteShoppingListTool(currentUser, context, intent);
+        AiChatResponse toolResponse = tryExecuteCombinedTools(currentUser, context, intent);
         if (toolResponse != null) {
             return toolResponse;
         }
         toolResponse = tryExecuteMealPlanTool(currentUser, context, intent);
+        if (toolResponse != null) {
+            return toolResponse;
+        }
+        toolResponse = tryExecuteShoppingListTool(currentUser, context, intent);
         if (toolResponse != null) {
             return toolResponse;
         }
@@ -152,24 +156,29 @@ public class DishlyAiOrchestrator {
         if (intent.confidence() < 0.85) {
             return null;
         }
+        ShoppingListExecution execution = executeShoppingListTool(currentUser, context);
+        return execution == null ? null : new AiChatResponse(execution.message(), execution.configured());
+    }
+
+    private ShoppingListExecution executeShoppingListTool(AppUser currentUser, AiConversationContext context) {
         IngredientExtraction extraction = extractIngredients(context.message(), context.history());
         if (extraction.noMissingIngredients()) {
-            return new AiChatResponse("Ich habe nichts hinzugefuegt, weil keine fehlenden Zutaten angegeben sind.", true);
+            return new ShoppingListExecution(true, true, "Ich habe nichts hinzugefuegt, weil keine fehlenden Zutaten angegeben sind.", null);
         }
         if (extraction.ingredients().isEmpty()) {
             if (!extraction.optionalIngredients().isEmpty()) {
-                return new AiChatResponse("Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", true);
+                return new ShoppingListExecution(true, false, "Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", null);
             }
-            return new AiChatResponse("Welche konkreten Zutaten soll ich hinzufuegen? Schreib sie bitte z.B. so: Limette, Olivenoel, Salz.", true);
+            return new ShoppingListExecution(true, false, "Welche konkreten Zutaten soll ich hinzufuegen? Schreib sie bitte z.B. so: Limette, Olivenoel, Salz.", null);
         }
         try {
             AiShoppingListToolResult result = shoppingListTool.addMissingIngredients(currentUser, extraction.ingredients());
             if (!result.changedAnything() && !extraction.optionalIngredients().isEmpty()) {
-                return new AiChatResponse("Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", true);
+                return new ShoppingListExecution(true, false, "Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", result);
             }
-            return new AiChatResponse(shoppingListToolMessage(result), true);
+            return new ShoppingListExecution(true, true, shoppingListToolMessage(result), result);
         } catch (RuntimeException exception) {
-            return new AiChatResponse("Ich konnte die Zutaten gerade nicht zur Einkaufsliste hinzufuegen: " + exception.getMessage(), false);
+            return new ShoppingListExecution(false, true, "Ich konnte die Zutaten gerade nicht zur Einkaufsliste hinzufuegen: " + exception.getMessage(), null);
         }
     }
 
@@ -178,30 +187,82 @@ public class DishlyAiOrchestrator {
                 .anyMatch(plan -> plan.type() == AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST);
     }
 
+    private boolean hasMealPlanAction(AiIntentDetectionResult intent) {
+        return mealPlanAction(intent) != null;
+    }
+
+    private AiChatResponse tryExecuteCombinedTools(AppUser currentUser, AiConversationContext context, AiIntentDetectionResult intent) {
+        if (!hasMealPlanAction(intent) || !hasShoppingListFollowUpAction(intent)) {
+            return null;
+        }
+        MealPlanExecution mealPlanExecution = executeMealPlanTool(currentUser, context, intent);
+        if (mealPlanExecution == null) {
+            return null;
+        }
+        if (!mealPlanExecution.success()) {
+            return new AiChatResponse(
+                    mealPlanExecution.message() + " Die fehlenden Zutaten habe ich nicht hinzugefuegt, bis wir das geklaert haben.",
+                    mealPlanExecution.configured()
+            );
+        }
+        ShoppingListExecution shoppingListExecution = executeShoppingListTool(currentUser, context);
+        if (shoppingListExecution == null) {
+            return new AiChatResponse("Ich habe " + mealPlanExecution.title()
+                    + " fuer " + dateSlotLabel(mealPlanExecution.targetDate(), mealPlanExecution.mealSlot())
+                    + " eingetragen. Welche fehlenden Zutaten soll ich zusaetzlich zur Einkaufsliste hinzufuegen?", true);
+        }
+        if (!shoppingListExecution.configured()) {
+            return new AiChatResponse("Ich habe " + mealPlanExecution.title()
+                    + " fuer " + dateSlotLabel(mealPlanExecution.targetDate(), mealPlanExecution.mealSlot())
+                    + " in deinen Wochenplan eingetragen. " + shoppingListExecution.message(), false);
+        }
+        if (!shoppingListExecution.actionable()) {
+            return new AiChatResponse("Ich habe " + mealPlanExecution.title()
+                    + " fuer " + dateSlotLabel(mealPlanExecution.targetDate(), mealPlanExecution.mealSlot())
+                    + " eingetragen. Welche fehlenden Zutaten soll ich zusaetzlich zur Einkaufsliste hinzufuegen?", true);
+        }
+        if (shoppingListExecution.addedItems().isEmpty()) {
+            return new AiChatResponse("Erledigt. Ich habe " + mealPlanExecution.title()
+                    + " fuer " + dateSlotLabel(mealPlanExecution.targetDate(), mealPlanExecution.mealSlot())
+                    + " in deinen Wochenplan eingetragen. Fuer die Einkaufsliste habe ich nichts Neues hinzugefuegt"
+                    + shoppingListNoChangeReason(shoppingListExecution.result()) + ".", true);
+        }
+        return new AiChatResponse("Erledigt. Ich habe " + mealPlanExecution.title()
+                + " fuer " + dateSlotLabel(mealPlanExecution.targetDate(), mealPlanExecution.mealSlot())
+                + " in deinen Wochenplan eingetragen und " + joinNames(shoppingListExecution.addedItems())
+                + " zur Einkaufsliste hinzugefuegt.", true);
+    }
+
     private AiChatResponse tryExecuteMealPlanTool(AppUser currentUser, AiConversationContext context, AiIntentDetectionResult intent) {
+        MealPlanExecution execution = executeMealPlanTool(currentUser, context, intent);
+        return execution == null ? null : new AiChatResponse(execution.message(), execution.configured());
+    }
+
+    private MealPlanExecution executeMealPlanTool(AppUser currentUser, AiConversationContext context, AiIntentDetectionResult intent) {
         AiActionPlan plan = mealPlanAction(intent);
         if (plan == null || plan.confidence() < 0.80) {
             return null;
         }
         if (plan.targetDate() == null || plan.mealSlot() == null) {
-            return new AiChatResponse(fallback(intent.clarificationQuestion(), mealPlanClarification(plan)), true);
+            return new MealPlanExecution(false, true, fallback(intent.clarificationQuestion(), mealPlanClarification(plan)), null, null, null);
         }
         String title = firstNonBlank(plan.recipeTitle(), extractMealPlanTitle(context.message(), context.history(), intent));
         if (title == null) {
-            return new AiChatResponse("Welches Gericht soll ich eintragen?", true);
+            return new MealPlanExecution(false, true, "Welches Gericht soll ich eintragen?", null, plan.targetDate(), plan.mealSlot());
         }
         try {
             AiMealPlanToolResult result = mealPlanTool.addToMealPlan(currentUser, plan.targetDate(), plan.mealSlot(), plan.recipeId(), title);
             if (result.conflict()) {
-                return new AiChatResponse("Fuer " + dateSlotLabel(result.targetDate(), result.mealSlot())
+                return new MealPlanExecution(false, true, "Fuer " + dateSlotLabel(result.targetDate(), result.mealSlot())
                         + " ist bereits " + fallback(result.existingTitle(), "ein Gericht")
-                        + " eingetragen. Soll ich es ersetzen?", true);
+                        + " eingetragen. Soll ich es ersetzen?", fallback(result.plannedTitle(), title), result.targetDate(), result.mealSlot());
             }
-            return new AiChatResponse("Erledigt. Ich habe " + fallback(result.plannedTitle(), title)
+            String plannedTitle = fallback(result.plannedTitle(), title);
+            return new MealPlanExecution(true, true, "Erledigt. Ich habe " + plannedTitle
                     + " fuer " + dateSlotLabel(result.targetDate(), result.mealSlot())
-                    + " in deinen Wochenplan eingetragen.", true);
+                    + " in deinen Wochenplan eingetragen.", plannedTitle, result.targetDate(), result.mealSlot());
         } catch (RuntimeException exception) {
-            return new AiChatResponse("Ich konnte das Gericht leider nicht in den Wochenplan eintragen. Bitte versuche es nochmal.", false);
+            return new MealPlanExecution(false, false, "Ich konnte das Gericht leider nicht in den Wochenplan eintragen. Bitte versuche es nochmal.", title, plan.targetDate(), plan.mealSlot());
         }
     }
 
@@ -274,6 +335,28 @@ public class DishlyAiOrchestrator {
         return message.toString();
     }
 
+    private String shoppingListNoChangeReason(AiShoppingListToolResult result) {
+        if (result == null) {
+            return ", weil keine fehlenden Zutaten angegeben sind";
+        }
+        if (result.skippedPantryItems().isEmpty() && result.skippedShoppingListItems().isEmpty()) {
+            return ", weil die fehlenden Zutaten bereits vorhanden sind";
+        }
+        StringBuilder reason = new StringBuilder(", weil ");
+        if (!result.skippedPantryItems().isEmpty()) {
+            reason.append(joinNames(result.skippedPantryItems()))
+                    .append(result.skippedPantryItems().size() == 1 ? " bereits im Vorrat ist" : " bereits im Vorrat sind");
+        }
+        if (!result.skippedPantryItems().isEmpty() && !result.skippedShoppingListItems().isEmpty()) {
+            reason.append(" und ");
+        }
+        if (!result.skippedShoppingListItems().isEmpty()) {
+            reason.append(joinNames(result.skippedShoppingListItems()))
+                    .append(result.skippedShoppingListItems().size() == 1 ? " schon auf deiner Einkaufsliste steht" : " schon auf deiner Einkaufsliste stehen");
+        }
+        return reason.toString();
+    }
+
     private String extractMealPlanTitle(String message, List<AiChatRequest.AiChatTurn> history, AiIntentDetectionResult intent) {
         String fromIntent = extractOptionTitle(intent.normalizedUserRequest());
         if (fromIntent != null) {
@@ -316,6 +399,8 @@ public class DishlyAiOrchestrator {
             }
             List<java.util.regex.Pattern> patterns = List.of(
                     java.util.regex.Pattern.compile("(?iu)(?:eine\\s+moegliche\\s+idee\\s+waere|eine\\s+m.gliche\\s+idee\\s+w.re|ich\\s+empfehle|gute\\s+idee:?|rezeptidee:?|gerichtsidee:?)\\s+(.+)$"),
+                    java.util.regex.Pattern.compile("(?iu)wie\\s+w.re\\s+es\\s+mit\\s+(.+)$"),
+                    java.util.regex.Pattern.compile("(?iu)wie\\s+waere\\s+es\\s+mit\\s+(.+)$"),
                     java.util.regex.Pattern.compile("(?iu)^(.+?)\\s+(?:waere|w.re)\\s+eine\\s+gute\\s+idee\\b.*$")
             );
             for (java.util.regex.Pattern pattern : patterns) {
@@ -337,7 +422,17 @@ public class DishlyAiOrchestrator {
         }
         String cleaned = value
                 .replaceAll("(?iu)\\b(?:mit\\s+zutaten|zutaten|fehlende\\s+zutaten|moechtest|mochtest|m.chtest|willst\\s+du|soll\\s+ich)\\b.*$", "")
+                .replaceAll("(?iu)^einem\\s+einfachen\\s+", "")
+                .replaceAll("(?iu)^einer\\s+einfachen\\s+", "")
+                .replaceAll("(?iu)^ein\\s+einfaches\\s+", "")
+                .replaceAll("(?iu)^einen\\s+einfachen\\s+", "")
+                .replaceAll("(?iu)^einem\\s+", "")
+                .replaceAll("(?iu)^einer\\s+", "")
+                .replaceAll("(?iu)^ein\\s+", "")
+                .replaceAll("(?iu)^eine\\s+", "")
                 .replaceAll("[\"'`]+", "")
+                .replaceAll("\\s+", " ")
+                .trim()
                 .replaceAll("[.;:!?]+$", "")
                 .replaceAll("\\s+", " ")
                 .trim();
@@ -359,9 +454,21 @@ public class DishlyAiOrchestrator {
         } else if (targetDate.equals(LocalDate.now().plusDays(2))) {
             dateLabel = "uebermorgen";
         } else {
-            dateLabel = targetDate.toString();
+            dateLabel = dayLabel(targetDate);
         }
         return dateLabel + " " + mealSlotLabel(mealSlot);
+    }
+
+    private String dayLabel(LocalDate targetDate) {
+        return switch (targetDate.getDayOfWeek()) {
+            case MONDAY -> "Montag";
+            case TUESDAY -> "Dienstag";
+            case WEDNESDAY -> "Mittwoch";
+            case THURSDAY -> "Donnerstag";
+            case FRIDAY -> "Freitag";
+            case SATURDAY -> "Samstag";
+            case SUNDAY -> "Sonntag";
+        };
     }
 
     private String mealSlotLabel(MealSlot mealSlot) {
@@ -388,13 +495,15 @@ public class DishlyAiOrchestrator {
     }
 
     private IngredientExtraction extractIngredients(String message, List<AiChatRequest.AiChatTurn> history) {
-        List<String> fromDirectUserCommand = extractIngredientsFromUserCommand(message);
-        if (!fromDirectUserCommand.isEmpty()) {
-            return new IngredientExtraction(fromDirectUserCommand, List.of(), false);
-        }
-        IngredientExtraction fromUserMessage = extractIngredientsFromText(message);
-        if (fromUserMessage.hasSignal()) {
-            return fromUserMessage;
+        if (!shouldPreferHistoryIngredients(message)) {
+            List<String> fromDirectUserCommand = extractIngredientsFromUserCommand(message);
+            if (!fromDirectUserCommand.isEmpty()) {
+                return new IngredientExtraction(fromDirectUserCommand, List.of(), false);
+            }
+            IngredientExtraction fromUserMessage = extractIngredientsFromText(message);
+            if (fromUserMessage.hasSignal()) {
+                return fromUserMessage;
+            }
         }
         if (history == null || history.isEmpty()) {
             return IngredientExtraction.empty();
@@ -410,6 +519,15 @@ public class DishlyAiOrchestrator {
             }
         }
         return IngredientExtraction.empty();
+    }
+
+    private boolean shouldPreferHistoryIngredients(String message) {
+        String normalized = normalizeForIngredientIntent(message);
+        return normalized.contains("fehlende zutaten")
+                || normalized.contains("fehlenden zutaten")
+                || normalized.contains("die zutaten")
+                || normalized.contains("zutaten in meine einkaufsliste")
+                || normalized.contains("zutaten auf die einkaufsliste");
     }
 
     private List<String> extractIngredientsFromUserCommand(String text) {
@@ -442,10 +560,46 @@ public class DishlyAiOrchestrator {
         if (value == null) {
             return false;
         }
-        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        String normalized = normalizeForIngredientIntent(value);
         return !normalized.isBlank()
                 && !normalized.contains("einkaufsliste")
+                && !looksLikeMealPlanFragment(normalized)
                 && !List.of("es", "das", "dies", "diese", "die", "alle", "alles").contains(normalized);
+    }
+
+    private boolean looksLikeMealPlanFragment(String normalized) {
+        return normalized.startsWith("es fur ")
+                || normalized.startsWith("das fur ")
+                || normalized.startsWith("fur ")
+                || normalized.contains(" wochenplan")
+                || normalized.contains("zum wochenplan")
+                || normalized.contains("in den wochenplan")
+                || normalized.contains(" morgen ")
+                || normalized.contains(" sonntag")
+                || normalized.contains(" montag")
+                || normalized.contains(" dienstag")
+                || normalized.contains(" mittwoch")
+                || normalized.contains(" donnerstag")
+                || normalized.contains(" freitag")
+                || normalized.contains(" samstag")
+                || normalized.contains(" abend")
+                || normalized.contains(" mittag")
+                || normalized.contains(" fruhstuck")
+                || normalized.contains(" eintragen")
+                || normalized.contains("fuge es")
+                || normalized.contains("fuege es");
+    }
+
+    private String normalizeForIngredientIntent(String value) {
+        if (value == null) {
+            return "";
+        }
+        return java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^\\p{L}\\p{N}]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim()
+                .toLowerCase(Locale.ROOT);
     }
 
     private IngredientExtraction extractIngredientsFromText(String text) {
@@ -884,5 +1038,22 @@ public class DishlyAiOrchestrator {
     }
 
     private record OptionalSplit(String requiredText, String optionalText) {
+    }
+
+    private record MealPlanExecution(boolean success,
+                                     boolean configured,
+                                     String message,
+                                     String title,
+                                     LocalDate targetDate,
+                                     MealSlot mealSlot) {
+    }
+
+    private record ShoppingListExecution(boolean configured,
+                                         boolean actionable,
+                                         String message,
+                                         AiShoppingListToolResult result) {
+        List<String> addedItems() {
+            return result == null ? List.of() : result.addedItems();
+        }
     }
 }

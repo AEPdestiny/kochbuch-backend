@@ -60,7 +60,9 @@ public class AiIntentDetector {
             );
         }
 
-        if (isShoppingListConfirmation(normalized) && previousAssistantProvidedShoppingIngredients(history)) {
+        if (isShoppingListConfirmation(normalized)
+                && previousAssistantProvidedShoppingIngredients(history)
+                && !isMealPlanIntent(normalized, history)) {
             AiActionPlan plan = action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.89, null, null);
             return result(language, normalized, AiIntent.ADD_TO_SHOPPING_LIST, List.of(plan), false, null, 0.89);
         }
@@ -70,28 +72,23 @@ public class AiIntentDetector {
             LocalDate date = detectTargetDate(normalized);
             boolean needsClarification = slot == null || date == null;
             AiActionPlan plan = action(AiActionType.ADD_RECIPE_TO_MEAL_PLAN, 0.82, date, slot);
+            List<AiActionPlan> plans = new ArrayList<>();
+            plans.add(plan);
+            if (isCombinedShoppingListSignal(normalized)) {
+                plans.add(action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.86, null, null));
+            }
             return result(
                     language,
                     normalized,
                     AiIntent.ADD_TO_MEAL_PLAN,
-                    List.of(plan),
+                    List.copyOf(plans),
                     needsClarification,
                     needsClarification ? mealPlanClarification(slot, date) : null,
                     0.82
             );
         }
 
-        if ((containsAny(normalized, "einkaufsliste", "shopping list")
-                && containsAny(normalized, "mach", "fuge", "fuege", "hinzu", "hinzufugen", "add", "put", "pack", "packen", "setz", "setze", "zutaten", "brauche", "fehlt", "vorrat"))
-                || containsAll(normalized, "zutaten", "hinzu")
-                || containsAll(normalized, "ingredients", "add")
-                || containsAll(normalized, "fuge", "hinzu")
-                || containsAll(normalized, "fuege", "hinzu")
-                || containsAll(normalized, "brauche", "einkaufsliste")
-                || containsAll(normalized, "fehlt", "einkaufsliste")
-                || containsAny(normalized, "alisveris listesi", "alisveris listesine")
-                || containsAll(normalized, "add", "shopping")
-                || containsAll(normalized, "ekle", "alisveris")) {
+        if (isShoppingListIntent(normalized)) {
             AiActionPlan plan = action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.86, null, null);
             return result(language, normalized, AiIntent.ADD_TO_SHOPPING_LIST, List.of(plan), false, null, 0.86);
         }
@@ -261,6 +258,26 @@ public class AiIntentDetector {
                 "yes",
                 "evet",
                 "tamam");
+    }
+
+    private boolean isShoppingListIntent(String normalized) {
+        return (containsAny(normalized, "einkaufsliste", "shopping list")
+                && containsAny(normalized, "mach", "fuge", "fuege", "hinzu", "hinzufugen", "add", "put", "pack", "packen", "setz", "setze", "zutaten", "brauche", "fehlt", "vorrat"))
+                || containsAll(normalized, "zutaten", "hinzu")
+                || containsAll(normalized, "ingredients", "add")
+                || containsAll(normalized, "fuge", "hinzu")
+                || containsAll(normalized, "fuege", "hinzu")
+                || containsAll(normalized, "brauche", "einkaufsliste")
+                || containsAll(normalized, "fehlt", "einkaufsliste")
+                || containsAny(normalized, "alisveris listesi", "alisveris listesine")
+                || containsAll(normalized, "add", "shopping")
+                || containsAll(normalized, "ekle", "alisveris");
+    }
+
+    private boolean isCombinedShoppingListSignal(String normalized) {
+        return containsAny(normalized, "einkaufsliste", "shopping list", "fehlende zutaten", "zutaten einkaufsliste")
+                || containsAll(normalized, "zutaten", "hinzu")
+                || normalized.matches(".*\\bund\\s+(?:fuge|fuege|pack|packe|setz|setze)\\b.*");
     }
 
     private boolean previousAssistantProvidedShoppingIngredients(List<AiChatRequest.AiChatTurn> history) {

@@ -109,7 +109,28 @@ public class AiShoppingListTool {
                 || normalized.contains("koch")
                 || normalized.contains("brat")
                 || normalized.contains("rezept")
-                || normalized.contains("gericht");
+                || normalized.contains("gericht")
+                || normalized.startsWith("es fur")
+                || normalized.startsWith("das fur")
+                || normalized.startsWith("fur ")
+                || normalized.contains("wochenplan")
+                || normalized.contains("hinzu")
+                || normalized.contains("eintragen")
+                || normalized.contains("trag")
+                || normalized.contains("fuge es")
+                || normalized.contains("fuege es")
+                || normalized.startsWith("es morgen")
+                || normalized.startsWith("das morgen")
+                || normalized.contains("sonntag")
+                || normalized.contains("montag")
+                || normalized.contains("dienstag")
+                || normalized.contains("mittwoch")
+                || normalized.contains("donnerstag")
+                || normalized.contains("freitag")
+                || normalized.contains("samstag")
+                || normalized.contains("abend")
+                || normalized.contains("mittag")
+                || normalized.contains("fruhstuck");
     }
 
     private String normalizeForReject(String value) {
