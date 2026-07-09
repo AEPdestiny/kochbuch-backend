@@ -11,9 +11,11 @@ import de.htwberlin.webtech.user.entity.AppUser;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -158,6 +160,68 @@ class AiShoppingListToolTest {
         assertEquals("Salz", requestCaptor.getValue().getName());
     }
 
+    @Test
+    void addMissingIngredients_should_store_fraction_quantities_units_and_clean_names() {
+        AppUser user = user();
+        doReturn(List.of()).when(shoppingListService).listMine(user);
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(user);
+
+        AiShoppingListToolResult result = underTest.addMissingIngredients(user, List.of(
+                "1/2 Schalotte",
+                "1/2 TL Knoblauch",
+                "1/2 EL Basilikum",
+                "8 g Spinat",
+                "2 Pilze",
+                "etwas Olivenöl nach Bedarf"
+        ));
+
+        assertEquals(List.of("Schalotte", "Knoblauch", "Basilikum", "Spinat", "Pilze", "Olivenöl"), result.addedItems());
+        ArgumentCaptor<ShoppingListItemRequest> requestCaptor = ArgumentCaptor.forClass(ShoppingListItemRequest.class);
+        verify(shoppingListService, times(6)).create(requestCaptor.capture(), eq(user));
+        List<ShoppingListItemRequest> requests = requestCaptor.getAllValues();
+
+        assertRequest(requests.get(0), "Schalotte", new BigDecimal("0.5"), null);
+        assertRequest(requests.get(1), "Knoblauch", new BigDecimal("0.5"), "TL");
+        assertRequest(requests.get(2), "Basilikum", new BigDecimal("0.5"), "EL");
+        assertRequest(requests.get(3), "Spinat", new BigDecimal("8"), "g");
+        assertRequest(requests.get(4), "Pilze", new BigDecimal("2"), null);
+        assertRequest(requests.get(5), "Olivenöl", null, null);
+    }
+
+    @Test
+    void addMissingIngredients_should_parse_full_real_world_quantity_case_without_broken_names() {
+        AppUser user = user();
+        doReturn(List.of()).when(shoppingListService).listMine(user);
+        doReturn(List.of(pantryItem("Ei"))).when(pantryItemRepository).findByOwner(user);
+
+        AiShoppingListToolResult result = underTest.addMissingIngredients(user, List.of(
+                "1/2 Schalotte",
+                "1/2 TL Knoblauch",
+                "2 Pilze",
+                "4 Cherrytomaten",
+                "1/2 EL Basilikum",
+                "8 g Spinat",
+                "etwas Olivenöl nach Bedarf"
+        ));
+
+        assertEquals(List.of("Schalotte", "Knoblauch", "Pilze", "Cherrytomaten", "Basilikum", "Spinat", "Olivenöl"), result.addedItems());
+        ArgumentCaptor<ShoppingListItemRequest> requestCaptor = ArgumentCaptor.forClass(ShoppingListItemRequest.class);
+        verify(shoppingListService, times(7)).create(requestCaptor.capture(), eq(user));
+        List<ShoppingListItemRequest> requests = requestCaptor.getAllValues();
+
+        assertEquals(List.of("Schalotte", "Knoblauch", "Pilze", "Cherrytomaten", "Basilikum", "Spinat", "Olivenöl"),
+                requests.stream().map(ShoppingListItemRequest::getName).toList());
+        assertTrue(requests.stream().map(ShoppingListItemRequest::getName).noneMatch(name ->
+                name.contains("/2") || name.contains("TL") || name.contains("EL") || name.contains("nach Bedarf") || name.contains("etwas")));
+        assertRequest(requests.get(0), "Schalotte", new BigDecimal("0.5"), null);
+        assertRequest(requests.get(1), "Knoblauch", new BigDecimal("0.5"), "TL");
+        assertRequest(requests.get(2), "Pilze", new BigDecimal("2"), null);
+        assertRequest(requests.get(3), "Cherrytomaten", new BigDecimal("4"), null);
+        assertRequest(requests.get(4), "Basilikum", new BigDecimal("0.5"), "EL");
+        assertRequest(requests.get(5), "Spinat", new BigDecimal("8"), "g");
+        assertRequest(requests.get(6), "Olivenöl", null, null);
+    }
+
     private ShoppingListItem shoppingItem(String name) {
         ShoppingListItem item = new ShoppingListItem();
         item.setName(name);
@@ -177,5 +241,15 @@ class AiShoppingListToolTest {
         user.setEmail("user@example.com");
         user.setPasswordHash("hash");
         return user;
+    }
+
+    private void assertRequest(ShoppingListItemRequest request, String name, BigDecimal quantity, String unit) {
+        assertEquals(name, request.getName());
+        if (quantity == null) {
+            assertNull(request.getQuantity());
+        } else {
+            assertEquals(0, quantity.compareTo(request.getQuantity()));
+        }
+        assertEquals(unit, request.getUnit());
     }
 }

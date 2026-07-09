@@ -8,15 +8,26 @@ import de.htwberlin.webtech.shopping.service.ShoppingListService;
 import de.htwberlin.webtech.user.entity.AppUser;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @ApplicationScoped
 public class AiShoppingListTool {
+
+    private static final Pattern LEADING_QUANTITY = Pattern.compile(
+            "^(?<quantity>\\d+\\s*(?:-|\\u2013)\\s*\\d+|\\d+\\s*/\\s*\\d+|\\d+(?:[\\.,]\\d+)?)(?:\\s+|(?=\\p{L}))(?<rest>.+)$",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    private static final Pattern LEADING_UNIT = Pattern.compile(
+            "^(?<unit>g|kg|gr|gramm|ml|l|liter|tl|el|essloeffel|essloffel|essl\\p{L}ffel|teeloeffel|teeloffel|teel\\p{L}ffel|tasse|tassen|stueck|stuck|st\\p{L}ck|stk|prise|prisen|bund|scheibe|scheiben|zehe|zehen)\\b\\s*(?<rest>.*)$",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private final ShoppingListService shoppingListService;
     private final PantryItemRepository pantryItemRepository;
@@ -42,7 +53,8 @@ public class AiShoppingListTool {
         Set<String> handled = new LinkedHashSet<>();
 
         for (String ingredient : ingredients) {
-            String cleaned = cleanIngredientName(ingredient);
+            IngredientParse parsed = parseIngredient(ingredient);
+            String cleaned = parsed.cleanedName();
             String normalized = normalizeName(cleaned);
             if (cleaned.isBlank() || normalized.isBlank() || isRejectedFragment(cleaned) || handled.contains(normalized)) {
                 continue;
@@ -59,6 +71,8 @@ public class AiShoppingListTool {
 
             ShoppingListItemRequest request = new ShoppingListItemRequest();
             request.setName(cleaned);
+            request.setQuantity(parsed.quantity());
+            request.setUnit(parsed.unit());
             request.setChecked(false);
             shoppingListService.create(request, currentUser);
             shoppingNames.add(normalized);
@@ -80,18 +94,91 @@ public class AiShoppingListTool {
     }
 
     private String cleanIngredientName(String value) {
+        return parseIngredient(value).cleanedName();
+    }
+
+    private IngredientParse parseIngredient(String value) {
         if (value == null) {
-            return "";
+            return new IngredientParse("", null, null);
         }
-        return value
+        String cleaned = value
                 .replaceAll("(?iu)^(?:fehlende\\s+zutaten|zutaten|ingredients|malzemeler)\\s*[:\\-]\\s*", "")
                 .replaceAll("(?iu)^(?:f.r\\s+das\\s+rezept\\s+brauchst\\s+du|fuer\\s+das\\s+rezept\\s+brauchst\\s+du|du\\s+ben.tigst|du\\s+benoetigst|folgende\\s+zutaten\\s+hinzuf.gen|folgende\\s+zutaten\\s+hinzufuegen)\\s*[:\\-]?\\s*", "")
-                .replaceAll("^[\\-_*\\d.)\\s]+", "")
-                .replaceAll("(?iu)^(g|kg|gr|gramm|ml|l|liter|stueck|stück|stk|tl|el|essloeffel|esslöffel|teeloeffel|teelöffel|prise|prisen|cup|cups|tasse|tassen|packung|dose)\\s+", "")
-                .replaceAll("(?iu)\\b(?:zum\\s+braten|nach\\s+geschmack|gehackt|frisch|frische|frischer|optional)\\b", "")
+                .replaceAll("^[\\-_*\\s]+", "")
+                .trim();
+
+        BigDecimal quantity = null;
+        String unit = null;
+        Matcher quantityMatcher = LEADING_QUANTITY.matcher(cleaned);
+        if (quantityMatcher.matches()) {
+            String rawQuantity = quantityMatcher.group("quantity");
+            quantity = parseQuantity(rawQuantity);
+            cleaned = quantityMatcher.group("rest").trim();
+        }
+
+        Matcher unitMatcher = LEADING_UNIT.matcher(cleaned);
+        if (unitMatcher.matches()) {
+            unit = normalizeUnit(unitMatcher.group("unit"));
+            cleaned = unitMatcher.group("rest").trim();
+        }
+
+        cleaned = cleaned
+                .replaceAll("(?iu)\\b(?:etwas|ca\\.?|circa|ungef.hr|ungefaehr)\\b", "")
+                .replaceAll("(?iu)\\b(?:zum\\s+braten|nach\\s+bedarf|nach\\s+geschmack|gehackt|frisch|frische|frischer|optional)\\b", "")
+                .replaceAll("(?iu)^\\s*(?:oder|und|&)\\s+", "")
+                .replaceAll("^[\\-/_,.;:\\s]+", "")
                 .replaceAll("[.;:]+$", "")
                 .replaceAll("\\s+", " ")
                 .trim();
+
+        return new IngredientParse(cleaned, quantity, unit);
+    }
+
+    private BigDecimal parseQuantity(String rawQuantity) {
+        if (rawQuantity == null || rawQuantity.isBlank() || rawQuantity.contains("-") || rawQuantity.contains("\u2013")) {
+            return null;
+        }
+        String normalized = rawQuantity.replaceAll("\\s+", "").replace(',', '.');
+        if (normalized.contains("/")) {
+            String[] parts = normalized.split("/", 2);
+            try {
+                BigDecimal numerator = new BigDecimal(parts[0]);
+                BigDecimal denominator = new BigDecimal(parts[1]);
+                if (BigDecimal.ZERO.compareTo(denominator) == 0) {
+                    return null;
+                }
+                return numerator.divide(denominator, MathContext.DECIMAL64).stripTrailingZeros();
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        try {
+            return new BigDecimal(normalized).stripTrailingZeros();
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String normalizeUnit(String unit) {
+        if (unit == null || unit.isBlank()) {
+            return null;
+        }
+        String normalized = normalizeForReject(unit);
+        return switch (normalized) {
+            case "g", "gr", "gramm" -> "g";
+            case "kg" -> "kg";
+            case "ml" -> "ml";
+            case "l", "liter" -> "l";
+            case "tl", "teeloeffel", "teeloffel" -> "TL";
+            case "el", "essloeffel", "essloffel" -> "EL";
+            case "tasse", "tassen" -> "Tasse";
+            case "stueck", "stuck", "stk" -> "Stueck";
+            case "prise", "prisen" -> "Prise";
+            case "bund" -> "Bund";
+            case "scheibe", "scheiben" -> "Scheibe";
+            case "zehe", "zehen" -> "Zehe";
+            default -> unit.trim();
+        };
     }
 
     private boolean isRejectedFragment(String value) {
@@ -152,16 +239,15 @@ public class AiShoppingListTool {
         if (value == null) {
             return "";
         }
-        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
+        String cleaned = cleanIngredientName(value);
+        String normalized = Normalizer.normalize(cleaned, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .replaceAll("[^\\p{L}\\p{N}]+", " ")
                 .replaceAll("\\s+", " ")
                 .trim()
                 .toLowerCase(Locale.ROOT);
         normalized = normalized
-                .replaceAll("^\\d+\\s*", "")
-                .replaceAll("^(g|kg|gr|gramm|ml|l|liter|stueck|stuck|stk|tl|el|essloeffel|essloffel|teeloeffel|teeloffel|prise|prisen|cup|cups|tasse|tassen|packung|dose)\\s+", "")
-                .replaceAll("\\b(zum braten|nach geschmack|gehackt|frisch|frische|frischer|optional)\\b", "")
+                .replaceAll("\\b(zum braten|nach bedarf|nach geschmack|gehackt|frisch|frische|frischer|optional)\\b", "")
                 .replaceAll("\\s+", " ")
                 .trim();
         normalized = singularize(normalized);
@@ -185,5 +271,8 @@ public class AiShoppingListTool {
             return normalized.substring(0, normalized.length() - 1);
         }
         return normalized;
+    }
+
+    private record IngredientParse(String cleanedName, BigDecimal quantity, String unit) {
     }
 }
