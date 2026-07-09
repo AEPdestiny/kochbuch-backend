@@ -126,6 +126,34 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
+    void answer_should_resolve_numeric_recipe_option_without_restaurant_action() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        doReturn("Hier ist das Rezept fuer Milchreis-Pfannkuchen.").when(groqClient).complete(any(), any());
+
+        AiChatResponse response = underTest.answer(user, "2", List.of(
+                turn("assistant", """
+                        Was passt zu deinem Vorrat?
+                        (1) ein einfaches Ei-Rezept
+                        (2) ein Rezept fuer Milchreis-Pfannkuchen
+                        (3) ein anderes Gericht
+                        """)
+        ));
+
+        ArgumentCaptor<String> systemPromptCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(groqClient).complete(systemPromptCaptor.capture(), promptCaptor.capture());
+        String systemPrompt = systemPromptCaptor.getValue();
+        String prompt = promptCaptor.getValue();
+        assertEquals("Hier ist das Rezept fuer Milchreis-Pfannkuchen.", response.getMessage());
+        assertTrue(systemPrompt.contains("Biete keine Restaurant-Suche als Standardoption an."));
+        assertTrue(prompt.contains("primaryIntent=FOLLOW_UP_SELECTION"));
+        assertTrue(prompt.contains("Der Nutzer hat Option 2 gewaehlt"));
+        assertTrue(prompt.contains("Milchreis-Pfannkuchen"));
+        assertTrue(prompt.contains("plannedActions=keine"));
+    }
+
+    @Test
     void answer_should_describe_empty_shopping_list_and_empty_recipes_honestly() {
         AppUser user = user();
         stubEmptyContext(user);

@@ -41,6 +41,23 @@ class AiIntentDetectorTest {
     }
 
     @Test
+    void detect_should_resolve_numeric_reply_to_previous_recipe_option_without_restaurant_action() {
+        AiIntentDetectionResult result = underTest.detect("2", List.of(
+                turn("assistant", """
+                        (1) ein einfaches Ei-Rezept
+                        (2) ein Rezept fuer Milchreis-Pfannkuchen
+                        (3) ein anderes Gericht
+                        """)
+        ));
+
+        assertEquals(AiIntent.FOLLOW_UP_SELECTION, result.primaryIntent());
+        assertTrue(result.normalizedUserRequest().contains("Option 2"));
+        assertTrue(result.normalizedUserRequest().contains("Milchreis-Pfannkuchen"));
+        assertTrue(result.plannedActions().isEmpty());
+        assertFalse(result.needsClarification());
+    }
+
+    @Test
     void detect_should_map_german_shopping_list_command() {
         AiIntentDetectionResult result = underTest.detect("fuege es zur einkaufsliste hinzu", List.of());
 

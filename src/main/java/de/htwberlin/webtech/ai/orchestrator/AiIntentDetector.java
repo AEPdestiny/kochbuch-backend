@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 public class AiIntentDetector {
 
     private static final Pattern NUMERIC_SELECTION = Pattern.compile("\\b([123])\\b");
+    private static final Pattern NUMBERED_OPTION = Pattern.compile("(?:^|\\s|\\()([123])\\)?\\s*(?:=|:|-)?\\s*([^()]+?)(?=\\s*\\(?[123]\\)?\\s*(?:=|:|-)?\\s+|$)");
 
     public AiIntentDetectionResult detect(String message, List<AiChatRequest.AiChatTurn> history) {
         String normalized = normalize(message);
@@ -35,16 +36,23 @@ public class AiIntentDetector {
 
         List<Integer> selections = selectedNumbers(normalized);
         if (!selections.isEmpty() && previousAssistantOfferedNumberedOptions(history)) {
-            List<AiActionPlan> plans = selections.stream()
-                    .map(this::planForSelection)
+            List<ResolvedOption> resolvedOptions = resolveSelectedOptions(selections, history);
+            List<AiActionPlan> plans = resolvedOptions.stream()
+                    .map(option -> planForOptionText(option.text()))
+                    .filter(plan -> plan != null)
                     .toList();
+            String normalizedSelection = resolvedOptions.isEmpty()
+                    ? normalized
+                    : resolvedOptions.stream()
+                    .map(option -> "Der Nutzer hat Option " + option.number() + " gewaehlt: " + option.text())
+                    .collect(java.util.stream.Collectors.joining("; "));
             return new AiIntentDetectionResult(
                     language,
-                    normalized,
+                    normalizedSelection,
                     AiIntent.FOLLOW_UP_SELECTION,
                     plans,
                     0.95,
-                    needsClarification(plans),
+                    !plans.isEmpty() && needsClarification(plans),
                     clarificationFor(plans)
             );
         }
@@ -116,13 +124,21 @@ public class AiIntentDetector {
         return new AiIntentDetectionResult(language, normalized, intent, plans, confidence, needsClarification, clarificationQuestion);
     }
 
-    private AiActionPlan planForSelection(Integer selection) {
-        return switch (selection) {
-            case 1 -> action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.95, null, null);
-            case 2 -> action(AiActionType.FIND_RESTAURANT, 0.95, null, null);
-            case 3 -> action(AiActionType.ADD_RECIPE_TO_MEAL_PLAN, 0.95, null, null);
-            default -> action(AiActionType.ASK_CLARIFICATION, 0.2, null, null);
-        };
+    private AiActionPlan planForOptionText(String optionText) {
+        String normalized = normalize(optionText);
+        if (containsAny(normalized, "einkaufsliste", "shopping list", "zutaten hinzufugen", "zutaten hinzufuegen", "alisveris")) {
+            return action(AiActionType.ADD_INGREDIENTS_TO_SHOPPING_LIST, 0.95, null, null);
+        }
+        if (containsAny(normalized, "wochenplan", "meal plan", "planen", "einplanen")) {
+            return action(AiActionType.ADD_RECIPE_TO_MEAL_PLAN, 0.95, null, null);
+        }
+        if (containsAny(normalized, "restaurant", "lokal", "essen gehen", "find restaurant")) {
+            return action(AiActionType.FIND_RESTAURANT, 0.95, null, null);
+        }
+        if (containsAny(normalized, "details", "detail", "rezept offnen", "recipe details")) {
+            return action(AiActionType.OPEN_RECIPE, 0.90, null, null);
+        }
+        return null;
     }
 
     private AiActionPlan action(AiActionType type, double confidence, LocalDate targetDate, MealSlot mealSlot) {
@@ -147,6 +163,52 @@ public class AiIntentDetector {
             selections.add(Integer.parseInt(matcher.group(1)));
         }
         return new ArrayList<>(selections);
+    }
+
+    private List<ResolvedOption> resolveSelectedOptions(List<Integer> selections, List<AiChatRequest.AiChatTurn> history) {
+        String lastOptionsText = lastAssistantTextWithNumberedOptions(history);
+        if (lastOptionsText.isBlank()) {
+            return List.of();
+        }
+        java.util.Map<Integer, String> options = parseNumberedOptions(lastOptionsText);
+        return selections.stream()
+                .filter(options::containsKey)
+                .map(selection -> new ResolvedOption(selection, options.get(selection)))
+                .toList();
+    }
+
+    private String lastAssistantTextWithNumberedOptions(List<AiChatRequest.AiChatTurn> history) {
+        if (history == null || history.isEmpty()) {
+            return "";
+        }
+        for (int i = history.size() - 1; i >= 0; i--) {
+            AiChatRequest.AiChatTurn turn = history.get(i);
+            if (turn == null || !"assistant".equalsIgnoreCase(turn.getRole()) || turn.getText() == null) {
+                continue;
+            }
+            if (previousAssistantOfferedNumberedOptions(List.of(turn))) {
+                return turn.getText();
+            }
+        }
+        return "";
+    }
+
+    private java.util.Map<Integer, String> parseNumberedOptions(String text) {
+        String compact = text.replaceAll("\\s+", " ").trim();
+        Matcher matcher = NUMBERED_OPTION.matcher(compact);
+        java.util.Map<Integer, String> options = new java.util.LinkedHashMap<>();
+        while (matcher.find()) {
+            int number = Integer.parseInt(matcher.group(1));
+            String option = matcher.group(2)
+                    .replaceAll("(?i)\\b(?:moechtest|mochtest|willst|soll ich|oder)\\b", "")
+                    .replaceAll("[?.!]+$", "")
+                    .replaceAll("\\s+", " ")
+                    .trim();
+            if (!option.isBlank()) {
+                options.put(number, option);
+            }
+        }
+        return options;
     }
 
     private boolean isShoppingListConfirmation(String normalized) {
@@ -196,6 +258,9 @@ public class AiIntentDetector {
                 .anyMatch(text -> text.contains("(1)") || text.contains("1)") || text.contains(" 1 ")
                         || text.contains("(2)") || text.contains("2)") || text.contains(" 2 ")
                         || text.contains("(3)") || text.contains("3)") || text.contains(" 3 "));
+    }
+
+    private record ResolvedOption(int number, String text) {
     }
 
     private boolean isMealPlanIntent(String normalized) {
