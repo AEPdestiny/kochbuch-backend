@@ -9,6 +9,7 @@ public record AiConversationContext(
         AppUser user,
         String message,
         List<AiChatRequest.AiChatTurn> history,
+        String locale,
         String appContextSummary
 ) {
 }

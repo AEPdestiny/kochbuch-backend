@@ -24,24 +24,37 @@ class AiChatServiceTest {
         AppUser user = user();
         List<AiChatRequest.AiChatTurn> history = List.of(turn("assistant", "Moechtest du (1) Details oder (2) Restaurant?"));
         AiChatResponse expected = new AiChatResponse("Antwort", true);
-        doReturn(expected).when(orchestrator).answer(user, "2", history);
+        doReturn(expected).when(orchestrator).answer(user, "2", history, null);
 
         AiChatResponse response = underTest.answer(user, "2", history);
 
         assertEquals(expected, response);
-        verify(orchestrator).answer(user, "2", history);
+        verify(orchestrator).answer(user, "2", history, null);
+    }
+
+    @Test
+    void answer_should_delegate_to_orchestrator_with_locale() {
+        AppUser user = user();
+        List<AiChatRequest.AiChatTurn> history = List.of(turn("assistant", "Zutaten: Reis"));
+        AiChatResponse expected = new AiChatResponse("Antwort", true);
+        doReturn(expected).when(orchestrator).answer(user, "Hallo", history, "de");
+
+        AiChatResponse response = underTest.answer(user, "Hallo", history, "de");
+
+        assertEquals(expected, response);
+        verify(orchestrator).answer(user, "Hallo", history, "de");
     }
 
     @Test
     void answer_without_history_should_delegate_with_empty_history() {
         AppUser user = user();
         AiChatResponse expected = new AiChatResponse("Antwort", true);
-        doReturn(expected).when(orchestrator).answer(user, "Hallo", List.of());
+        doReturn(expected).when(orchestrator).answer(user, "Hallo", List.of(), null);
 
         AiChatResponse response = underTest.answer(user, "Hallo");
 
         assertEquals(expected, response);
-        verify(orchestrator).answer(user, "Hallo", List.of());
+        verify(orchestrator).answer(user, "Hallo", List.of(), null);
     }
 
     private AiChatRequest.AiChatTurn turn(String role, String text) {

@@ -78,7 +78,11 @@ public class DishlyAiOrchestrator {
     }
 
     public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history) {
-        AiConversationContext context = buildConversationContext(currentUser, message, history);
+        return answer(currentUser, message, history, null);
+    }
+
+    public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history, String locale) {
+        AiConversationContext context = buildConversationContext(currentUser, message, history, locale);
         AiIntentDetectionResult intent = intentDetector.detect(context.message(), context.history());
         AiChatResponse toolResponse = tryExecuteShoppingListTool(currentUser, context, intent);
         if (toolResponse != null) {
@@ -92,6 +96,11 @@ public class DishlyAiOrchestrator {
                 Wenn du nummerierte Optionen anbietest, muessen die Nummern echte Dishly-Rezeptideen oder Dishly-Aktionen sein.
                 Biete keine Restaurant-Suche als Standardoption an.
                 Nutze nur die bereitgestellten Nutzerdaten.
+                Use recipe titles and ingredients from the active UI locale.
+                If active locale is de, prefer German recipe data with language=de.
+                Do not output English recipe titles or English ingredients when German recipe candidates exist.
+                Do not claim a recipe is from the catalog unless it is present in the provided candidate recipe context.
+                If no suitable localized recipe exists, label the suggestion as a free recipe idea, not a saved Dishly recipe.
                 Respektiere Allergien, Abneigungen und Ernaehrungsziele strikt.
                 Erfinde keine Vorrats-, Einkaufslisten- oder Rezeptdaten.
                 Behaupte nie, dass du App-Aktionen ausgefuehrt hast.
@@ -271,11 +280,12 @@ public class DishlyAiOrchestrator {
                 + ", requiresConfirmation=" + plan.requiresConfirmation();
     }
 
-    private AiConversationContext buildConversationContext(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history) {
-        return new AiConversationContext(currentUser, message, history == null ? List.of() : history, buildContext(currentUser));
+    private AiConversationContext buildConversationContext(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history, String locale) {
+        String normalizedLocale = normalizeLocale(locale);
+        return new AiConversationContext(currentUser, message, history == null ? List.of() : history, normalizedLocale, buildContext(currentUser, normalizedLocale));
     }
 
-    private String buildContext(AppUser currentUser) {
+    private String buildContext(AppUser currentUser, String locale) {
         LocalDate weekStart = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate weekEnd = weekStart.plusDays(6);
         UserPreferences preferences = preferencesRepository.findByOwner(currentUser).orElse(null);
@@ -294,9 +304,8 @@ public class DishlyAiOrchestrator {
                 .limit(OWN_RECIPE_LIMIT)
                 .map(this::recipeSummary)
                 .collect(Collectors.joining("; "));
-        String publishedRecipes = recipeRepository.findRandomPublished(PUBLISHED_RECIPE_LIMIT * 3).stream()
-                .filter(recipe -> matchesPreferences(recipe, preferences))
-                .limit(PUBLISHED_RECIPE_LIMIT)
+        List<Recipe> localizedPublishedCandidates = localizedPublishedCandidates(locale, preferences);
+        String publishedRecipes = localizedPublishedCandidates.stream()
                 .map(this::recipeSummary)
                 .collect(Collectors.joining("; "));
         String favorites = favoriteRepository.findByOwner(currentUser).stream()
@@ -307,6 +316,7 @@ public class DishlyAiOrchestrator {
         return """
                 Kontext fuer Dishly AI:
                 Nutzer: %s
+                Active UI locale: %s
 
                 User profile:
                 %s
@@ -331,19 +341,52 @@ public class DishlyAiOrchestrator {
 
                 Safety rules:
                 - Allergien und Abneigungen haben Vorrang vor Rezeptvorschlaegen.
+                - Nutze Rezepttitel und Zutaten passend zur aktiven UI-Sprache.
+                - Bei locale=de keine englischen Katalog-Rezepttitel oder englischen Zutaten ausgeben, wenn deutsche Kandidaten vorhanden sind.
+                - Bezeichne nur Rezepte aus "Dishly recipe catalog" als gespeicherte Dishly-Katalogrezepte.
+                - Wenn keine lokalisierten Katalogkandidaten vorhanden sind, kennzeichne Vorschlaege als freie Rezeptidee.
                 - Keine Vorrats-, Einkaufslisten- oder Rezeptdaten erfinden.
                 - Keine App-Aktionen behaupten; nur konkrete naechste Schritte empfehlen.
                 - Leere oder fehlende Daten klar benennen.
                 """.formatted(
                 currentUser.getUsername(),
+                fallback(locale, "unknown"),
                 preferences == null ? "nicht ausgefuellt" : preferencesText(preferences),
                 pantry.isBlank() ? "keine Vorratsdaten" : pantry,
                 mealPlan.isBlank() ? "keine geplanten Mahlzeiten" : mealPlan,
                 shoppingList.isBlank() ? "Einkaufsliste ist leer" : shoppingList,
                 ownRecipes.isBlank() ? "keine eigenen Rezepte gespeichert" : ownRecipes,
-                publishedRecipes.isBlank() ? "keine passenden Dishly-Rezepte verfuegbar" : publishedRecipes,
+                publishedRecipes.isBlank() ? localizedCatalogEmptyText(locale) : publishedRecipes,
                 favorites.isBlank() ? "keine externen Favoriten" : favorites
         );
+    }
+
+    private List<Recipe> localizedPublishedCandidates(String locale, UserPreferences preferences) {
+        if (locale == null || locale.isBlank()) {
+            return recipeRepository.findRandomPublished(PUBLISHED_RECIPE_LIMIT * 3).stream()
+                    .filter(recipe -> matchesPreferences(recipe, preferences))
+                    .limit(PUBLISHED_RECIPE_LIMIT)
+                    .toList();
+        }
+        return recipeRepository.findRandomPublishedByLanguage(locale, PUBLISHED_RECIPE_LIMIT * 3).stream()
+                .filter(recipe -> matchesPreferences(recipe, preferences))
+                .limit(PUBLISHED_RECIPE_LIMIT)
+                .toList();
+    }
+
+    private String localizedCatalogEmptyText(String locale) {
+        if (locale == null || locale.isBlank()) {
+            return "keine passenden Dishly-Rezepte verfuegbar";
+        }
+        return "keine passenden lokalisierten Dishly-Rezepte fuer locale=" + locale + " verfuegbar";
+    }
+
+    private String normalizeLocale(String locale) {
+        if (locale == null || locale.isBlank()) {
+            return null;
+        }
+        String normalized = locale.trim().toLowerCase(Locale.ROOT).split("[-_]")[0];
+        return normalized.matches("[a-z]{2}") ? normalized : null;
     }
 
     private String buildHistory(List<AiChatRequest.AiChatTurn> history) {

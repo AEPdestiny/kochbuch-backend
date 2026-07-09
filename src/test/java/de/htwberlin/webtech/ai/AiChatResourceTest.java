@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -63,7 +64,7 @@ class AiChatResourceTest {
     void chat_should_return_answer() {
         AppUser user = user();
         doReturn(user).when(userContext).requireUser("Bearer valid-token");
-        doReturn(new AiChatResponse("Antwort", true)).when(service).answer(user, "Hallo", java.util.List.of());
+        doReturn(new AiChatResponse("Antwort", true)).when(service).answer(user, "Hallo", java.util.List.of(), null);
 
         given()
                 .contentType(ContentType.JSON)
@@ -80,7 +81,7 @@ class AiChatResourceTest {
     void chat_should_accept_optional_history() {
         AppUser user = user();
         doReturn(user).when(userContext).requireUser("Bearer valid-token");
-        doReturn(new AiChatResponse("Antwort", true)).when(service).answer(org.mockito.ArgumentMatchers.eq(user), org.mockito.ArgumentMatchers.eq("2"), anyList());
+        doReturn(new AiChatResponse("Antwort", true)).when(service).answer(eq(user), eq("2"), anyList(), eq("de"));
 
         given()
                 .contentType(ContentType.JSON)
@@ -90,7 +91,8 @@ class AiChatResourceTest {
                           "message": "2",
                           "history": [
                             { "role": "assistant", "text": "Moechtest du (1) Details oder (2) Restaurant?" }
-                          ]
+                          ],
+                          "locale": "de-DE"
                         }
                         """)
                 .when().post("/ai/chat")

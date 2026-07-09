@@ -26,6 +26,10 @@ public class AiChatService {
     }
 
     public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history) {
-        return orchestrator.answer(currentUser, message, history);
+        return answer(currentUser, message, history, null);
+    }
+
+    public AiChatResponse answer(AppUser currentUser, String message, List<AiChatRequest.AiChatTurn> history, String locale) {
+        return orchestrator.answer(currentUser, message, history, locale);
     }
 }

@@ -98,6 +98,51 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
+    void answer_should_use_german_published_recipe_candidates_for_german_locale() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        doReturn(List.of(recipe("Leek And Pea Frittata", "dinner", 430, 21.0, "leek, peas, parsley")))
+                .when(recipeRepository).findRandomPublished(45);
+        doReturn(List.of(recipe("Lauch-Erbsen-Frittata", "abendessen", 430, 21.0, "Lauch, Erbsen, Petersilie", "de")))
+                .when(recipeRepository).findRandomPublishedByLanguage("de", 45);
+        doReturn("Antwort").when(groqClient).complete(any(), any());
+
+        underTest.answer(user, "Was kann ich heute mit meinem Vorrat kochen?", List.of(), "de-DE");
+
+        ArgumentCaptor<String> systemPromptCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(groqClient).complete(systemPromptCaptor.capture(), promptCaptor.capture());
+        String systemPrompt = systemPromptCaptor.getValue();
+        String prompt = promptCaptor.getValue();
+        assertTrue(prompt.contains("Active UI locale: de"));
+        assertTrue(prompt.contains("Lauch-Erbsen-Frittata"));
+        assertTrue(prompt.contains("Zutaten=Lauch, Erbsen, Petersilie"));
+        assertFalse(prompt.contains("Leek And Pea Frittata"));
+        assertFalse(prompt.contains("leek, peas, parsley"));
+        assertTrue(systemPrompt.contains("If active locale is de, prefer German recipe data with language=de."));
+        assertTrue(systemPrompt.contains("Do not output English recipe titles or English ingredients when German recipe candidates exist."));
+        assertTrue(systemPrompt.contains("Do not claim a recipe is from the catalog unless it is present in the provided candidate recipe context."));
+    }
+
+    @Test
+    void answer_should_mark_missing_localized_catalog_when_no_german_candidates_exist() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        doReturn(List.of(recipe("Leek And Pea Frittata", "dinner", 430, 21.0, "leek, peas, parsley")))
+                .when(recipeRepository).findRandomPublished(45);
+        doReturn(List.of()).when(recipeRepository).findRandomPublishedByLanguage("de", 45);
+        doReturn("Antwort").when(groqClient).complete(any(), any());
+
+        underTest.answer(user, "Was kann ich kochen?", List.of(), "de");
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        verify(groqClient).complete(any(), promptCaptor.capture());
+        String prompt = promptCaptor.getValue();
+        assertTrue(prompt.contains("keine passenden lokalisierten Dishly-Rezepte fuer locale=de verfuegbar"));
+        assertFalse(prompt.contains("Leek And Pea Frittata"));
+    }
+
+    @Test
     void answer_should_include_limited_chat_history_for_follow_up_messages() {
         AppUser user = user();
         stubEmptyContext(user);
@@ -372,6 +417,10 @@ class DishlyAiOrchestratorTest {
     }
 
     private Recipe recipe(String title, String category, Integer calories, Double protein, String ingredients) {
+        return recipe(title, category, calories, protein, ingredients, "en");
+    }
+
+    private Recipe recipe(String title, String category, Integer calories, Double protein, String ingredients, String language) {
         Recipe recipe = new Recipe();
         recipe.setTitle(title);
         recipe.setCategory(category);
@@ -379,6 +428,7 @@ class DishlyAiOrchestratorTest {
         recipe.setProtein(protein);
         recipe.setIngredients(ingredients);
         recipe.setPublished(true);
+        recipe.setLanguage(language);
         return recipe;
     }
 
