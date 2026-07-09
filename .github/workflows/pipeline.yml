@@ -19,5 +19,5 @@ jobs:
         with:
           distribution: 'adopt'
           java-version: '21'
-      - name: Run Tests
-        run: ./gradlew test
+      - name: Run Checks
+        run: ./gradlew check
