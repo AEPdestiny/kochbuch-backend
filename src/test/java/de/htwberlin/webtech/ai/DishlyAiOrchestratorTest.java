@@ -270,6 +270,73 @@ class DishlyAiOrchestratorTest {
     }
 
     @Test
+    void answer_should_not_extract_instruction_text_after_ingredient_line_and_should_ask_for_optional_choice() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> pantryIngredients = List.of("Milchreis", "Milch", "Tomate");
+        doReturn(new AiShoppingListToolResult(List.of(), pantryIngredients, List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, pantryIngredients);
+
+        AiChatResponse response = underTest.answer(user, "3", List.of(
+                turn("assistant", """
+                        Zutaten: Milchreis, Milch, Tomate, eventuell Zucker oder Suessstoff nach Geschmack
+
+                        Um den Milchreis-Pudding zuzubereiten, koennen Sie den Milchreis mit Milch und einem wenig Zucker oder Suessstoff nach Geschmack kochen.
+                        1. Rezeptdetails anzeigen
+                        2. Weitere Rezeptideen erhalten
+                        3. Einkaufsliste fuer fehlende Zutaten erstellen
+                        """)
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Optional fehlen Zucker und Suessstoff. Was soll ich hinzufuegen?", response.getMessage());
+        verify(shoppingListTool).addMissingIngredients(user, pantryIngredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_prefer_missing_ingredients_line() {
+        AppUser user = user();
+        stubEmptyContext(user);
+        List<String> ingredients = List.of("Salz", "Pfeffer");
+        doReturn(new AiShoppingListToolResult(ingredients, List.of(), List.of()))
+                .when(shoppingListTool).addMissingIngredients(user, ingredients);
+
+        AiChatResponse response = underTest.answer(user, "1", List.of(
+                turn("assistant", """
+                        Verfuegbare Zutaten: Milchreis, Milch, Tomate
+                        Fehlende Zutaten: Salz, Pfeffer
+                        Zutaten: Milchreis, Milch, Tomate, Salz, Pfeffer
+                        1. Einkaufsliste fuer fehlende Zutaten erstellen
+                        """)
+        ));
+
+        assertTrue(response.isConfigured());
+        assertTrue(response.getMessage().contains("Salz und Pfeffer"));
+        verify(shoppingListTool).addMissingIngredients(user, ingredients);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
+    void answer_should_not_mutate_when_missing_ingredients_are_none() {
+        AppUser user = user();
+        stubEmptyContext(user);
+
+        AiChatResponse response = underTest.answer(user, "1", List.of(
+                turn("assistant", """
+                        Verfuegbare Zutaten: Milchreis, Milch, Tomate
+                        Fehlende Zutaten: keine
+                        1. Einkaufsliste fuer fehlende Zutaten erstellen
+                        """)
+        ));
+
+        assertTrue(response.isConfigured());
+        assertEquals("Ich habe nichts hinzugefuegt, weil keine fehlenden Zutaten angegeben sind.", response.getMessage());
+        verifyNoInteractions(shoppingListTool);
+        verifyNoInteractions(groqClient);
+    }
+
+    @Test
     void answer_should_extract_following_ingredients_add_pattern_for_numeric_selection() {
         AppUser user = user();
         stubEmptyContext(user);

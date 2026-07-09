@@ -44,7 +44,7 @@ public class AiShoppingListTool {
         for (String ingredient : ingredients) {
             String cleaned = cleanIngredientName(ingredient);
             String normalized = normalizeName(cleaned);
-            if (cleaned.isBlank() || normalized.isBlank() || handled.contains(normalized)) {
+            if (cleaned.isBlank() || normalized.isBlank() || isRejectedFragment(cleaned) || handled.contains(normalized)) {
                 continue;
             }
             handled.add(normalized);
@@ -84,12 +84,44 @@ public class AiShoppingListTool {
             return "";
         }
         return value
+                .replaceAll("(?iu)^(?:fehlende\\s+zutaten|zutaten|ingredients|malzemeler)\\s*[:\\-]\\s*", "")
+                .replaceAll("(?iu)^(?:f.r\\s+das\\s+rezept\\s+brauchst\\s+du|fuer\\s+das\\s+rezept\\s+brauchst\\s+du|du\\s+ben.tigst|du\\s+benoetigst|folgende\\s+zutaten\\s+hinzuf.gen|folgende\\s+zutaten\\s+hinzufuegen)\\s*[:\\-]?\\s*", "")
                 .replaceAll("^[\\-_*\\d.)\\s]+", "")
                 .replaceAll("(?iu)^(g|kg|gr|gramm|ml|l|liter|stueck|stück|stk|tl|el|essloeffel|esslöffel|teeloeffel|teelöffel|prise|prisen|cup|cups|tasse|tassen|packung|dose)\\s+", "")
                 .replaceAll("(?iu)\\b(?:zum\\s+braten|nach\\s+geschmack|gehackt|frisch|frische|frischer|optional)\\b", "")
                 .replaceAll("[.;:]+$", "")
                 .replaceAll("\\s+", " ")
                 .trim();
+    }
+
+    private boolean isRejectedFragment(String value) {
+        String normalized = normalizeForReject(value);
+        return normalized.contains("in die einkaufsliste")
+                || normalized.contains("in meine einkaufsliste")
+                || normalized.contains("bitte")
+                || normalized.contains("koennen sie")
+                || normalized.contains("konnen sie")
+                || normalized.contains("kannst du")
+                || normalized.contains("moechten sie")
+                || normalized.contains("mochten sie")
+                || normalized.contains("um den")
+                || normalized.contains("zubereiten")
+                || normalized.contains("koch")
+                || normalized.contains("brat")
+                || normalized.contains("rezept")
+                || normalized.contains("gericht");
+    }
+
+    private String normalizeForReject(String value) {
+        if (value == null) {
+            return "";
+        }
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^\\p{L}\\p{N}]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim()
+                .toLowerCase(Locale.ROOT);
     }
 
     private String normalizeName(String value) {

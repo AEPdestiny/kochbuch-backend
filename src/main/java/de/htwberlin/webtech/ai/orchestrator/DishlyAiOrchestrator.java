@@ -141,12 +141,21 @@ public class DishlyAiOrchestrator {
         if (intent.confidence() < 0.85) {
             return null;
         }
-        List<String> ingredients = extractIngredients(context.message(), context.history());
-        if (ingredients.isEmpty()) {
+        IngredientExtraction extraction = extractIngredients(context.message(), context.history());
+        if (extraction.noMissingIngredients()) {
+            return new AiChatResponse("Ich habe nichts hinzugefuegt, weil keine fehlenden Zutaten angegeben sind.", true);
+        }
+        if (extraction.ingredients().isEmpty()) {
+            if (!extraction.optionalIngredients().isEmpty()) {
+                return new AiChatResponse("Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", true);
+            }
             return new AiChatResponse("Welche konkreten Zutaten soll ich hinzufuegen? Schreib sie bitte z.B. so: Limette, Olivenoel, Salz.", true);
         }
         try {
-            AiShoppingListToolResult result = shoppingListTool.addMissingIngredients(currentUser, ingredients);
+            AiShoppingListToolResult result = shoppingListTool.addMissingIngredients(currentUser, extraction.ingredients());
+            if (!result.changedAnything() && !extraction.optionalIngredients().isEmpty()) {
+                return new AiChatResponse("Optional fehlen " + joinNames(extraction.optionalIngredients()) + ". Was soll ich hinzufuegen?", true);
+            }
             return new AiChatResponse(shoppingListToolMessage(result), true);
         } catch (RuntimeException exception) {
             return new AiChatResponse("Ich konnte die Zutaten gerade nicht zur Einkaufsliste hinzufuegen: " + exception.getMessage(), false);
@@ -195,29 +204,29 @@ public class DishlyAiOrchestrator {
         return message.toString();
     }
 
-    private List<String> extractIngredients(String message, List<AiChatRequest.AiChatTurn> history) {
+    private IngredientExtraction extractIngredients(String message, List<AiChatRequest.AiChatTurn> history) {
         List<String> fromDirectUserCommand = extractIngredientsFromUserCommand(message);
         if (!fromDirectUserCommand.isEmpty()) {
-            return fromDirectUserCommand;
+            return new IngredientExtraction(fromDirectUserCommand, List.of(), false);
         }
-        List<String> fromUserMessage = extractIngredientsFromText(message);
-        if (!fromUserMessage.isEmpty()) {
+        IngredientExtraction fromUserMessage = extractIngredientsFromText(message);
+        if (fromUserMessage.hasSignal()) {
             return fromUserMessage;
         }
         if (history == null || history.isEmpty()) {
-            return List.of();
+            return IngredientExtraction.empty();
         }
         for (int i = history.size() - 1; i >= 0; i--) {
             AiChatRequest.AiChatTurn turn = history.get(i);
             if (turn == null || !"assistant".equalsIgnoreCase(turn.getRole())) {
                 continue;
             }
-            List<String> ingredients = extractIngredientsFromText(turn.getText());
-            if (!ingredients.isEmpty()) {
+            IngredientExtraction ingredients = extractIngredientsFromText(turn.getText());
+            if (ingredients.hasSignal()) {
                 return ingredients;
             }
         }
-        return List.of();
+        return IngredientExtraction.empty();
     }
 
     private List<String> extractIngredientsFromUserCommand(String text) {
@@ -256,21 +265,112 @@ public class DishlyAiOrchestrator {
                 && !List.of("es", "das", "dies", "diese", "die", "alle", "alles").contains(normalized);
     }
 
-    private List<String> extractIngredientsFromText(String text) {
+    private IngredientExtraction extractIngredientsFromText(String text) {
         if (text == null || text.isBlank()) {
-            return List.of();
+            return IngredientExtraction.empty();
         }
-        String normalized = text.replaceAll("\\s+", " ").trim();
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-                "(?iu)(?:fehlende\\s+zutaten|zutaten|ingredients|malzemeler|f.r\\s+das\\s+rezept\\s+brauchst\\s+du|fuer\\s+das\\s+rezept\\s+brauchst\\s+du|du\\s+ben.tigst|du\\s+benoetigst|folgende\\s+zutaten\\s+hinzuf.gen|folgende\\s+zutaten\\s+hinzufuegen|could\\s+add)\\s*[:\\-]?\\s*([^.!?\\n]+)"
+        IngredientExtraction fallback = IngredientExtraction.empty();
+        for (String line : text.split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.isBlank()) {
+                continue;
+            }
+            if (isStopLine(trimmed)) {
+                continue;
+            }
+            MarkerLine markerLine = markerLine(trimmed);
+            if (markerLine == null) {
+                continue;
+            }
+            if (markerLine.missing() && isNoMissing(markerLine.value())) {
+                return new IngredientExtraction(List.of(), List.of(), true);
+            }
+            IngredientExtraction extracted = splitIngredientLine(markerLine.value());
+            if (markerLine.missing()) {
+                return extracted;
+            }
+            if (fallback.isEmpty()) {
+                fallback = extracted;
+            }
+        }
+        return fallback;
+    }
+
+    private MarkerLine markerLine(String line) {
+        String[] markerPatterns = {
+                "(?iu)^(?:.*?[.!?]\\s*)?fehlende\\s+zutaten\\s*[:\\-]\\s*(.+)$",
+                "(?iu)^(?:.*?[.!?]\\s*)?zutaten\\s*[:\\-]\\s*(.+)$",
+                "(?iu)^(?:.*?[.!?]\\s*)?f.r\\s+das\\s+rezept\\s+brauchst\\s+du\\s*[:\\-]?\\s*(.+)$",
+                "(?iu)^(?:.*?[.!?]\\s*)?fuer\\s+das\\s+rezept\\s+brauchst\\s+du\\s*[:\\-]?\\s*(.+)$",
+                "(?iu)^(?:.*?[.!?]\\s*)?du\\s+ben.tigst\\s*[:\\-]?\\s*(.+)$",
+                "(?iu)^(?:.*?[.!?]\\s*)?du\\s+benoetigst\\s*[:\\-]?\\s*(.+)$",
+                "(?iu)^(?:.*?[.!?]\\s*)?folgende\\s+zutaten\\s+hinzuf.gen\\s*[:\\-]?\\s*(.+)$",
+                "(?iu)^(?:.*?[.!?]\\s*)?folgende\\s+zutaten\\s+hinzufuegen\\s*[:\\-]?\\s*(.+)$",
+                "(?iu)^(?:.*?[.!?]\\s*)?ingredients\\s*[:\\-]\\s*(.+)$",
+                "(?iu)^(?:.*?[.!?]\\s*)?malzemeler\\s*[:\\-]\\s*(.+)$"
+        };
+        for (String markerPattern : markerPatterns) {
+            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(markerPattern).matcher(line);
+            if (matcher.find()) {
+                return new MarkerLine(markerPattern.contains("fehlende"), trimIngredientListValue(matcher.group(1)));
+            }
+        }
+        return null;
+    }
+
+    private String trimIngredientListValue(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replaceAll("(?iu)\\b(?:moechtest|mochtest|möchtest|willst\\s+du|soll\\s+ich|welche\\s+option|um\\s+den|zubereitung|anleitung)\\b.*$", "")
+                .replaceAll("[.;:]+$", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private boolean isStopLine(String line) {
+        String normalized = line.toLowerCase(Locale.ROOT);
+        return normalized.startsWith("um ")
+                || normalized.startsWith("zubereitung")
+                || normalized.startsWith("anleitung")
+                || normalized.startsWith("moechten sie")
+                || normalized.startsWith("mochten sie")
+                || normalized.startsWith("welche option")
+                || normalized.matches("^\\s*(?:[-*]\\s*)?\\(?[123]\\)?[.)\\-:].*");
+    }
+
+    private boolean isNoMissing(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        return normalized.equals("keine")
+                || normalized.equals("keine.")
+                || normalized.equals("nichts")
+                || normalized.equals("none");
+    }
+
+    private IngredientExtraction splitIngredientLine(String ingredientText) {
+        OptionalSplit optionalSplit = splitOptionalIngredients(ingredientText);
+        return new IngredientExtraction(
+                splitIngredientText(optionalSplit.requiredText()),
+                splitIngredientText(optionalSplit.optionalText()),
+                false
         );
-        java.util.regex.Matcher matcher = pattern.matcher(normalized);
-        if (!matcher.find()) {
-            return List.of();
+    }
+
+    private OptionalSplit splitOptionalIngredients(String ingredientText) {
+        if (ingredientText == null || ingredientText.isBlank()) {
+            return new OptionalSplit("", "");
         }
-        String ingredientText = matcher.group(1)
-                .replaceAll("(?iu)\\b(?:m.chtest|moechtest|mochtest|willst|soll ich|would you|ister misin)\\b.*$", "");
-        return splitIngredientText(ingredientText);
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(?iu)\\b(?:eventuell|optional)\\b\\s*(.+)$")
+                .matcher(ingredientText);
+        if (!matcher.find()) {
+            return new OptionalSplit(ingredientText, "");
+        }
+        return new OptionalSplit(
+                ingredientText.substring(0, matcher.start()).replaceAll("[,;\\s]+$", ""),
+                matcher.group(1)
+        );
     }
 
     private List<String> splitIngredientText(String ingredientText) {
@@ -281,11 +381,31 @@ public class DishlyAiOrchestrator {
                 .replaceAll("(?iu)\\b(?:nach\\s+geschmack|zum\\s+braten|ich\\s+habe\\s+es\\s+nicht\\s+im\\s+vorrat)\\b", "")
                 .replaceAll("\\?.*$", "")
                 .trim();
-        return java.util.Arrays.stream(cleaned.split("\\s*,\\s*|\\s*&\\s*|\\s+und\\s+|\\s+and\\s+|\\s+ve\\s+"))
+        return java.util.Arrays.stream(cleaned.split("\\s*,\\s*|\\s*&\\s*|\\s+und\\s+|\\s+oder\\s+|\\s+and\\s+|\\s+or\\s+|\\s+ve\\s+"))
                 .map(String::trim)
+                .map(value -> value.replaceAll("^[\\s.;:]+|[\\s.;:]+$", "").trim())
                 .filter(value -> !value.isBlank())
                 .filter(value -> value.length() <= 60)
+                .filter(value -> !looksLikeInstructionFragment(value))
                 .toList();
+    }
+
+    private boolean looksLikeInstructionFragment(String value) {
+        String normalized = value.toLowerCase(Locale.ROOT);
+        return normalized.contains("in die einkaufsliste")
+                || normalized.contains("in meine einkaufsliste")
+                || normalized.contains("bitte")
+                || normalized.contains("koennen sie")
+                || normalized.contains("konnen sie")
+                || normalized.contains("kannst du")
+                || normalized.contains("moechten sie")
+                || normalized.contains("mochten sie")
+                || normalized.contains("um den")
+                || normalized.contains("zubereiten")
+                || normalized.contains("kochen")
+                || normalized.contains("braten")
+                || normalized.contains("rezept")
+                || normalized.contains("gericht");
     }
 
     private String joinNames(List<String> names) {
@@ -561,5 +681,25 @@ public class DishlyAiOrchestrator {
             return "";
         }
         return " (" + quantity + (unit == null || unit.isBlank() ? "" : " " + unit) + ")";
+    }
+
+    private record IngredientExtraction(List<String> ingredients, List<String> optionalIngredients, boolean noMissingIngredients) {
+        static IngredientExtraction empty() {
+            return new IngredientExtraction(List.of(), List.of(), false);
+        }
+
+        boolean hasSignal() {
+            return noMissingIngredients || !ingredients.isEmpty() || !optionalIngredients.isEmpty();
+        }
+
+        boolean isEmpty() {
+            return !hasSignal();
+        }
+    }
+
+    private record MarkerLine(boolean missing, String value) {
+    }
+
+    private record OptionalSplit(String requiredText, String optionalText) {
     }
 }

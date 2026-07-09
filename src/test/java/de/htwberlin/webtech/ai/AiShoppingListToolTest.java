@@ -113,6 +113,26 @@ class AiShoppingListToolTest {
         assertEquals(List.of("Salz", "Pfeffer"), requestCaptor.getAllValues().stream().map(ShoppingListItemRequest::getName).toList());
     }
 
+    @Test
+    void addMissingIngredients_should_reject_instruction_fragments() {
+        AppUser user = user();
+        doReturn(List.of()).when(shoppingListService).listMine(user);
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(user);
+
+        AiShoppingListToolResult result = underTest.addMissingIngredients(user, List.of(
+                "Zutaten: Milchreis",
+                "koennen Sie den Milchreis mit Milch",
+                "einem wenig Zucker oder Suessstoff kochen",
+                "bitte in die Einkaufsliste",
+                "Salz"
+        ));
+
+        assertEquals(List.of("Milchreis", "Salz"), result.addedItems());
+        ArgumentCaptor<ShoppingListItemRequest> requestCaptor = ArgumentCaptor.forClass(ShoppingListItemRequest.class);
+        verify(shoppingListService, times(2)).create(requestCaptor.capture(), eq(user));
+        assertEquals(List.of("Milchreis", "Salz"), requestCaptor.getAllValues().stream().map(ShoppingListItemRequest::getName).toList());
+    }
+
     private ShoppingListItem shoppingItem(String name) {
         ShoppingListItem item = new ShoppingListItem();
         item.setName(name);
