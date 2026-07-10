@@ -49,6 +49,15 @@ public class ExternalRecipeFavoriteResource {
     }
 
     @DELETE
+    @Path("/{favoriteId}")
+    public Response removeById(@HeaderParam("Authorization") String authorizationHeader,
+                               @PathParam("favoriteId") Long favoriteId) {
+        AppUser currentUser = userContext.requireUser(authorizationHeader);
+        service.removeById(currentUser, favoriteId);
+        return Response.noContent().build();
+    }
+
+    @DELETE
     @Path("/{source}/{externalRecipeId}")
     public Response remove(@HeaderParam("Authorization") String authorizationHeader,
                            @PathParam("source") String source,

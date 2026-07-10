@@ -104,6 +104,20 @@ class ExternalRecipeFavoriteResourceTest {
         verify(service).remove(user, "SPOONACULAR", "716429");
     }
 
+    @Test
+    void removeById_should_delete_external_favorite_without_external_fields() {
+        AppUser user = user();
+        doReturn(user).when(userContext).requireUser("Bearer token");
+
+        given()
+                .header("Authorization", "Bearer token")
+                .when().delete("/favorites/external/1")
+                .then()
+                .statusCode(204);
+
+        verify(service).removeById(user, 1L);
+    }
+
     private ExternalRecipeFavorite favorite(String id, String title) {
         ExternalRecipeFavorite favorite = new ExternalRecipeFavorite();
         favorite.setId(1L);

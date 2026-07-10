@@ -693,6 +693,26 @@ class RecipeResourceTest {
     }
 
     @Test
+    void remove_favorite_should_not_require_recipe_payload() {
+        AppUser currentUser = user();
+        Recipe updated = recipe("Broken old favorite");
+        updated.setOwner(currentUser);
+        updated.setFavorite(false);
+        updated.setIngredients("");
+        updated.setInstructions("");
+        doReturn(currentUser).when(userContext).requireUser("Bearer valid-token");
+        doReturn(updated).when(recipeService).removeFavorite(1L, currentUser);
+
+        given()
+                .header("Authorization", "Bearer valid-token")
+                .when().delete("/recipes/1/favorite")
+                .then()
+                .statusCode(204);
+
+        verify(recipeService).removeFavorite(1L, currentUser);
+    }
+
+    @Test
     void update_should_return_bad_request_when_calories_is_negative() {
         given()
                 .contentType(ContentType.JSON)

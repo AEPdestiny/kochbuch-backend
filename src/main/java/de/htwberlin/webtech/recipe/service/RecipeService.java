@@ -171,6 +171,14 @@ public class RecipeService {
     }
 
     @Transactional
+    public Recipe removeFavorite(Long id, AppUser currentUser) {
+        Recipe existing = findById(id);
+        ensureOwner(existing, currentUser);
+        existing.setFavorite(false);
+        return existing;
+    }
+
+    @Transactional
     public void delete(Long id) {
         boolean deleted = repo.deleteById(id);
         if (!deleted) {

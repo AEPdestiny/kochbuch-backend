@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -452,6 +453,40 @@ class RecipeServiceTest {
 
         verify(repo).findById(1L);
         verifyNoMoreInteractions(repo);
+    }
+
+    @Test
+    @DisplayName("removeFavorite should clear favorite without validating recipe content")
+    void removeFavorite_should_clear_favorite_without_validating_recipe_content() {
+        var owner = user(1L, "owner@example.com");
+        var existing = recipe("Broken favorite");
+        existing.setOwner(owner);
+        existing.setFavorite(true);
+        existing.setIngredients("");
+        existing.setInstructions("");
+        doReturn(existing).when(repo).findById(1L);
+
+        var result = underTest.removeFavorite(1L, owner);
+
+        verify(repo).findById(1L);
+        verifyNoMoreInteractions(repo);
+        assertSame(existing, result);
+        assertFalse(result.isFavorite());
+    }
+
+    @Test
+    @DisplayName("removeFavorite should reject different user")
+    void removeFavorite_should_reject_different_user() {
+        var existing = recipe("Favorite");
+        existing.setOwner(user(1L, "owner@example.com"));
+        existing.setFavorite(true);
+        doReturn(existing).when(repo).findById(1L);
+
+        assertThrows(ForbiddenException.class, () -> underTest.removeFavorite(1L, user(2L, "other@example.com")));
+
+        verify(repo).findById(1L);
+        verifyNoMoreInteractions(repo);
+        assertTrue(existing.isFavorite());
     }
 
     private Recipe recipe(String title) {

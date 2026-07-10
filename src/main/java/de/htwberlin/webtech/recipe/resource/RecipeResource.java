@@ -152,6 +152,19 @@ public class RecipeResource {
     }
 
     @DELETE
+    @Path("/{id}/favorite")
+    @Operation(summary = "Remove recipe favorite", description = "Removes the favorite flag from an owned recipe without updating recipe content.")
+    @APIResponse(responseCode = "204", description = "Favorite removed")
+    @APIResponse(responseCode = "401", description = "Missing or invalid Bearer token")
+    @APIResponse(responseCode = "403", description = "Only the owner may update the favorite flag")
+    @APIResponse(responseCode = "404", description = "Recipe not found")
+    public Response removeFavorite(@PathParam("id") Long id, @HeaderParam("Authorization") String authorizationHeader) {
+        AppUser currentUser = userContext.requireUser(authorizationHeader);
+        service.removeFavorite(id, currentUser);
+        return Response.noContent().build();
+    }
+
+    @DELETE
     @Path("/{id}")
     @Operation(summary = "Delete recipe", description = "Deletes an existing local recipe.")
     @APIResponse(responseCode = "204", description = "Recipe deleted")

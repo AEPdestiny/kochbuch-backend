@@ -38,6 +38,16 @@ public class ExternalRecipeFavoriteService {
                 .ifPresent(repository::delete);
     }
 
+    @Transactional
+    public void removeById(AppUser owner, Long favoriteId) {
+        if (favoriteId == null) {
+            return;
+        }
+        repository.findByIdOptional(favoriteId)
+                .filter(favorite -> isOwner(favorite, owner))
+                .ifPresent(repository::delete);
+    }
+
     private ExternalRecipeFavorite create(AppUser owner, String externalRecipeId, String title, String imageUrl, String source) {
         ExternalRecipeFavorite favorite = new ExternalRecipeFavorite();
         favorite.setOwner(owner);
@@ -69,5 +79,12 @@ public class ExternalRecipeFavoriteService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean isOwner(ExternalRecipeFavorite favorite, AppUser owner) {
+        return favorite.getOwner() != null
+                && owner != null
+                && favorite.getOwner().getId() != null
+                && favorite.getOwner().getId().equals(owner.getId());
     }
 }
