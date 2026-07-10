@@ -110,7 +110,9 @@ public final class RecipeIngredientNormalizer {
         String cleaned = HTML_TAG.matcher(value).replaceAll(" ")
                 .replaceAll("\\s+", " ")
                 .trim();
-        cleaned = cleaned.replaceAll("^[,;:.\\-\\s]+", "").replaceAll("[,;:.\\-\\s]+$", "").trim();
+        cleaned = cleaned.replaceAll("^[\\s\\u2022\\u00B7\\u25CF*\\-\\u2013\\u2014.:),;]+", "")
+                .replaceAll("[,;:.\\-\\s]+$", "")
+                .trim();
         cleaned = LEADING_SERVINGS.matcher(cleaned).replaceFirst("").trim();
         cleaned = LEADING_ZERO_UNIT.matcher(cleaned).replaceFirst("").trim();
         cleaned = cleaned.replaceAll("\\s+[01](?:[,.]0+)?$", "").trim();

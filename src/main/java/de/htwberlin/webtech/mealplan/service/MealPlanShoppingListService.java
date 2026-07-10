@@ -199,6 +199,7 @@ public class MealPlanShoppingListService {
 
     private ParsedIngredient parseIngredient(String ingredient, String recipeTitle) {
         String cleaned = normalizeQuantityGlyphs(ingredient == null ? "" : ingredient.trim())
+                .replaceFirst("^[\\s\\u2022\\u00B7\\u25CF*\\-\\u2013\\u2014.:)]+", "")
                 .replaceAll("\\s+", " ");
         if (cleaned.isBlank()) {
             return new ParsedIngredient("", null, null, recipeTitle, ingredient);

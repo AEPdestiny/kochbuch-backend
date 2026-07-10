@@ -125,6 +125,28 @@ class RecipeIngredientNormalizerTest {
     }
 
     @Test
+    void normalizeToList_should_strip_leading_bullet_and_list_markers() {
+        assertEquals(
+                List.of(
+                        "1/2 tbsp soy sauce",
+                        "2 package shrimp flavored udon",
+                        "scallion, finely cut",
+                        "1/2 cup fish cake, thinly sliced flat",
+                        "1 tsp minced garlic",
+                        "2 eggs, poached"
+                ),
+                RecipeIngredientNormalizer.normalizeToList("""
+                        \u20221/2 tbsp soy sauce
+                        - 2 package shrimp flavored udon
+                        \u2022scallion, finely cut
+                        .1/2 cup fish cake, thinly sliced flat
+                        .1 tsp minced garlic
+                        \u20222 eggs, poached
+                        """)
+        );
+    }
+
+    @Test
     void normalizeToText_should_return_frontend_compatible_newline_text() {
         assertEquals(
                 "200 g Tomaten\n150 g Pasta",

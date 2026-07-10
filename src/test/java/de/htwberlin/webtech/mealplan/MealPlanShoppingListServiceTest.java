@@ -325,6 +325,38 @@ class MealPlanShoppingListServiceTest {
         assertEquals(0, BigDecimal.ONE.compareTo(items.get(3).getQuantity()));
     }
 
+    @Test
+    @DisplayName("createShoppingList should strip bullet markers before parsing ingredients")
+    void createShoppingList_should_strip_bullet_markers_before_parsing_ingredients() {
+        AppUser owner = user(1L);
+        LocalDate weekStart = LocalDate.of(2026, 6, 1);
+        doReturn(List.of(mealPlan(owner, recipe("Bullet Ingredients",
+                "\u20221/2 tbsp soy sauce\n\u20222 package shrimp flavored udon\n\u2022scallion, finely cut\n.1/2 cup fish cake, thinly sliced flat\n.1 tsp minced garlic\n\u20222 eggs, poached"))))
+                .when(mealPlanRepository).findByOwnerAndPlannedDateBetween(owner, weekStart, weekStart.plusDays(6));
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(owner);
+        doReturn(List.of()).when(shoppingListItemRepository).findByOwner(owner);
+
+        underTest.createShoppingList(owner, weekStart);
+
+        ArgumentCaptor<ShoppingListItem> captor = ArgumentCaptor.forClass(ShoppingListItem.class);
+        verify(shoppingListItemRepository, org.mockito.Mockito.times(6)).persist(captor.capture());
+        List<ShoppingListItem> items = captor.getAllValues();
+        assertEquals(List.of(
+                "soy sauce",
+                "shrimp flavored udon",
+                "scallion, finely cut",
+                "fish cake, thinly sliced flat",
+                "minced garlic",
+                "eggs, poached"
+        ), items.stream().map(ShoppingListItem::getName).toList());
+        assertEquals(java.util.Arrays.asList("tbsp", "package", null, "cup", "tsp", null),
+                items.stream().map(ShoppingListItem::getUnit).toList());
+        assertEquals(0, new BigDecimal("0.5").compareTo(items.get(0).getQuantity()));
+        assertEquals(0, BigDecimal.valueOf(2).compareTo(items.get(1).getQuantity()));
+        assertEquals(0, BigDecimal.ONE.compareTo(items.get(4).getQuantity()));
+        assertEquals(0, BigDecimal.valueOf(2).compareTo(items.get(5).getQuantity()));
+    }
+
     private AppUser user(Long id) {
         AppUser user = new AppUser();
         user.setId(id);
