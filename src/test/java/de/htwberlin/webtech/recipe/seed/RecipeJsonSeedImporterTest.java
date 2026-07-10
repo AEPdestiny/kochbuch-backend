@@ -252,6 +252,40 @@ class RecipeJsonSeedImporterTest {
     }
 
     @Test
+    void importStream_should_preserve_supported_units_when_structured_ingredient_has_no_original_text() {
+        RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
+        when(persistence.upsertSeedRecipe(any(Recipe.class))).thenReturn(true);
+        RecipeJsonSeedImporter importer = new RecipeJsonSeedImporter(persistence, new ObjectMapper());
+        String json = """
+                [
+                  {
+                    "id": 92001,
+                    "language": "en",
+                    "title": "Unit Test Recipe",
+                    "instructions": "Mix.",
+                    "extendedIngredients": [
+                      { "name": "ham", "amount": 6, "unit": "ounces" },
+                      { "name": "oil", "amount": 1.25, "unit": "t" },
+                      { "name": "parsley", "amount": 2, "unit": "stalks" }
+                    ]
+                  }
+                ]
+                """;
+
+        int imported = importer.importStream(
+                new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)),
+                "inline.json",
+                "lunch",
+                "en"
+        );
+
+        ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
+        verify(persistence).upsertSeedRecipe(captor.capture());
+        assertEquals(1, imported);
+        assertEquals("6 Unzen ham\n1,25 TL oil\n2 Stiele parsley", captor.getValue().getIngredients());
+    }
+
+    @Test
     void importStream_should_normalize_safe_german_title_terms() {
         RecipeSeedPersistence persistence = mock(RecipeSeedPersistence.class);
         when(persistence.upsertSeedRecipe(any(Recipe.class))).thenReturn(true);

@@ -751,6 +751,7 @@ class DishlyAiOrchestratorTest {
         AppUser user = user();
         stubEmptyContext(user);
         LocalDate sunday = nextOrSame(java.time.DayOfWeek.SUNDAY);
+        String sundayLabel = mealPlanDayLabel(sunday);
         doReturn(new AiMealPlanToolResult(true, false, "Omelett mit Kartoffeln", null, sunday, MealSlot.DINNER))
                 .when(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Omelett mit Kartoffeln");
 
@@ -759,7 +760,7 @@ class DishlyAiOrchestratorTest {
         ));
 
         assertTrue(response.isConfigured());
-        assertEquals("Erledigt. Ich habe Omelett mit Kartoffeln fuer Sonntag Abend in deinen Wochenplan eingetragen.", response.getMessage());
+        assertEquals("Erledigt. Ich habe Omelett mit Kartoffeln fuer " + sundayLabel + " Abend in deinen Wochenplan eingetragen.", response.getMessage());
         verify(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Omelett mit Kartoffeln");
         verifyNoInteractions(shoppingListTool);
         verifyNoInteractions(groqClient);
@@ -786,6 +787,7 @@ class DishlyAiOrchestratorTest {
         AppUser user = user();
         stubEmptyContext(user);
         LocalDate sunday = nextOrSame(java.time.DayOfWeek.SUNDAY);
+        String sundayLabel = mealPlanDayLabel(sunday);
         List<String> ingredients = List.of("Ei", "Salz", "Pfeffer");
         doReturn(new AiMealPlanToolResult(true, false, "Eiersalat", null, sunday, MealSlot.DINNER))
                 .when(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
@@ -801,7 +803,7 @@ class DishlyAiOrchestratorTest {
                         """)));
 
         assertTrue(response.isConfigured());
-        assertEquals("Erledigt. Ich habe Eiersalat fuer Sonntag Abend in deinen Wochenplan eingetragen und Salz und Pfeffer zur Einkaufsliste hinzugefuegt.", response.getMessage());
+        assertEquals("Erledigt. Ich habe Eiersalat fuer " + sundayLabel + " Abend in deinen Wochenplan eingetragen und Salz und Pfeffer zur Einkaufsliste hinzugefuegt.", response.getMessage());
         verify(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
         verify(shoppingListTool).addMissingIngredients(user, ingredients);
         verifyNoInteractions(groqClient);
@@ -812,6 +814,7 @@ class DishlyAiOrchestratorTest {
         AppUser user = user();
         stubEmptyContext(user);
         LocalDate sunday = nextOrSame(java.time.DayOfWeek.SUNDAY);
+        String sundayLabel = mealPlanDayLabel(sunday);
         List<String> ingredients = List.of("Ei", "Salz", "Pfeffer");
         doReturn(new AiMealPlanToolResult(true, false, "Eiersalat", null, sunday, MealSlot.DINNER))
                 .when(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
@@ -826,7 +829,7 @@ class DishlyAiOrchestratorTest {
                         """)));
 
         assertTrue(response.isConfigured());
-        assertEquals("Erledigt. Ich habe Eiersalat fuer Sonntag Abend in deinen Wochenplan eingetragen und Pfeffer zur Einkaufsliste hinzugefuegt.", response.getMessage());
+        assertEquals("Erledigt. Ich habe Eiersalat fuer " + sundayLabel + " Abend in deinen Wochenplan eingetragen und Pfeffer zur Einkaufsliste hinzugefuegt.", response.getMessage());
         verify(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
         verify(shoppingListTool).addMissingIngredients(user, ingredients);
         verifyNoInteractions(groqClient);
@@ -856,6 +859,7 @@ class DishlyAiOrchestratorTest {
         AppUser user = user();
         stubEmptyContext(user);
         LocalDate sunday = nextOrSame(java.time.DayOfWeek.SUNDAY);
+        String sundayLabel = mealPlanDayLabel(sunday);
         doReturn(new AiMealPlanToolResult(false, true, "Eiersalat", "Pasta", sunday, MealSlot.DINNER))
                 .when(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
 
@@ -867,7 +871,7 @@ class DishlyAiOrchestratorTest {
                         """)));
 
         assertTrue(response.isConfigured());
-        assertEquals("Fuer Sonntag Abend ist bereits Pasta eingetragen. Soll ich es ersetzen? Die fehlenden Zutaten habe ich nicht hinzugefuegt, bis wir das geklaert haben.", response.getMessage());
+        assertEquals("Fuer " + sundayLabel + " Abend ist bereits Pasta eingetragen. Soll ich es ersetzen? Die fehlenden Zutaten habe ich nicht hinzugefuegt, bis wir das geklaert haben.", response.getMessage());
         verify(mealPlanTool).addToMealPlan(user, sunday, MealSlot.DINNER, null, "Eiersalat");
         verifyNoInteractions(shoppingListTool);
         verifyNoInteractions(groqClient);
@@ -933,5 +937,27 @@ class DishlyAiOrchestratorTest {
 
     private LocalDate nextOrSame(java.time.DayOfWeek dayOfWeek) {
         return LocalDate.now().with(java.time.temporal.TemporalAdjusters.nextOrSame(dayOfWeek));
+    }
+
+    private String mealPlanDayLabel(LocalDate date) {
+        long days = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), date);
+        if (days == 0) {
+            return "heute";
+        }
+        if (days == 1) {
+            return "morgen";
+        }
+        if (days == 2) {
+            return "uebermorgen";
+        }
+        return switch (date.getDayOfWeek()) {
+            case MONDAY -> "Montag";
+            case TUESDAY -> "Dienstag";
+            case WEDNESDAY -> "Mittwoch";
+            case THURSDAY -> "Donnerstag";
+            case FRIDAY -> "Freitag";
+            case SATURDAY -> "Samstag";
+            case SUNDAY -> "Sonntag";
+        };
     }
 }

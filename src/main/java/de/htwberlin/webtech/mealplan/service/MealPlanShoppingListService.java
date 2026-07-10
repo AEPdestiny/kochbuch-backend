@@ -42,10 +42,12 @@ public class MealPlanShoppingListService {
     private static final Set<String> GRAM_UNITS = Set.of("g", "kg");
     private static final Set<String> MILLILITER_UNITS = Set.of("ml", "l");
     private static final Set<String> COUNT_UNITS = Set.of(
-            "stück", "stueck", "stuck", "stk", "ei", "eier", "zehe", "zehen", "scheibe", "scheiben",
-            "packung", "packungen", "dose", "dosen"
+            "stueck", "stk", "ei", "eier", "zehe", "zehen", "stiel", "stiele", "scheibe", "scheiben",
+            "packung", "packungen", "dose", "dosen", "bund"
     );
-    private static final Set<String> UNSAFE_COUNT_UNITS = Set.of("tl", "el", "prise", "prisen", "tasse", "cup");
+    private static final Set<String> UNSAFE_COUNT_UNITS = Set.of(
+            "tl", "el", "prise", "prisen", "tasse", "unzen", "oz", "pfund"
+    );
     private static final Set<String> ALL_UNITS = union(GRAM_UNITS, MILLILITER_UNITS, COUNT_UNITS, UNSAFE_COUNT_UNITS);
 
     private final MealPlanRepository mealPlanRepository;
@@ -197,13 +199,18 @@ public class MealPlanShoppingListService {
     }
 
     private ParsedIngredient parseIngredient(String ingredient, String recipeTitle) {
-        String cleaned = ingredient == null ? "" : ingredient.trim().replaceAll("\\s+", " ");
+        String cleaned = normalizeQuantityGlyphs(ingredient == null ? "" : ingredient.trim())
+                .replaceAll("\\s+", " ");
         if (cleaned.isBlank()) {
             return new ParsedIngredient("", null, null, recipeTitle, ingredient);
         }
         String[] parts = cleaned.split(" ", 3);
         BigDecimal quantity = parseQuantity(parts[0]);
         if (quantity == null) {
+            ParsedIngredient unitOnly = parseLeadingUnitWithoutQuantity(cleaned, recipeTitle, ingredient);
+            if (!unitOnly.name().isBlank()) {
+                return unitOnly;
+            }
             return new ParsedIngredient(cleaned, null, null, recipeTitle, ingredient);
         }
         if (parts.length == 1) {
@@ -215,6 +222,44 @@ public class MealPlanShoppingListService {
         }
         String name = cleaned.substring(parts[0].length()).trim();
         return new ParsedIngredient(name, quantity, null, recipeTitle, ingredient);
+    }
+
+    private ParsedIngredient parseLeadingUnitWithoutQuantity(String cleaned, String recipeTitle, String rawIngredient) {
+        String[] parts = cleaned.split(" ", 4);
+        int index = 0;
+        while (index < parts.length && isSizeDescriptor(parts[index])) {
+            index++;
+        }
+        if (index < parts.length - 1) {
+            String possibleUnit = canonicalUnit(parts[index]);
+            if (ALL_UNITS.contains(possibleUnit)) {
+                String name = String.join(" ", java.util.Arrays.copyOfRange(parts, index + 1, parts.length)).trim();
+                return new ParsedIngredient(name, null, possibleUnit, recipeTitle, rawIngredient);
+            }
+        }
+        return new ParsedIngredient("", null, null, recipeTitle, rawIngredient);
+    }
+
+    private boolean isSizeDescriptor(String value) {
+        String normalized = normalizeName(value);
+        return normalized.equals("large")
+                || normalized.equals("small")
+                || normalized.equals("medium")
+                || normalized.equals("gross")
+                || normalized.equals("klein")
+                || normalized.equals("mittel");
+    }
+
+    private String normalizeQuantityGlyphs(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value
+                .replace("\u00bc", "1/4")
+                .replace("\u00bd", "1/2")
+                .replace("\u00be", "3/4")
+                .replace("\u2153", "1/3")
+                .replace("\u2154", "2/3");
     }
 
     private BigDecimal parseQuantity(String value) {
@@ -258,7 +303,8 @@ public class MealPlanShoppingListService {
         String normalized = Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9äöüß ]", " ")
+                .replace("ß", "ss")
+                .replaceAll("[^a-z0-9 ]", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
         return normalized;
@@ -307,17 +353,22 @@ public class MealPlanShoppingListService {
         }
         String normalized = normalizeName(unit);
         return switch (normalized) {
-            case "stueck", "stuck", "stk", "stück" -> "stueck";
-            case "essloeffel", "esslöffel", "tbsp", "tablespoon" -> "el";
-            case "teeloeffel", "teelöffel", "tsp", "teaspoon" -> "tl";
-            case "pinch" -> "prise";
+            case "stueck", "stuck", "stk" -> "stueck";
+            case "essloeffel", "essloffel", "tbsp", "tbsps", "tablespoon", "tablespoons" -> "el";
+            case "teeloeffel", "teeloffel", "tsp", "tsps", "teaspoon", "teaspoons", "t" -> "tl";
+            case "pinch", "pinches" -> "prise";
             case "clove" -> "zehe";
             case "cloves" -> "zehen";
+            case "stalk" -> "stiel";
+            case "stalks" -> "stiele";
             case "slice" -> "scheibe";
             case "slices" -> "scheiben";
             case "can" -> "dose";
             case "cans" -> "dosen";
-            case "cup" -> "tasse";
+            case "cup", "cups" -> "tasse";
+            case "ounce", "ounces", "unze", "unzen", "oz" -> "unzen";
+            case "pound", "pounds", "pfund", "lb", "lbs" -> "pfund";
+            case "bunch" -> "bund";
             case "piece", "pieces" -> "stueck";
             case "pack", "packs" -> "packung";
             default -> normalized;

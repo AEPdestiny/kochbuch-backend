@@ -11,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -260,6 +261,46 @@ class RecipeServiceTest {
         verify(repo).findById(1L);
         verifyNoMoreInteractions(repo);
         assertSame(published, result);
+    }
+
+    @Test
+    @DisplayName("findVisibleById should return public seed sibling for requested language")
+    void findVisibleById_should_return_public_seed_sibling_for_requested_language() {
+        var english = recipe("Blueberry Muffins");
+        english.setId(1L);
+        english.setExternalId("635547");
+        english.setCategory("breakfast");
+        english.setLanguage("en");
+        var german = recipe("Blaubeer-Muffins");
+        german.setId(2L);
+        german.setExternalId("635547");
+        german.setCategory("breakfast");
+        german.setLanguage("de");
+        doReturn(english).when(repo).findById(1L);
+        doReturn(Optional.of(german)).when(repo).findPublishedSeedSibling(english, "de");
+
+        var result = underTest.findVisibleById(1L, null, "de");
+
+        verify(repo).findById(1L);
+        verify(repo).findPublishedSeedSibling(english, "de");
+        verifyNoMoreInteractions(repo);
+        assertSame(german, result);
+    }
+
+    @Test
+    @DisplayName("findVisibleById should keep user recipe when language is requested")
+    void findVisibleById_should_keep_user_recipe_when_language_is_requested() {
+        var owner = user(1L, "owner@example.com");
+        var owned = recipe("Own Pasta");
+        owned.setOwner(owner);
+        owned.setLanguage("en");
+        doReturn(owned).when(repo).findById(1L);
+
+        var result = underTest.findVisibleById(1L, owner, "de");
+
+        verify(repo).findById(1L);
+        verifyNoMoreInteractions(repo);
+        assertSame(owned, result);
     }
 
     @Test

@@ -520,8 +520,7 @@ public class RecipeJsonSeedImporter {
             return false;
         }
         String normalized = original.toLowerCase();
-        return normalized.matches(".*\\b(ounce|ounces|oz|pound|pounds|lb|lbs|teaspoon|teaspoons|tablespoon|tablespoons|tbsp|tsp|cup|cups)\\b.*")
-                || normalized.matches(".*\\b0\\.0[0-9]+\\b.*")
+        return normalized.matches(".*\\b0\\.0[0-9]+\\b.*")
                 || normalized.matches(".*\\b[0-9]+\\.[0-9]{2,}\\b.*");
     }
 
@@ -539,11 +538,16 @@ public class RecipeJsonSeedImporter {
             return "";
         }
         return switch (unit.trim().toLowerCase()) {
-            case "teaspoon", "teaspoons", "tsp" -> "TL";
-            case "tablespoon", "tablespoons", "tbsp" -> "EL";
-            case "ounce", "ounces", "oz" -> "g";
-            case "pound", "pounds", "lb", "lbs" -> "g";
-            case "cup", "cups" -> "ml";
+            case "teaspoon", "teaspoons", "tsp", "tsps", "t" -> "TL";
+            case "tablespoon", "tablespoons", "tbsp", "tbsps" -> "EL";
+            case "cup", "cups" -> "Tasse";
+            case "ounce", "ounces", "oz" -> "Unzen";
+            case "pound", "pounds", "lb", "lbs" -> "Pfund";
+            case "clove", "cloves" -> "Zehen";
+            case "bunch" -> "Bund";
+            case "stalk", "stalks" -> "Stiele";
+            case "pinch" -> "Prise";
+            case "piece", "pieces" -> "Stueck";
             default -> unit.trim();
         };
     }
@@ -564,7 +568,6 @@ public class RecipeJsonSeedImporter {
             return String.valueOf((long) number);
         }
         return BigDecimal.valueOf(number)
-                .setScale(number < 1 ? 2 : 1, java.math.RoundingMode.HALF_UP)
                 .stripTrailingZeros()
                 .toPlainString()
                 .replace(".", ",");

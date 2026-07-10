@@ -117,9 +117,15 @@ public class RecipeResource {
     @Operation(summary = "Get recipe by id", description = "Returns one recipe by its technical id.")
     @APIResponse(responseCode = "200", description = "Recipe returned")
     @APIResponse(responseCode = "404", description = "Recipe not found")
-    public RecipeResponse getById(@PathParam("id") Long id, @HeaderParam("Authorization") String authorizationHeader) {
+    public RecipeResponse getById(
+            @PathParam("id") Long id,
+            @QueryParam("language") String language,
+            @HeaderParam("Authorization") String authorizationHeader
+    ) {
         AppUser currentUser = userContext.currentUserOrNull(authorizationHeader);
-        Recipe recipe = service.findVisibleById(id, currentUser);
+        Recipe recipe = language == null || language.isBlank()
+                ? service.findVisibleById(id, currentUser)
+                : service.findVisibleById(id, currentUser, language);
         RecipeResponse response = mapper.toResponse(recipe);
         response.setOwnedByCurrentUser(isOwner(recipe, currentUser));
         if (!isOwner(recipe, currentUser)) {

@@ -275,6 +275,9 @@ Für Funktionen, die externe APIs nutzen (externe Rezepte, Restaurantsuche, Bild
 `application.properties`-Werte gesetzt sein (siehe Tabelle unten). Ohne diese Keys starten Backend und die übrigen Endpunkte trotzdem — die jeweilige Funktion liefert
 dann Fehler oder eine Konfigurationsmeldung.
 
+Eine sichere Vorlage liegt in `.env.example`. Für lokale oder Production-Werte diese Datei kopieren und mit eigenen Werten befüllen, echte Secrets aber niemals
+committen. Die lokalen Dateien `.env`, `.env.local`, `.env.development.local` und `.env.production.local` sind über `.gitignore` ausgeschlossen.
+
 ### 2. Frontend starten
 
 ```bash
@@ -294,10 +297,14 @@ konfiguriert. CORS ist im Backend-Dev-Profil standardmäßig für genau diesen O
 | `JWT_SECRET` (mind. 32 Zeichen) | Auth | Ja — Start bricht sonst ab |
 | `JWT_ISSUER`, `JWT_EXPIRES_IN_SECONDS` | Auth | Nein (Defaults vorhanden) |
 | `CORS_ORIGINS` | CORS | Ja |
-| `spoonacular.api.keys` / `spoonacular.api.key` | Externe Rezepte | Nein, aber ohne Key keine externen Rezepte |
-| `tavily.api.key` | Anleitungssuche, Restaurantsuche | Nein, aber ohne Key keine Tavily-Suche |
+| `SPOONACULAR_API_KEYS` / `SPOONACULAR_API_KEY` | Externe Rezepte | Nein, aber ohne Key keine externen Rezepte |
+| `TAVILY_API_KEY` | Anleitungssuche, Restaurantsuche | Nein, aber ohne Key keine Tavily-Suche |
 | `GEOAPIFY_API_KEY` | Restaurantsuche (Geocoding) | Nein, aber ohne Key kein Geocoding |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET` | Bild-Upload | Nein, aber ohne Werte kein Bild-Upload |
+| `GROQ_API_KEY`, `GROQ_MODEL` | Dishly AI | Nein, Dishly AI meldet ohne Key kontrolliert "nicht konfiguriert" |
+
+`SPOONACULAR_API_KEYS`, `SPOONACULAR_API_KEY`, `TAVILY_API_KEY` und `GROQ_API_KEY` werden von Quarkus auf die intern verwendeten Properties
+`spoonacular.api.keys`, `spoonacular.api.key`, `tavily.api.key` und `groq.api.key` gemappt.
 
 ## Projektstruktur
 

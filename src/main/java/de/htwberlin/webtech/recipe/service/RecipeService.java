@@ -133,8 +133,19 @@ public class RecipeService {
     }
 
     public Recipe findVisibleById(Long id, AppUser currentUser) {
+        return findVisibleById(id, currentUser, null);
+    }
+
+    public Recipe findVisibleById(Long id, AppUser currentUser, String language) {
         Recipe recipe = findById(id);
         if (recipe.isPublished() || isOwner(recipe, currentUser)) {
+            if (recipe.isPublished() && !isOwner(recipe, currentUser) && hasText(language)) {
+                String requestedLanguage = normalizeLanguage(language);
+                String recipeLanguage = normalizeLanguage(recipe.getLanguage());
+                if (!requestedLanguage.equals(recipeLanguage)) {
+                    return repo.findPublishedSeedSibling(recipe, requestedLanguage).orElse(recipe);
+                }
+            }
             return recipe;
         }
         throw new RecipeNotFoundException(id);

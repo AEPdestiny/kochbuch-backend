@@ -113,6 +113,28 @@ public class RecipeRepository implements PanacheRepository<Recipe> {
         ).firstResultOptional();
     }
 
+    public Optional<Recipe> findPublishedSeedSibling(Recipe recipe, String language) {
+        if (recipe == null
+                || recipe.getOwner() != null
+                || recipe.getExternalId() == null
+                || recipe.getExternalId().isBlank()
+                || recipe.getCategory() == null
+                || recipe.getCategory().isBlank()) {
+            return Optional.empty();
+        }
+        return find("""
+                owner is null
+                and published = true
+                and externalId = ?1
+                and lower(category) = ?2
+                and lower(coalesce(language, 'en')) = ?3
+                """,
+                recipe.getExternalId().trim(),
+                recipe.getCategory().toLowerCase(),
+                normalizeLanguage(language)
+        ).firstResultOptional();
+    }
+
     public Optional<Recipe> findSeedByTitleCategoryAndLanguage(String title, String category, String language) {
         return find("""
                 owner is null
