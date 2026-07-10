@@ -39,14 +39,13 @@ import java.util.Set;
 public class MealPlanShoppingListService {
 
     private static final String CATEGORY = "Wochenplan";
-    private static final Set<String> GRAM_UNITS = Set.of("g", "kg");
+    private static final Set<String> GRAM_UNITS = Set.of("g", "kg", "oz", "lb");
     private static final Set<String> MILLILITER_UNITS = Set.of("ml", "l");
     private static final Set<String> COUNT_UNITS = Set.of(
-            "stueck", "stk", "ei", "eier", "zehe", "zehen", "stiel", "stiele", "scheibe", "scheiben",
-            "packung", "packungen", "dose", "dosen", "bund"
+            "piece", "stk", "ei", "eier", "clove", "stalk", "slice", "package", "can", "bunch"
     );
     private static final Set<String> UNSAFE_COUNT_UNITS = Set.of(
-            "tl", "el", "prise", "prisen", "tasse", "unzen", "oz", "pfund"
+            "tsp", "tbsp", "pinch", "cup"
     );
     private static final Set<String> ALL_UNITS = union(GRAM_UNITS, MILLILITER_UNITS, COUNT_UNITS, UNSAFE_COUNT_UNITS);
 
@@ -351,26 +350,30 @@ public class MealPlanShoppingListService {
         if (unit == null || unit.isBlank()) {
             return null;
         }
+        String trimmed = unit.trim();
+        if ("T".equals(trimmed)) {
+            return "tbsp";
+        }
+        if ("t".equals(trimmed)) {
+            return "tsp";
+        }
         String normalized = normalizeName(unit);
         return switch (normalized) {
-            case "stueck", "stuck", "stk" -> "stueck";
-            case "essloeffel", "essloffel", "tbsp", "tbsps", "tablespoon", "tablespoons" -> "el";
-            case "teeloeffel", "teeloffel", "tsp", "tsps", "teaspoon", "teaspoons", "t" -> "tl";
-            case "pinch", "pinches" -> "prise";
-            case "clove" -> "zehe";
-            case "cloves" -> "zehen";
-            case "stalk" -> "stiel";
-            case "stalks" -> "stiele";
-            case "slice" -> "scheibe";
-            case "slices" -> "scheiben";
-            case "can" -> "dose";
-            case "cans" -> "dosen";
-            case "cup", "cups" -> "tasse";
-            case "ounce", "ounces", "unze", "unzen", "oz" -> "unzen";
-            case "pound", "pounds", "pfund", "lb", "lbs" -> "pfund";
-            case "bunch" -> "bund";
-            case "piece", "pieces" -> "stueck";
-            case "pack", "packs" -> "packung";
+            case "gram", "grams" -> "g";
+            case "liter", "liters", "litre", "litres" -> "l";
+            case "stueck", "stuck", "stk", "piece", "pieces" -> "piece";
+            case "essloeffel", "essloffel", "el", "tbsp", "tbsps", "tablespoon", "tablespoons" -> "tbsp";
+            case "teeloeffel", "teeloffel", "tl", "tsp", "tsps", "teaspoon", "teaspoons" -> "tsp";
+            case "prise", "prisen", "pinch", "pinches" -> "pinch";
+            case "zehe", "zehen", "clove", "cloves" -> "clove";
+            case "stiel", "stiele", "stalk", "stalks" -> "stalk";
+            case "scheibe", "scheiben", "slice", "slices" -> "slice";
+            case "dose", "dosen", "can", "cans" -> "can";
+            case "tasse", "tassen", "cup", "cups" -> "cup";
+            case "ounce", "ounces", "unze", "unzen", "oz" -> "oz";
+            case "pound", "pounds", "pfund", "lb", "lbs" -> "lb";
+            case "bund", "bunch", "bunches" -> "bunch";
+            case "packung", "packungen", "paket", "pakete", "package", "packages", "pack", "packs" -> "package";
             default -> normalized;
         };
     }
@@ -383,6 +386,12 @@ public class MealPlanShoppingListService {
         if ("kg".equals(canonical) || "l".equals(canonical)) {
             return quantity.multiply(BigDecimal.valueOf(1000));
         }
+        if ("oz".equals(canonical)) {
+            return quantity.multiply(BigDecimal.valueOf(28.3495));
+        }
+        if ("lb".equals(canonical)) {
+            return quantity.multiply(BigDecimal.valueOf(453.59237));
+        }
         if (GRAM_UNITS.contains(canonical) || MILLILITER_UNITS.contains(canonical) || COUNT_UNITS.contains(canonical)) {
             return quantity;
         }
@@ -393,6 +402,12 @@ public class MealPlanShoppingListService {
         String canonical = canonicalUnit(unit);
         if ("kg".equals(canonical) || "l".equals(canonical)) {
             return quantity.divide(BigDecimal.valueOf(1000), 3, RoundingMode.HALF_UP).stripTrailingZeros();
+        }
+        if ("oz".equals(canonical)) {
+            return quantity.divide(BigDecimal.valueOf(28.3495), 3, RoundingMode.HALF_UP).stripTrailingZeros();
+        }
+        if ("lb".equals(canonical)) {
+            return quantity.divide(BigDecimal.valueOf(453.59237), 3, RoundingMode.HALF_UP).stripTrailingZeros();
         }
         return quantity.stripTrailingZeros();
     }

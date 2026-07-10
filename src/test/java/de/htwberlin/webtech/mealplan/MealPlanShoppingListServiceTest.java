@@ -214,11 +214,11 @@ class MealPlanShoppingListServiceTest {
         ArgumentCaptor<ShoppingListItem> captor = ArgumentCaptor.forClass(ShoppingListItem.class);
         verify(shoppingListItemRepository).persist(captor.capture());
         assertEquals("Mehl", captor.getValue().getName());
-        assertEquals("tasse", captor.getValue().getUnit());
+        assertEquals("cup", captor.getValue().getUnit());
     }
 
     @Test
-    @DisplayName("createShoppingList should parse 'cup' as a recognized unit (canonical: tasse)")
+    @DisplayName("createShoppingList should parse 'cup' as a recognized unit")
     void createShoppingList_should_parse_cup_unit() {
         AppUser owner = user(1L);
         LocalDate weekStart = LocalDate.of(2026, 6, 1);
@@ -232,11 +232,11 @@ class MealPlanShoppingListServiceTest {
         ArgumentCaptor<ShoppingListItem> captor = ArgumentCaptor.forClass(ShoppingListItem.class);
         verify(shoppingListItemRepository).persist(captor.capture());
         assertEquals("Milch", captor.getValue().getName());
-        assertEquals("tasse", captor.getValue().getUnit());
+        assertEquals("cup", captor.getValue().getUnit());
     }
 
     @Test
-    @DisplayName("createShoppingList should parse 'piece' as a recognized unit (canonical: stueck)")
+    @DisplayName("createShoppingList should parse 'piece' as a recognized unit")
     void createShoppingList_should_parse_piece_unit() {
         AppUser owner = user(1L);
         LocalDate weekStart = LocalDate.of(2026, 6, 1);
@@ -250,7 +250,7 @@ class MealPlanShoppingListServiceTest {
         ArgumentCaptor<ShoppingListItem> captor = ArgumentCaptor.forClass(ShoppingListItem.class);
         verify(shoppingListItemRepository).persist(captor.capture());
         assertEquals("Tomate", captor.getValue().getName());
-        assertEquals("stueck", captor.getValue().getUnit());
+        assertEquals("piece", captor.getValue().getUnit());
     }
 
     @Test
@@ -269,7 +269,7 @@ class MealPlanShoppingListServiceTest {
         verify(shoppingListItemRepository).persist(captor.capture());
         assertEquals("Petersilie, gehackt", captor.getValue().getName());
         assertEquals(0, new BigDecimal("0.25").compareTo(captor.getValue().getQuantity()));
-        assertEquals("tasse", captor.getValue().getUnit());
+        assertEquals("cup", captor.getValue().getUnit());
     }
 
     @Test
@@ -289,10 +289,40 @@ class MealPlanShoppingListServiceTest {
         verify(shoppingListItemRepository, org.mockito.Mockito.times(4)).persist(captor.capture());
         List<ShoppingListItem> items = captor.getAllValues();
         assertEquals(List.of("ham", "Petersilie", "Öl", "Knoblauch"), items.stream().map(ShoppingListItem::getName).toList());
-        assertEquals("unzen", items.get(0).getUnit());
-        assertEquals("stiele", items.get(1).getUnit());
-        assertEquals("tl", items.get(2).getUnit());
-        assertEquals("zehen", items.get(3).getUnit());
+        assertEquals("oz", items.get(0).getUnit());
+        assertEquals("stalk", items.get(1).getUnit());
+        assertEquals("tsp", items.get(2).getUnit());
+        assertEquals("clove", items.get(3).getUnit());
+    }
+
+    @Test
+    @DisplayName("createShoppingList should parse package, spoon, weight and slice units")
+    void createShoppingList_should_parse_package_spoon_weight_and_slice_units() {
+        AppUser owner = user(1L);
+        LocalDate weekStart = LocalDate.of(2026, 6, 1);
+        doReturn(List.of(mealPlan(owner, recipe("Mixed Units",
+                "1 Packung Knorr-Sauce Hollandaise\n1 Teelöffel weißer Essig\n0.5 oz butter\n1 lb potatoes\n2 Scheiben Schinken\n3 slices ham"))))
+                .when(mealPlanRepository).findByOwnerAndPlannedDateBetween(owner, weekStart, weekStart.plusDays(6));
+        doReturn(List.of()).when(pantryItemRepository).findByOwner(owner);
+        doReturn(List.of()).when(shoppingListItemRepository).findByOwner(owner);
+
+        underTest.createShoppingList(owner, weekStart);
+
+        ArgumentCaptor<ShoppingListItem> captor = ArgumentCaptor.forClass(ShoppingListItem.class);
+        verify(shoppingListItemRepository, org.mockito.Mockito.times(6)).persist(captor.capture());
+        List<ShoppingListItem> items = captor.getAllValues();
+        assertEquals(List.of(
+                "Knorr-Sauce Hollandaise",
+                "weißer Essig",
+                "butter",
+                "potatoes",
+                "Schinken",
+                "ham"
+        ), items.stream().map(ShoppingListItem::getName).toList());
+        assertEquals(List.of("package", "tsp", "oz", "lb", "slice", "slice"),
+                items.stream().map(ShoppingListItem::getUnit).toList());
+        assertEquals(0, new BigDecimal("0.5").compareTo(items.get(2).getQuantity()));
+        assertEquals(0, BigDecimal.ONE.compareTo(items.get(3).getQuantity()));
     }
 
     private AppUser user(Long id) {

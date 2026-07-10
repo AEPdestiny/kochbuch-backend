@@ -266,7 +266,9 @@ class RecipeJsonSeedImporterTest {
                     "extendedIngredients": [
                       { "name": "ham", "amount": 6, "unit": "ounces" },
                       { "name": "oil", "amount": 1.25, "unit": "t" },
-                      { "name": "parsley", "amount": 2, "unit": "stalks" }
+                      { "name": "parsley", "amount": 2, "unit": "stalks" },
+                      { "name": "sauce", "amount": 1, "unit": "package" },
+                      { "name": "potatoes", "amount": 1, "unit": "lb" }
                     ]
                   }
                 ]
@@ -282,7 +284,7 @@ class RecipeJsonSeedImporterTest {
         ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
         verify(persistence).upsertSeedRecipe(captor.capture());
         assertEquals(1, imported);
-        assertEquals("6 Unzen ham\n1,25 TL oil\n2 Stiele parsley", captor.getValue().getIngredients());
+        assertEquals("6 oz ham\n1,25 tsp oil\n2 stalk parsley\n1 package sauce\n1 lb potatoes", captor.getValue().getIngredients());
     }
 
     @Test

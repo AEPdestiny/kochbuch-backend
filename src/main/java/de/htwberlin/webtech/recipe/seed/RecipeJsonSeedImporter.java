@@ -530,24 +530,35 @@ public class RecipeJsonSeedImporter {
                 && amountNode.isNumber()
                 && amountNode.asDouble() > 0
                 && amountNode.asDouble() < 0.15
-                && "TL".equals(normalizedUnit);
+                && "tsp".equals(normalizedUnit);
     }
 
     private String normalizedUnit(String unit) {
         if (unit == null || unit.isBlank()) {
             return "";
         }
-        return switch (unit.trim().toLowerCase()) {
-            case "teaspoon", "teaspoons", "tsp", "tsps", "t" -> "TL";
-            case "tablespoon", "tablespoons", "tbsp", "tbsps" -> "EL";
-            case "cup", "cups" -> "Tasse";
-            case "ounce", "ounces", "oz" -> "Unzen";
-            case "pound", "pounds", "lb", "lbs" -> "Pfund";
-            case "clove", "cloves" -> "Zehen";
-            case "bunch" -> "Bund";
-            case "stalk", "stalks" -> "Stiele";
-            case "pinch" -> "Prise";
-            case "piece", "pieces" -> "Stueck";
+        String trimmed = unit.trim();
+        if ("T".equals(trimmed)) {
+            return "tbsp";
+        }
+        if ("t".equals(trimmed)) {
+            return "tsp";
+        }
+        return switch (trimmed.toLowerCase()) {
+            case "gram", "grams" -> "g";
+            case "liter", "liters", "litre", "litres" -> "l";
+            case "teelöffel", "teeloeffel", "teeloffel", "tl", "teaspoon", "teaspoons", "tsp", "tsps" -> "tsp";
+            case "esslöffel", "essloeffel", "essloffel", "el", "tablespoon", "tablespoons", "tbsp", "tbsps" -> "tbsp";
+            case "tasse", "tassen", "cup", "cups" -> "cup";
+            case "ounce", "ounces", "unze", "unzen", "oz" -> "oz";
+            case "pound", "pounds", "pfund", "lb", "lbs" -> "lb";
+            case "clove", "cloves", "zehe", "zehen" -> "clove";
+            case "bunch", "bunches", "bund" -> "bunch";
+            case "stalk", "stalks", "stiel", "stiele" -> "stalk";
+            case "pinch", "pinches", "prise", "prisen" -> "pinch";
+            case "piece", "pieces", "stück", "stueck", "stuck", "stk" -> "piece";
+            case "slice", "slices", "scheibe", "scheiben" -> "slice";
+            case "package", "packages", "pack", "packs", "packung", "packungen", "paket", "pakete" -> "package";
             default -> unit.trim();
         };
     }
