@@ -325,6 +325,14 @@ konsistente Fehlerantworten.
 (`cypress/e2e/smoke.cy.ts`). Codequalität wird über ESLint (inkl. Vue-, TypeScript- und Cypress-Regeln) und Checkstyle durchgesetzt, `vue-tsc` prüft die
 Typkorrektheit vor jedem Produktions-Build.
 
+**GitHub Actions: Backend CI** läuft bei Pushes und Pull Requests auf `main`/`master` sowie manuell per `workflow_dispatch`.
+Der Workflow prüft:
+
+- `./gradlew test`
+- `./gradlew checkstyleMain`
+- `./gradlew checkstyleTest`
+- `./gradlew check`
+
 ## Fazit
 
 Dishly Smart zeigt, wie aus einem einfachen Recipe-CRUD-Fundament durch konsequente fachliche Erweiterung ein zusammenhängendes System entstehen kann:
